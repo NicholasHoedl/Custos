@@ -1,0 +1,255 @@
+# Ledger — Product Specification
+
+**Version:** 0.1 (MVP Planning)
+**Date:** 2026-06-25
+**Status:** Draft — awaiting developer approval
+
+---
+
+## 1. Problem Statement
+
+Dungeons & Dragons sessions generate a constant stream of narrative information — NPC names and motivations, location details, faction politics, quest hooks, offhand quotes that turn out to matter three sessions later. The current state of the art for most players and Dungeon Masters is a mix of scattered handwritten notes, half-filled Google Docs, and memory. Information is routinely lost, misremembered, or impossible to find quickly.
+
+The core failure modes are:
+
+- **Capture friction**: Note-taking tools are too slow to use live at the table. Players stop taking notes because the UI fights them.
+- **Retrieval failure**: Even when notes exist, finding a specific detail from three sessions ago means reading through walls of text.
+- **Context blindness**: When deciding how a character would act, players have no fast way to surface what the character knows, wants, and has experienced.
+
+Ledger solves all three.
+
+---
+
+## 2. Target User
+
+**Primary user:** The developer (a solo D&D player and/or Dungeon Master). This is a personal passion project; there is no external user research phase. All UX decisions should be validated against the developer's own session workflow.
+
+**User profile:**
+- Plays and/or runs D&D campaigns (one or more active campaigns at any time)
+- Takes notes during live sessions (fast input is a hard requirement — the app is used at the table)
+- Reviews and queries notes between sessions
+- Uses Windows 11
+- Has an Anthropic API key and is comfortable providing it in app settings
+- Is the sole user of the machine and data — no multi-user or sharing requirements
+
+---
+
+## 3. The Three Pillars
+
+### Pillar 1: Capture
+
+Low-friction narrative note-taking during live play. The app must not slow down the session.
+
+**What it means:**
+- Fast entry of structured entities: NPCs, locations, factions, quests/plot threads, items, player characters (PCs), and timestamped session events/quotes
+- A campaign-and-session context is always active ("I am taking notes for Campaign X, Session Y")
+- Quick-add entry that does not require navigating deep menus or filling long forms
+- Entities are linked to each other (an NPC belongs to a location, a quest involves a faction, etc.)
+- Notes are freeform text attached to entities; the structure is the entity type, not the note format
+
+**Key flows:**
+- Open the app, resume the active session, start capturing
+- Quick-add: type a name, pick a type, write a note — done in under 10 seconds
+- Link an NPC to a location or faction without leaving the current screen
+
+### Pillar 2: Recall
+
+AI semantic search over the user's notes. Natural-language queries return synthesized, cited answers grounded in the actual notes.
+
+**What it means:**
+- The user types a question in plain English ("what did the innkeeper say about the north road three sessions ago?")
+- The system embeds the query, retrieves the most relevant note chunks from the local vector store, then passes them to Claude with citations enabled
+- Claude synthesizes a direct answer with inline citations pointing back to the source notes
+- Recall works **offline for the retrieval step** (local embeddings + local vector store); the synthesis step requires the Anthropic API
+- Results are streamed for responsive UX
+
+**Key flow:**
+1. User types a natural-language question in the Recall panel
+2. App embeds the query locally (no network call)
+3. App retrieves top-k relevant note chunks from the local vector index
+4. App calls Claude (Sonnet 4.6 default; Opus 4.8 optional) via main process, passing retrieved chunks as document blocks with `citations: {enabled: true}`
+5. Streamed answer appears in the UI with clickable citations linking back to the source entity/note
+6. If offline: retrieval still works; synthesis step is blocked with a clear message ("Synthesis requires network — showing retrieved notes instead")
+
+### Pillar 3: Suggest
+
+In-character action options during live play. Rather than a single suggestion, Ledger surfaces a **spread of plausible in-character responses** so the player can choose. Given the active PC's traits, goals, and the campaign's current situation, Claude determines which **4 attitudes** the PC is *most likely* to adopt and writes a **unique in-character action for each**.
+
+**What it means:**
+- Tied to the currently active player character and campaign context
+- Grounded in the campaign's history (via RAG retrieval — relevant history is pulled, not the whole campaign)
+- The model picks **4 of the attitudes** below (the ones most likely for *this* PC in *this* moment) and returns one distinct in-character action per chosen attitude
+- Uses Claude Opus 4.8 with adaptive thinking (effort `high`, or `medium` if latency is unacceptable at the table) and **structured output**, so the 4 results render as discrete cards
+- Stays in character — the model frames each option as something the PC would actually do, not as a narrator
+
+**Attitude taxonomy** (7 attitudes; the model selects the 4 most likely for this PC in this moment):
+
+| Attitude | Meaning |
+|---|---|
+| Neutral / Default | Impartial, unemotional baseline; no clear alignment ("I don't know what to say") |
+| Friendly / Supportive | Cooperation, trust, alignment with allies ("Let's work together to solve this") |
+| Hostile / Aggressive | Opposition, distrust, willingness to fight ("I'll take care of this myself — no help from you") |
+| Moral / Ethical | Strong sense of right and wrong, often a moral dilemma ("I won't let you hurt anyone") |
+| Selfish / Opportunistic | Personal gain over others' well-being ("I'll take the prize for myself") |
+| Compassionate / Altruistic | Helping others even at personal cost ("I'll help them no matter what") |
+| Cynical / Skeptical | Distrust of others' intentions ("I don't believe you have good intentions") |
+
+**Key flow:**
+1. User opens the Suggest panel with the active PC selected
+2. User describes the current situation in a short free-text field ("We just found out the mayor is corrupt and the party is split on what to do")
+3. App retrieves relevant history (past interactions, PC goals, faction relationships) via RAG
+4. App builds a prompt: system role + cached campaign/character context prefix + retrieved history + current situation, instructing the model to choose the 4 most-likely attitudes and give one in-character action each
+5. Claude Opus 4.8 returns 4 `{attitude, action}` recommendations (structured output)
+6. The 4 options render as distinct attitude cards; the player picks what fits the table
+7. If offline: feature is unavailable; clear message shown
+
+---
+
+## 4. MVP Scope
+
+The MVP delivers all three pillars at their simplest viable form. It is a single-user local desktop app with no sync, no collaboration, and no mobile companion.
+
+### In scope for MVP
+
+**Capture**
+- Campaign management: create, name, describe, and switch between campaigns
+- Session management: create sessions (numbered, dated, with a title/summary field) within a campaign
+- Entity CRUD for: NPCs, Locations, Factions, Quests/Plot Threads, Items, Player Characters (PCs)
+- Freeform notes attached to any entity, timestamped, linked to the session in which they were created
+- Timestamped event/quote log per session (quick one-liner capture with optional entity tag)
+- Basic entity linking (NPC → Location, NPC → Faction, Quest → NPC, etc.)
+- Keyboard-first quick-add flow (global hotkey or persistent quick-add bar)
+- Search/filter within entity lists (local text search, no AI)
+
+**Recall**
+- Local embedding pipeline: notes chunked and embedded on write (or on demand), stored in local vector index
+- Natural-language query interface in a dedicated Recall panel
+- Retrieve top-k chunks → synthesize with Claude → stream cited answer
+- Citations link back to the source entity and note
+- Graceful offline degradation (show retrieved chunks if Claude unavailable)
+
+**Suggest**
+- Suggest panel tied to active PC and campaign
+- Free-text situation input
+- RAG retrieval of relevant context
+- Claude Opus 4.8 (adaptive thinking + structured output) returns **4 attitude-based recommendations** — the model picks the 4 attitudes the PC is most likely to adopt and writes a unique in-character action for each
+- Results render as 4 distinct attitude cards
+- Graceful offline degradation (clear unavailable message)
+
+**Onboarding (first run)**
+- Explicit first-run onboarding step: enter the Anthropic API key and download the local embedding model (~25 MB) with visible progress, before AI features (Recall / Suggest) are enabled
+
+**Settings**
+- API key entry and secure storage (Electron safeStorage)
+- Model selection for Recall synthesis (Sonnet 4.6 / Opus 4.8)
+- Basic app preferences (theme, font size)
+
+**Infrastructure**
+- Single-window Electron shell with React + TypeScript + Tailwind + shadcn/ui
+- Local SQLite database for all note/entity data
+- Local vector index (SQLite-backed, see Architecture)
+- All Claude calls routed through Electron main process (renderer never sees the API key)
+- IPC bridge with typed contracts between renderer and main
+
+### Out of scope for MVP
+
+These are explicitly deferred. Do not design the MVP around them.
+
+- Multi-user or sync (no cloud backend, no accounts, no auth)
+- Mobile companion app
+- Dice rolling or initiative tracker (separate concerns)
+- PDF / rulebook ingestion or RAG over external documents
+- Agentic RAG (Claude calling a search tool autonomously — MVP is retrieve-then-synthesize, single LLM call)
+- Audio transcription of sessions
+- Image/map attachment to entities
+- Campaign export / import / sharing
+- Plugin system or extensibility hooks
+- Analytics, telemetry, or crash reporting
+- Automated session summarization
+- Calendar or session scheduling
+- Character sheet management (Ledger tracks narrative, not stats)
+
+---
+
+## 5. Success Criteria
+
+The MVP is successful when the developer can:
+
+1. Open the app at the start of a D&D session and capture NPC names, quotes, and location details in under 10 seconds per entry without losing the thread of play
+2. After a session, ask "what did [NPC] say about [topic] in session [N]?" and receive a coherent, cited answer that correctly references the source note
+3. During a difficult roleplay moment, open the Suggest panel, describe the situation in a sentence, and receive **4 plausible, distinct in-character options** — one per the attitudes the PC is most likely to adopt — within an acceptable latency window (target: results within a few seconds on a normal home internet connection; the adaptive-thinking pass is the main cost)
+4. Close and reopen the app with all data intact (local-first persistence confirmed)
+5. Use the app with the API key stored securely and never visible in logs, renderer console, or network traffic from the renderer process
+
+---
+
+## 6. Key User Flows
+
+### Flow A: Starting a Session
+
+1. Launch Ledger
+2. Select active campaign from sidebar (or create new campaign)
+3. Create new session (auto-incrementing number, today's date, optional title)
+4. Session is now active — quick-add bar is live
+
+### Flow B: Capturing During Play
+
+1. NPC is introduced: press quick-add hotkey, type name "Aldric Vane", select type "NPC", add note "Innkeeper of the Copper Kettle; suspicious of strangers; knows about the north road ambush" — press Enter
+2. Quote is dropped: press quick-add hotkey, select type "Event/Quote", type the quote, optionally tag the NPC — press Enter
+3. Quest hook appears: quick-add, type quest name, type "Quest", brief note — press Enter
+4. All entries are timestamped and linked to the current session automatically
+
+### Flow C: Recall Query Between Sessions
+
+1. Open Recall panel
+2. Type "What did Aldric say about the north road?"
+3. App embeds query locally, retrieves top-k chunks
+4. Claude synthesizes: "In Session 3, Aldric Vane told the party that bandits had been ambushing caravans on the north road for the past month [Note: Session 3 > NPC: Aldric Vane]."
+5. User clicks citation to jump to the source note
+
+### Flow D: Suggest During Play
+
+1. Difficult roleplay moment: the party has discovered the mayor is corrupt
+2. Open Suggest panel — active PC (e.g. "Seraphina, a paladin of justice with a lawful-good alignment and a personal vendetta against corrupt officials") is shown
+3. User types situation: "We just confirmed the mayor is taking bribes from the thieves' guild. The party wants to expose him publicly but Seraphina's order forbids acting without evidence presented to proper authorities."
+4. App retrieves: Seraphina's traits/goals, past interactions with the mayor, relevant faction relationships
+5. Claude Opus 4.8 returns the 4 attitudes most likely for Seraphina here, each as its own card — e.g. **Moral/Ethical** ("Insist the party gather admissible evidence and present it to the high magistrate before acting"), **Compassionate/Altruistic** ("Protect the townsfolk the corruption is hurting — warn them quietly first"), **Hostile/Aggressive** ("Confront the mayor directly and demand he answer for it"), **Cynical/Skeptical** ("Assume the guild has leverage; find out who else is compromised before trusting anyone")
+6. The player reads the 4 options and picks the one that fits the table
+
+---
+
+## 7. Non-Goals (Explicit)
+
+- **Not a character sheet tool.** HP, spell slots, inventory stats — out of scope.
+- **Not a VTT (virtual tabletop).** No maps, tokens, dice, or initiative.
+- **Not a multi-user tool.** No sharing, collaboration, or cloud sync.
+- **Not a general AI assistant.** Claude is used only for Recall synthesis and Suggest; it does not have an open chat interface.
+- **Not a campaign creator.** Ledger tracks what has happened, not what could happen (no random tables, no generators).
+- **Not a web app.** Electron desktop only; no browser hosting.
+
+---
+
+## 8. Assumptions (Stated Explicitly)
+
+1. The developer is always the sole user of a given Ledger installation.
+2. A typical campaign will have 20–100 sessions and a few hundred to a few thousand individual notes/entities — not millions of records. This informs the choice to use SQLite and a simple vector store rather than a production-scale database.
+3. The developer has a stable Anthropic API key and accepts that Recall synthesis and Suggest require internet connectivity.
+4. The developer is willing to run a local embedding model on their Windows 11 machine; CPU-only inference is acceptable given the modest data volume.
+5. "Live at the table" means same-room physical play (not online VTT). The app is on a laptop or desktop next to the DM screen.
+6. Latency expectation for Suggest: first token within 3 seconds is a target, not a hard SLA. Streaming mitigates perceived latency.
+7. The developer wants to approve the tech stack before coding begins — this spec is a proposal, not a mandate.
+
+---
+
+## 9. Open Questions
+
+**Resolved by the developer (2026-06-25):**
+- **Quick-add hotkey** → a system-level **global** hotkey is in scope for the MVP; the window architecture accounts for it from Phase 0 (see ARCHITECTURE §3).
+- **Entity scope** → entities are **always campaign-scoped** for the MVP; world-level / shared entities are deferred.
+- **Color palette**, **vector-store packaging** (native `.dll` accepted), and **model-download UX** (explicit onboarding step) → resolved; see ARCHITECTURE and ROADMAP.
+- **Suggest attitude set** → confirmed **7 attitudes** (the "8" was a miscount); Suggest selects **4 of 7**.
+- **Window layout** → **single-window with panel switching** (sidebar nav swaps a single main content view; one feature at a time; no persistent AI drawer for the MVP).
+
+**Still open:**
+1. **Chunking strategy for notes:** one chunk per note (assumed for MVP) vs. sentence-boundary or fixed-size chunks. Revisit if notes get long.
+2. **Embedding performance:** confirm CPU-only `all-MiniLM-L6-v2` inference is acceptable on the developer's machine before committing.
