@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (recommendation: Zustand; confirm during Phase 0)
+Accepted — confirmed in Phase 0 (the app shell uses Zustand stores `ui-store` and `app-store`).
 
 **Date:** 2026-06-25
 **Deciders:** Solo developer
@@ -39,15 +39,15 @@ shell (ROADMAP P0-05) and the feature views.
 
 ## Decision
 
-(Proposed) Use **Zustand** for shared renderer state; keep purely local state in component
+Use **Zustand** for shared renderer state; keep purely local state in component
 `useState`.
 
 ## Rationale
 
 The shared state here is small but cross-cutting (active selections, streaming/loading) —
 exactly where Context's coarse re-renders hurt and Redux is overkill. Zustand's selective
-subscriptions and minimal boilerplate fit a solo-dev MVP. Marked **Proposed** to confirm once
-the shell exists in Phase 0; revisit if plain Context turns out to be sufficient.
+subscriptions and minimal boilerplate fit a solo-dev MVP. Confirmed in
+Phase 0 — the app shell uses Zustand stores (`ui-store`, `app-store`).
 
 ## Consequences
 

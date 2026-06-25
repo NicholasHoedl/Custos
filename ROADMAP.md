@@ -35,11 +35,11 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Expected output: `electron-vite dev` starts without errors; hot reload works
 
 **P0-02: Tailwind + shadcn/ui setup**
-- Install Tailwind CSS v4 and configure `tailwind.config.ts`
+- Install Tailwind CSS v4 (the `@tailwindcss/vite` plugin); configuration is **CSS-first** via an `@theme` block in globals.css — no `tailwind.config.ts`
 - Run `shadcn init` with the project's component output directory (`src/renderer/components/ui`)
 - Install initial shadcn primitives: Button, Card, Dialog, Input, Textarea, ScrollArea, Separator, Badge, Tooltip
 - Create `src/renderer/styles/globals.css` with CSS custom properties for the confirmed color palette (cool cyan→slate→charcoal; dark-first — dominant = jet-black/slate, single sharp accent = vivid cyan `#32e5eb`; see ARCHITECTURE §1 "Color Palette & Design Language" for the full Tailwind palette and the anti-"beige ledger" guardrails), plus font-face declarations for Bricolage Grotesque, Fraunces, and JetBrains Mono
-- Configure `tailwind.config.ts` to extend theme with the CSS variables
+- Expose the semantic tokens to Tailwind via an `@theme inline` block in globals.css (Tailwind v4 CSS-first; no `tailwind.config.ts`)
 - Verify fonts render correctly in the Electron window
 - Expected output: A styled "Ledger" heading in Fraunces renders; a shadcn Button renders; no inline styles present
 

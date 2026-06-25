@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+
+/*
+ * Ledger design system.
+ * Dark-first cool palette — NOT a generic recolor. See ARCHITECTURE.md §1.
+ * The accent (vivid cyan) is reserved for focus, active state, and affordances.
+ */
+
+:root {
+  /* ---- Palette (verbatim from the developer's Tailwind config) ---- */
+  --light-cyan: #e0fbfc;
+  --light-cyan-100: #095456;
+  --light-cyan-200: #11a7ad;
+  --light-cyan-300: #32e5eb;
+  --light-cyan-400: #88f0f3;
+  --light-cyan-500: #e0fbfc;
+  --light-cyan-600: #e5fcfc;
+  --light-cyan-700: #ecfcfd;
+  --light-cyan-800: #f2fdfe;
+  --light-cyan-900: #f9fefe;
+
+  --light-blue: #c2dfe3;
+  --light-blue-100: #1b363a;
+  --light-blue-200: #356d74;
+  --light-blue-300: #50a3ae;
+  --light-blue-400: #8ac2c9;
+  --light-blue-500: #c2dfe3;
+  --light-blue-600: #cfe6e9;
+  --light-blue-700: #dbecef;
+  --light-blue-800: #e7f3f4;
+  --light-blue-900: #f3f9fa;
+
+  --cool-steel: #9db4c0;
+  --cool-steel-100: #1b252a;
+  --cool-steel-200: #364a55;
+  --cool-steel-300: #516f7f;
+  --cool-steel-400: #7192a4;
+  --cool-steel-500: #9db4c0;
+  --cool-steel-600: #afc2cc;
+  --cool-steel-700: #c3d1d9;
+  --cool-steel-800: #d7e1e6;
+  --cool-steel-900: #ebf0f2;
+
+  --blue-slate: #5c6b73;
+  --blue-slate-100: #131617;
+  --blue-slate-200: #252b2e;
+  --blue-slate-300: #384146;
+  --blue-slate-400: #4a565d;
+  --blue-slate-500: #5c6b73;
+  --blue-slate-600: #798b94;
+  --blue-slate-700: #9ba8af;
+  --blue-slate-800: #bcc5c9;
+  --blue-slate-900: #dee2e4;
+
+  --jet-black: #253237;
+  --jet-black-100: #070a0b;
+  --jet-black-200: #0f1416;
+  --jet-black-300: #161e21;
+  --jet-black-400: #1d282c;
+  --jet-black-500: #253237;
+  --jet-black-600: #465f69;
+  --jet-black-700: #688c9b;
+  --jet-black-800: #9bb3bc;
+  --jet-black-900: #cdd9de;
+
+  /* ---- Semantic roles (dark-first) ---- */
+  --background: var(--jet-black-500);
+  --foreground: var(--blue-slate-900);
+  --surface: #2a373e; /* subtle in-family lift above the canvas */
+  --surface-raised: var(--blue-slate-300);
+  --card: #2a373e;
+  --card-foreground: var(--blue-slate-900);
+  --popover: #2a373e;
+  --popover-foreground: var(--blue-slate-900);
+  --primary: var(--light-cyan-300); /* THE accent — vivid cyan */
+  --primary-foreground: var(--jet-black-100);
+  --secondary: var(--blue-slate-300);
+  --secondary-foreground: var(--blue-slate-900);
+  --muted: var(--jet-black-400);
+  --muted-foreground: var(--cool-steel-500);
+  --accent: var(--light-cyan-200); /* deep accent for hover/active fills */
+  --accent-foreground: var(--light-cyan-500);
+  --destructive: #c2554a;
+  --destructive-foreground: #fbeae8;
+  --border: var(--blue-slate-300);
+  --input: var(--blue-slate-300);
+  --ring: var(--light-cyan-300);
+  --sidebar: var(--jet-black-400); /* a half-step darker than the canvas */
+  --sidebar-foreground: var(--cool-steel-500);
+
+  --radius: 0.5rem;
+
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-body: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+/* ---- Expose semantic roles to Tailwind v4 utilities ---- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}

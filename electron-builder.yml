@@ -1,0 +1,21 @@
+appId: com.ledger.app
+productName: Ledger
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!{.eslintcache,eslint.config.mjs,.prettierrc.yaml,.prettierignore,.editorconfig}'
+  - '!{.env,.env.*,.npmrc}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,drizzle.config.ts,electron.vite.config.ts}'
+  - '!{SPEC.md,ARCHITECTURE.md,ROADMAP.md,docs}'
+  - '!tests'
+# Native better-sqlite3 cannot run from inside app.asar — keep it unpacked (ADR-003/004).
+asarUnpack:
+  - resources/**
+  - '**/node_modules/better-sqlite3/**'
+# Bundle Drizzle migrations so migrate() can find them at process.resourcesPath/drizzle.
+extraResources:
+  - from: drizzle
+    to: drizzle
+win:
+  target: nsis

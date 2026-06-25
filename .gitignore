@@ -1,0 +1,24 @@
+node_modules
+dist
+out
+*.log
+.DS_Store
+
+# Local SQLite data
+*.db
+*.db-shm
+*.db-wal
+
+# Downloaded ONNX models (Phase 2)
+resources/models/*
+!resources/models/.gitkeep
+
+# Env / secrets
+.env
+.env.*
+
+# Tooling caches
+.eslintcache
+.vite
+test-results
+playwright-report

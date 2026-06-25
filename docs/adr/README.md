@@ -18,7 +18,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [004](004-local-datastore.md) | Local datastore: SQLite + better-sqlite3 + Drizzle ORM | Accepted | 2026-06-25 |
 | [005](005-api-key-storage.md) | API key storage: Electron safeStorage (DPAPI) | Accepted | 2026-06-25 |
 | [006](006-build-tooling.md) | Build tooling: electron-vite | Accepted | 2026-06-25 |
-| [007](007-renderer-state-management.md) | Renderer state management: Zustand | Proposed | 2026-06-25 |
+| [007](007-renderer-state-management.md) | Renderer state management: Zustand | Accepted | 2026-06-25 |
 | [008](008-streaming-ipc-protocol.md) | Streaming IPC protocol: custom typed channels | Accepted | 2026-06-25 |
 | [009](009-suggest-output-model.md) | Suggest output model: multi-attitude structured output | Accepted | 2026-06-25 |
 | [010](010-global-hotkey-behavior.md) | Global quick-add hotkey behavior | Proposed | 2026-06-25 |

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (decide during Phase 0)
+Proposed — Phase 0 ships the interim **focus-main** scaffolding (single-instance lock + `globalShortcut`); the popup-vs-focus behavior is decided in Phase 1 (P1-07).
 
 **Date:** 2026-06-25
 **Deciders:** Solo developer

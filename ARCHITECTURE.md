@@ -15,7 +15,7 @@ The stack is chosen to minimize packaging complexity, leverage the developer's e
 | Layer | Choice | Rationale |
 |---|---|---|
 | Shell | Electron (latest stable) | Confirmed decision. Local-first, full OS access for safeStorage and file system. |
-| Renderer framework | React 18 + TypeScript | Confirmed decision. Large ecosystem, shadcn/ui is React-native. |
+| Renderer framework | React 19 + TypeScript | Confirmed (React 19 chosen in Phase 0). Large ecosystem; shadcn/ui is React-native. |
 | Styling | Tailwind CSS v4 + shadcn/ui | Confirmed decision. Utility-first, no CSS modules. shadcn primitives for all standard UI components. |
 | Renderer bundler | Vite (with electron-vite wrapper) | Best DX for Electron + React + TypeScript in 2025/26. Fast HMR, good Electron integration. |
 | Main process language | TypeScript (compiled via electron-vite) | Same language as renderer; no context switching; strong types for IPC contracts. |
@@ -39,7 +39,7 @@ Loaded via CSS `@font-face` or a bundled font package:
 
 ### Color Palette & Design Language (required by aesthetic rules)
 
-All color tokens live in `src/renderer/styles/globals.css` as CSS custom properties; `tailwind.config.ts` extends the theme to consume them. No inline styles; no CSS modules.
+All color tokens live in `src/renderer/src/styles/globals.css` as CSS custom properties. **Tailwind v4 is CSS-first** — the `@tailwindcss/vite` plugin plus an `@theme inline` block consume those variables, so there is **no `tailwind.config.ts`**. Fonts are self-hosted via `@fontsource` (bundled woff2, offline-ready). As built in Phase 0, the renderer app lives under `src/renderer/src/` (electron-vite layout) with cross-process code in `src/shared/`. No inline styles; no CSS modules.
 
 **Developer-provided palette (Tailwind format) — use verbatim:**
 
@@ -448,12 +448,13 @@ ledger/
 ├── ROADMAP.md
 │
 ├── package.json
-├── tsconfig.json                   # base TS config
-├── tsconfig.main.json              # main process TS config
-├── tsconfig.renderer.json          # renderer TS config
-├── electron-vite.config.ts         # electron-vite build config
-├── tailwind.config.ts              # extends CSS vars
-├── components.json                 # shadcn/ui config
+├── tsconfig.json                   # references node + web
+├── tsconfig.node.json              # main + preload + shared
+├── tsconfig.web.json               # renderer
+├── electron.vite.config.ts         # electron-vite build config
+├── electron-builder.yml            # packaging (asarUnpack better-sqlite3; extraResources drizzle)
+├── drizzle.config.ts               # Drizzle Kit config
+├── components.json                 # shadcn/ui config — Tailwind v4 is CSS-first (no tailwind.config.ts)
 │
 ├── src/
 │   ├── shared/                     # code shared between main and renderer
