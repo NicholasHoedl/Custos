@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { APP_ID, APP_NAME, DEFAULT_HOTKEY } from '@shared/constants'
+import { QUICK_ADD_FOCUS_CHANNEL } from '@shared/ipc-types'
 import { getDb, dbHealthCheck } from './db'
 import { registerIpcHandlers } from './ipc/handlers'
 
@@ -74,7 +75,10 @@ if (!gotTheLock) {
 
     // Global quick-add hotkey. ADR-010: Phase 0 ships the focus-main behavior; the
     // popup-vs-focus decision is made in Phase 1. The hotkey is configurable (Settings).
-    const registered = globalShortcut.register(DEFAULT_HOTKEY, showAndFocusMainWindow)
+    const registered = globalShortcut.register(DEFAULT_HOTKEY, () => {
+      showAndFocusMainWindow()
+      mainWindow?.webContents.send(QUICK_ADD_FOCUS_CHANNEL)
+    })
     if (!registered) {
       console.warn(`[ledger] could not register global hotkey "${DEFAULT_HOTKEY}" (already in use?)`)
     }

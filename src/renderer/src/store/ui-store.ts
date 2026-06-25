@@ -4,10 +4,21 @@ export type ViewKey = 'capture' | 'recall' | 'suggest' | 'settings'
 
 interface UiState {
   activeView: ViewKey
+  /** Bumped to request the quick-add bar focus itself (global hotkey / Ctrl+K). */
+  quickAddNonce: number
+  /** Bumped to request the sidebar search focus itself (Ctrl+F). */
+  searchFocusNonce: number
   setActiveView: (view: ViewKey) => void
+  requestQuickAddFocus: () => void
+  requestSearchFocus: () => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
   activeView: 'capture',
-  setActiveView: (activeView) => set({ activeView })
+  quickAddNonce: 0,
+  searchFocusNonce: 0,
+  setActiveView: (activeView) => set({ activeView }),
+  requestQuickAddFocus: () =>
+    set((s) => ({ activeView: 'capture', quickAddNonce: s.quickAddNonce + 1 })),
+  requestSearchFocus: () => set((s) => ({ searchFocusNonce: s.searchFocusNonce + 1 }))
 }))

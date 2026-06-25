@@ -13,6 +13,17 @@ export const ENTITY_TYPES: readonly EntityType[] = [
   'event'
 ]
 
+/** Human labels for entity types (UI). */
+export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
+  npc: 'NPC',
+  location: 'Location',
+  faction: 'Faction',
+  quest: 'Quest',
+  item: 'Item',
+  pc: 'Player Character',
+  event: 'Event'
+}
+
 export interface Campaign {
   id: string
   name: string
@@ -37,8 +48,9 @@ export interface Entity {
   type: EntityType
   name: string
   description: string | null
-  traits: string[]
-  goals: string[]
+  traits: string[] // promoted (Suggest reads these)
+  goals: string[] // promoted
+  attributes: Record<string, unknown> // open bag of type-specific fields
   status: string | null
   createdAt: number
   updatedAt: number
@@ -57,8 +69,10 @@ export interface EntityLink {
   id: string
   fromEntityId: string
   toEntityId: string
-  relation: string
+  relation: string // forward RelationKey (see @shared/relations)
+  description: string | null // the "why/when" of the edge — the RAG-context lever
   campaignId: string
+  createdAt: number | null
 }
 
 export interface EventLogEntry {

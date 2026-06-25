@@ -1,17 +1,18 @@
-import { test, expect, _electron as electron } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
-import { join } from 'path'
+import { cleanup, launchApp } from './helpers'
 
 let app: ElectronApplication
 let page: Page
+let userDataDir: string
 
 test.beforeAll(async () => {
-  app = await electron.launch({ args: [join(__dirname, '..', '..', 'out', 'main', 'index.js')] })
-  page = await app.firstWindow()
+  ;({ app, page, userDataDir } = await launchApp())
 })
 
 test.afterAll(async () => {
   await app?.close()
+  cleanup(userDataDir)
 })
 
 test('launches with the Ledger window title', async () => {
