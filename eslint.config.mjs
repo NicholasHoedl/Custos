@@ -1,7 +1,7 @@
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['**/node_modules', '**/dist', '**/out', 'drizzle/**', 'resources/**'] },
+  { ignores: ['**/node_modules', '**/dist', '**/out', 'drizzle/**', 'resources/**', '_*.cjs'] },
   ...tseslint.configs.recommended,
   {
     rules: {

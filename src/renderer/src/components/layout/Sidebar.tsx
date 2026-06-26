@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, Plus, ScrollText, Search, Settings, Sparkles } from 'lucide-react'
+import {
+  BookOpen,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  ScrollText,
+  Search,
+  Settings,
+  Sparkles,
+  Trash2
+} from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign, Session } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
@@ -27,6 +37,21 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@renderer/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@renderer/components/ui/dropdown-menu'
 
 const NAV: { key: ViewKey; label: string; icon: typeof ScrollText }[] = [
   { key: 'capture', label: 'Capture', icon: ScrollText },
@@ -91,6 +116,10 @@ function CampaignSelector() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const setActiveCampaign = useAppStore((s) => s.setActiveCampaign)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  const activeCampaign = campaigns.find((c) => c.id === activeCampaignId) ?? null
 
   // If the persisted campaign no longer exists, clear the stale selection once campaigns load.
   useEffect(() => {
@@ -106,7 +135,7 @@ function CampaignSelector() {
   return (
     <div className="flex items-center gap-1.5">
       <Select value={activeCampaignId ?? ''} onValueChange={(v) => setActiveCampaign(v)}>
-        <SelectTrigger className="flex-1">
+        <SelectTrigger className="min-w-0 flex-1">
           <SelectValue placeholder="Select campaign" />
         </SelectTrigger>
         <SelectContent>
@@ -117,6 +146,25 @@ function CampaignSelector() {
           ))}
         </SelectContent>
       </Select>
+      {activeCampaign && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Campaign actions">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+              <Pencil />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       <Button
         variant="outline"
         size="icon"
@@ -133,6 +181,25 @@ function CampaignSelector() {
           setActiveCampaign(c.id)
         }}
       />
+      {activeCampaign && (
+        <>
+          <EditCampaignDialog
+            campaign={activeCampaign}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            onSaved={refresh}
+          />
+          <DeleteCampaignDialog
+            campaign={activeCampaign}
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            onDeleted={() => {
+              setActiveCampaign(null)
+              refresh()
+            }}
+          />
+        </>
+      )}
     </div>
   )
 }
@@ -222,6 +289,185 @@ function CreateCampaignDialog({
   )
 }
 
+function EditCampaignDialog({
+  campaign,
+  open,
+  onOpenChange,
+  onSaved
+}: {
+  campaign: Campaign
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+}) {
+  const [name, setName] = useState(campaign.name)
+  const [description, setDescription] = useState(campaign.description ?? '')
+  const [busy, setBusy] = useState(false)
+
+  // Re-seed the fields from the campaign each time the dialog opens (it stays mounted between opens).
+  useEffect(() => {
+    if (open) {
+      setName(campaign.name)
+      setDescription(campaign.description ?? '')
+    }
+  }, [open, campaign])
+
+  async function submit() {
+    const trimmed = name.trim()
+    if (!trimmed || busy) return
+    setBusy(true)
+    try {
+      await ledger.campaign.update(campaign.id, {
+        name: trimmed,
+        description: description.trim() || null
+      })
+      toast.success('Campaign updated', { description: trimmed })
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      toast.error('Could not update campaign', { description: String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">Edit campaign</DialogTitle>
+          <DialogDescription>Rename this campaign or update its description.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="ec-name">Name</Label>
+            <Input
+              id="ec-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submit()
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ec-desc">Description (optional)</Label>
+            <Textarea
+              id="ec-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={!name.trim() || busy}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteCampaignDialog({
+  campaign,
+  open,
+  onOpenChange,
+  onDeleted
+}: {
+  campaign: Campaign
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDeleted: () => void
+}) {
+  const [confirm, setConfirm] = useState('')
+  const [counts, setCounts] = useState<{ entities: number; sessions: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  // Load what's at stake (entity/session counts) so the warning is concrete; reset on close.
+  useEffect(() => {
+    if (!open) {
+      setConfirm('')
+      setCounts(null)
+      return
+    }
+    let alive = true
+    Promise.all([ledger.entity.list(campaign.id), ledger.session.list(campaign.id)])
+      .then(([entities, sessions]) => {
+        if (alive) setCounts({ entities: entities.length, sessions: sessions.length })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [open, campaign.id])
+
+  const match = confirm.trim() === campaign.name
+
+  async function doDelete() {
+    if (!match || busy) return
+    setBusy(true)
+    try {
+      await ledger.campaign.delete(campaign.id)
+      toast.success('Campaign deleted', { description: campaign.name })
+      onOpenChange(false)
+      onDeleted()
+    } catch (err) {
+      toast.error('Could not delete campaign', { description: String(err) })
+      setBusy(false) // keep the dialog open so the typed confirmation isn't lost
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display">Delete {campaign.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently deletes the entire campaign
+            {counts
+              ? ` — all ${counts.entities} ${counts.entities === 1 ? 'entity' : 'entities'}, ${counts.sessions} ${counts.sessions === 1 ? 'session' : 'sessions'}, and every note, relationship, and AI persona within it`
+              : ', including all its entities, notes, relationships, sessions, and AI personas'}
+            . This can’t be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="dc-confirm">
+            Type <span className="font-medium text-foreground">{campaign.name}</span> to confirm
+          </Label>
+          <Input
+            id="dc-confirm"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoFocus
+            autoComplete="off"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && match) {
+                e.preventDefault()
+                doDelete()
+              }
+            }}
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <Button variant="destructive" onClick={doDelete} disabled={!match || busy}>
+            Delete campaign
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 function sessionLabel(s: Session): string {
   const suffix = s.title ? ` · ${s.title}` : s.date ? ` · ${s.date}` : ''
   return `Session ${s.number}${suffix}`
@@ -232,10 +478,15 @@ function SessionControl({ campaignId }: { campaignId: string }) {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
   const [busy, setBusy] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
-  // Auto-select the most recent session when none is active (so notes link to a session by default).
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
+
+  // Auto-select the most recent session whenever the active one isn't a valid session in this campaign
+  // — covers first load (none active) and recovery after the active session is deleted.
   useEffect(() => {
-    if (!activeSessionId && sessions.length > 0) {
+    if (sessions.length > 0 && !sessions.some((s) => s.id === activeSessionId)) {
       const latest = sessions.reduce((a, b) => (a.number >= b.number ? a : b))
       setActiveSession(latest.id)
     }
@@ -263,7 +514,7 @@ function SessionControl({ campaignId }: { campaignId: string }) {
         onValueChange={setActiveSession}
         disabled={sessions.length === 0}
       >
-        <SelectTrigger className="flex-1">
+        <SelectTrigger className="min-w-0 flex-1">
           <SelectValue placeholder="No sessions" />
         </SelectTrigger>
         <SelectContent>
@@ -276,6 +527,25 @@ function SessionControl({ campaignId }: { campaignId: string }) {
             ))}
         </SelectContent>
       </Select>
+      {activeSession && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Session actions">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+              <Pencil />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       <Button
         variant="outline"
         size="icon"
@@ -285,7 +555,172 @@ function SessionControl({ campaignId }: { campaignId: string }) {
       >
         <Plus className="size-4" />
       </Button>
+      {activeSession && (
+        <>
+          <EditSessionDialog
+            session={activeSession}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            onSaved={refresh}
+          />
+          <DeleteSessionDialog
+            session={activeSession}
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            onDeleted={() => {
+              setActiveSession(null) // the auto-select effect re-picks the latest remaining session
+              refresh()
+            }}
+          />
+        </>
+      )}
     </div>
+  )
+}
+
+function EditSessionDialog({
+  session,
+  open,
+  onOpenChange,
+  onSaved
+}: {
+  session: Session
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+}) {
+  const [title, setTitle] = useState(session.title ?? '')
+  const [date, setDate] = useState(session.date ?? '')
+  const [summary, setSummary] = useState(session.summary ?? '')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setTitle(session.title ?? '')
+      setDate(session.date ?? '')
+      setSummary(session.summary ?? '')
+    }
+  }, [open, session])
+
+  async function submit() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await ledger.session.update(session.id, {
+        title: title.trim() || null,
+        date: date.trim() || null,
+        summary: summary.trim() || null
+      })
+      toast.success(`Session ${session.number} updated`)
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      toast.error('Could not update session', { description: String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">Edit session {session.number}</DialogTitle>
+          <DialogDescription>Update this session’s title, date, or summary.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="es-title">Title (optional)</Label>
+            <Input
+              id="es-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submit()
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="es-date">Date (optional)</Label>
+            <Input
+              id="es-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="es-summary">Summary (optional)</Label>
+            <Textarea
+              id="es-summary"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteSessionDialog({
+  session,
+  open,
+  onOpenChange,
+  onDeleted
+}: {
+  session: Session
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDeleted: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function doDelete() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await ledger.session.delete(session.id)
+      toast.success(`Session ${session.number} deleted`)
+      onOpenChange(false)
+      onDeleted()
+    } catch (err) {
+      toast.error('Could not delete session', { description: String(err) })
+      setBusy(false)
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display">Delete session {session.number}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the session and its event-log entries. Notes captured during it are kept, but
+            they’ll no longer be linked to a session. This can’t be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <Button variant="destructive" onClick={doDelete} disabled={busy}>
+            Delete
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 

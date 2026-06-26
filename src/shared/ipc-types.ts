@@ -10,6 +10,15 @@ import type {
 } from './entity-types'
 import type { RelationKey } from './relations'
 import type { EntityContext, HierarchyView, RelationshipView } from './graph-types'
+import type {
+  ModelDownloadProgress,
+  OnboardingStatus,
+  PersonaBrief,
+  RecallChunk,
+  RecallDone,
+  RecallError,
+  RecallRequest
+} from './recall-types'
 
 // ---- Input payloads ----
 export interface CreateCampaignInput {
@@ -77,12 +86,14 @@ export interface LedgerApi {
     get(id: string): Promise<Campaign | null>
     create(input: CreateCampaignInput): Promise<Campaign>
     update(id: string, patch: UpdateCampaignInput): Promise<Campaign>
+    delete(id: string): Promise<void>
   }
   session: {
     list(campaignId: string): Promise<Session[]>
     get(id: string): Promise<Session | null>
     create(input: CreateSessionInput): Promise<Session>
     update(id: string, patch: UpdateSessionInput): Promise<Session>
+    delete(id: string): Promise<void>
   }
   entity: {
     list(campaignId: string, type?: EntityType): Promise<Entity[]>
@@ -119,10 +130,31 @@ export interface LedgerApi {
   }
   apikey: {
     set(key: string): Promise<void>
+    exists(): Promise<boolean>
     validate(): Promise<{ valid: boolean }>
+    clear(): Promise<void>
+  }
+  recall: {
+    query(input: RecallRequest): Promise<{ requestId: string }>
+    cancel(requestId: string): Promise<void>
+  }
+  persona: {
+    get(entityId: string): Promise<PersonaBrief | null>
+    generate(entityId: string): Promise<PersonaBrief>
+    update(entityId: string, brief: string): Promise<PersonaBrief>
+  }
+  onboarding: {
+    status(): Promise<OnboardingStatus>
+    downloadModel(): Promise<void>
+    reindex(): Promise<number>
   }
   /** Subscribe to the main process asking the renderer to focus quick-add (global hotkey / Ctrl+K). */
   onQuickAddFocus(callback: () => void): () => void
+  /** Streaming Recall events (filter by requestId in the renderer). Each returns an unsubscribe fn. */
+  onRecallChunk(callback: (chunk: RecallChunk) => void): () => void
+  onRecallDone(callback: (done: RecallDone) => void): () => void
+  onRecallError(callback: (err: RecallError) => void): () => void
+  onModelDownloadProgress(callback: (progress: ModelDownloadProgress) => void): () => void
 }
 
 /** Channel names — the single source of truth shared by the preload and the main-process handlers. */
@@ -131,10 +163,12 @@ export const IPC = {
   campaignGet: 'campaign:get',
   campaignCreate: 'campaign:create',
   campaignUpdate: 'campaign:update',
+  campaignDelete: 'campaign:delete',
   sessionList: 'session:list',
   sessionGet: 'session:get',
   sessionCreate: 'session:create',
   sessionUpdate: 'session:update',
+  sessionDelete: 'session:delete',
   entityList: 'entity:list',
   entityGet: 'entity:get',
   entityCreate: 'entity:create',
@@ -155,13 +189,28 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   apikeySet: 'apikey:set',
-  apikeyValidate: 'apikey:validate'
+  apikeyExists: 'apikey:exists',
+  apikeyValidate: 'apikey:validate',
+  apikeyClear: 'apikey:clear',
+  recallQuery: 'recall:query',
+  recallCancel: 'recall:cancel',
+  personaGet: 'persona:get',
+  personaGenerate: 'persona:generate',
+  personaUpdate: 'persona:update',
+  onboardingStatus: 'onboarding:status',
+  modelDownload: 'onboarding:download-model',
+  onboardingReindex: 'onboarding:reindex'
 } as const
 
 /** One-way channel: main -> renderer, asking the UI to focus the quick-add bar. */
 export const QUICK_ADD_FOCUS_CHANNEL = 'ui:quick-add-focus'
 
-// ---- Phase 2 (declared for reference; intentionally NOT wired in Phase 1) ----
-//   'recall:query'  -> streamed tokens + final citations (streaming)
+// ---- One-way streaming channels: main -> renderer (Recall). Payloads are requestId-tagged. ----
+export const RECALL_CHUNK_CHANNEL = 'stream:chunk'
+export const RECALL_DONE_CHANNEL = 'stream:done'
+export const RECALL_ERROR_CHANNEL = 'stream:error'
+/** One-way: main -> renderer, embedding-model download progress (onboarding). */
+export const MODEL_DOWNLOAD_PROGRESS_CHANNEL = 'onboarding:model-progress'
+
+// ---- Phase 3 (declared for reference; NOT wired yet) ----
 //   'suggest:query' -> SuggestResult (structured: 4 of 7 attitude recommendations)
-//   'stream:chunk' | 'stream:done' | 'stream:error'

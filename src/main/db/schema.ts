@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, blob, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Phase 1: a typed property graph. Entities are nodes; entity_link rows are typed, directed edges.
 // Containment hierarchy (located_in/contains, member_of/has_member) is just edges traversed with
@@ -109,3 +109,44 @@ export const eventLog = sqliteTable(
   },
   (t) => [index('event_session_idx').on(t.sessionId)]
 )
+
+// ---- Phase 2 (Recall) ----
+// Local embeddings for RAG. One row per note / per entity (name+description). The vector is a float32
+// array stored as a BLOB; campaign scope is derived by joining back to entity.campaignId. Brute-force
+// cosine over these at MVP scale (ADR-012); sqlite-vec can replace the store later without schema change.
+
+export const noteEmbedding = sqliteTable('note_embedding', {
+  noteId: text('note_id')
+    .primaryKey()
+    .references(() => note.id, { onDelete: 'cascade' }),
+  model: text('model').notNull(),
+  dim: integer('dim').notNull(),
+  vector: blob('vector', { mode: 'buffer' }).notNull(),
+  contentHash: text('content_hash').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})
+
+export const entityEmbedding = sqliteTable('entity_embedding', {
+  entityId: text('entity_id')
+    .primaryKey()
+    .references(() => entity.id, { onDelete: 'cascade' }),
+  model: text('model').notNull(),
+  dim: integer('dim').notNull(),
+  vector: blob('vector', { mode: 'buffer' }).notNull(),
+  contentHash: text('content_hash').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})
+
+// The LLM-generated, user-editable in-character persona for a PC (the cached Recall prefix body).
+export const pcPersona = sqliteTable('pc_persona', {
+  entityId: text('entity_id')
+    .primaryKey()
+    .references(() => entity.id, { onDelete: 'cascade' }),
+  brief: text('brief').notNull(),
+  edited: integer('edited').notNull().default(0), // 1 once the user hand-edits the brief
+  stale: integer('stale').notNull().default(0), // 1 when the PC's source fields changed since generation
+  sourceHash: text('source_hash').notNull(),
+  model: text('model'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})

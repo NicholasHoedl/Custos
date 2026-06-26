@@ -53,3 +53,9 @@ export function updateSession(ctx: DbContext, id: string, patch: UpdateSessionIn
   if (!s) throw new Error(`Session ${id} not found`)
   return s
 }
+
+// Deletes a session. Its event-log entries cascade away; notes keep their content but have their
+// session link nulled (note.sessionId onDelete: 'set null') so no captured note is ever lost.
+export function deleteSession(ctx: DbContext, id: string): void {
+  ctx.drizzle.delete(schema.session).where(eq(schema.session.id, id)).run()
+}

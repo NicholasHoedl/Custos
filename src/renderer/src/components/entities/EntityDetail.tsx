@@ -10,6 +10,7 @@ import { useAppStore } from '@renderer/store/app-store'
 import { formatTimestamp } from '@renderer/lib/format'
 import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
+import { PersonaEditor } from './PersonaEditor'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Separator } from '@renderer/components/ui/separator'
@@ -170,6 +171,13 @@ export function EntityDetail({
         )}
 
         <AttributesBlock entity={entity} />
+
+        {entity.type === 'pc' && (
+          <>
+            <Separator />
+            <PersonaEditor entityId={entity.id} />
+          </>
+        )}
 
         <Separator />
 

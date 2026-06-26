@@ -22,3 +22,6 @@ resources/models/*
 .vite
 test-results
 playwright-report
+
+# Local one-off seed / diagnostic scripts (prefixed with _)
+_*.cjs

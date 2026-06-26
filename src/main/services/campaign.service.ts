@@ -41,3 +41,10 @@ export function updateCampaign(ctx: DbContext, id: string, patch: UpdateCampaign
   if (!c) throw new Error(`Campaign ${id} not found`)
   return c
 }
+
+// Deletes a campaign and everything under it. Sessions, entities, notes, links, event-log entries,
+// embeddings, and personas all cascade away via their foreign keys (onDelete: 'cascade') — no manual
+// cleanup needed.
+export function deleteCampaign(ctx: DbContext, id: string): void {
+  ctx.drizzle.delete(schema.campaign).where(eq(schema.campaign.id, id)).run()
+}

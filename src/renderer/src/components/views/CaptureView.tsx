@@ -53,6 +53,7 @@ export function CaptureView() {
             filter={filter}
             onFilterChange={setFilter}
             onSelect={setSelectedEntity}
+            onShowSessionLog={() => setSelectedEntity(null)}
           />
         </div>
         <div className="min-w-0 flex-1">

@@ -10,4 +10,5 @@ export function registerSessionHandlers(ctx: DbContext): void {
   ipcMain.handle(IPC.sessionUpdate, (_e, id: string, patch: UpdateSessionInput) =>
     svc.updateSession(ctx, id, patch)
   )
+  ipcMain.handle(IPC.sessionDelete, (_e, id: string) => svc.deleteSession(ctx, id))
 }

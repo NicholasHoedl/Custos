@@ -31,7 +31,13 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
       { key: 'player', label: 'Player', kind: 'text', placeholder: 'Who runs this character?' },
       { key: 'ancestry', label: 'Ancestry', kind: 'text', placeholder: 'e.g. Half-elf' },
       { key: 'class', label: 'Class', kind: 'text', placeholder: 'e.g. Rogue' },
-      { key: 'level', label: 'Level', kind: 'number', placeholder: '1' }
+      { key: 'level', label: 'Level', kind: 'number', placeholder: '1' },
+      {
+        key: 'backstory',
+        label: 'Backstory',
+        kind: 'textarea',
+        placeholder: 'Background, origins, and past experiences that shape who they are'
+      }
     ]
   },
   npc: {

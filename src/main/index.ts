@@ -3,8 +3,9 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { APP_ID, APP_NAME, DEFAULT_HOTKEY } from '@shared/constants'
 import { QUICK_ADD_FOCUS_CHANNEL } from '@shared/ipc-types'
-import { getDb, dbHealthCheck } from './db'
+import { getDb, dbHealthCheck, closeDb } from './db'
 import { registerIpcHandlers } from './ipc/handlers'
+import { warm } from './services/embedding.service'
 
 app.setName(APP_NAME)
 
@@ -70,8 +71,9 @@ if (!gotTheLock) {
     getDb()
     console.log(`[ledger] database ready — ${dbHealthCheck()} campaigns`)
 
-    registerIpcHandlers()
+    registerIpcHandlers(() => mainWindow)
     createWindow()
+    warm() // preload the embedding pipeline if the model is already downloaded
 
     // Global quick-add hotkey. ADR-010: Phase 0 ships the focus-main behavior; the
     // popup-vs-focus decision is made in Phase 1. The hotkey is configurable (Settings).
@@ -90,6 +92,7 @@ if (!gotTheLock) {
 
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
+    closeDb() // checkpoint + close so we never leave a stale WAL that could revert committed data
   })
 
   app.on('window-all-closed', () => {

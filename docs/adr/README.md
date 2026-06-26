@@ -23,6 +23,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [009](009-suggest-output-model.md) | Suggest output model: multi-attitude structured output | Accepted | 2026-06-25 |
 | [010](010-global-hotkey-behavior.md) | Global quick-add hotkey behavior | Proposed | 2026-06-25 |
 | [011](011-graph-query-raw-sql.md) | Raw SQL (recursive CTEs) for graph traversal; Drizzle for CRUD | Accepted | 2026-06-25 |
+| [012](012-vector-store-bruteforce.md) | Brute-force JS cosine vector store for v1 (refines ADR-003) | Accepted | 2026-06-25 |
 
 ## Status legend
 

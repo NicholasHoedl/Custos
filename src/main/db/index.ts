@@ -42,3 +42,21 @@ export function getRawDb(): Database.Database {
 export function dbHealthCheck(): number {
   return getDb().select().from(schema.campaign).all().length
 }
+
+/**
+ * Checkpoint the write-ahead log into the main DB file and close the handle. Called on app quit so we
+ * never leave an uncheckpointed WAL behind — a stale WAL from an unclean shutdown can silently revert
+ * committed writes the next time the file is opened (ADR-004; this is the root cause of the seed-loss
+ * we hit during Phase 2 dogfooding).
+ */
+export function closeDb(): void {
+  if (!rawDb) return
+  try {
+    rawDb.pragma('wal_checkpoint(TRUNCATE)')
+  } catch {
+    // best-effort: if a checkpoint can't complete we still close cleanly below
+  }
+  rawDb.close()
+  rawDb = null
+  db = null
+}

@@ -10,4 +10,5 @@ export function registerCampaignHandlers(ctx: DbContext): void {
   ipcMain.handle(IPC.campaignUpdate, (_e, id: string, patch: UpdateCampaignInput) =>
     svc.updateCampaign(ctx, id, patch)
   )
+  ipcMain.handle(IPC.campaignDelete, (_e, id: string) => svc.deleteCampaign(ctx, id))
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search } from 'lucide-react'
+import { ScrollText, Search } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -19,6 +19,8 @@ interface EntityBrowserProps {
   filter: EntityFilter
   onFilterChange: (filter: EntityFilter) => void
   onSelect: (id: string) => void
+  /** Clear the selection and return the detail pane to the session log. */
+  onShowSessionLog: () => void
 }
 
 // Master list of all entities in the campaign, filtered client-side by type (chips, with live counts)
@@ -29,7 +31,8 @@ export function EntityBrowser({
   selectedId,
   filter,
   onFilterChange,
-  onSelect
+  onSelect,
+  onShowSessionLog
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
 
@@ -44,6 +47,20 @@ export function EntityBrowser({
 
   return (
     <div className="flex h-full flex-col">
+      <div className="border-b border-border p-2">
+        <button
+          onClick={onShowSessionLog}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+            selectedId
+              ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+              : 'bg-primary/15 text-primary'
+          )}
+        >
+          <ScrollText className="size-4" />
+          Session Log
+        </button>
+      </div>
       <div className="border-b border-border">
         <div className="flex flex-wrap gap-1 p-2 pb-1.5">
           {FILTERS.map((f) => {
