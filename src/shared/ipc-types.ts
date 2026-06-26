@@ -89,11 +89,13 @@ export interface LedgerApi {
     get(id: string): Promise<Entity | null>
     create(input: CreateEntityInput): Promise<Entity>
     update(id: string, patch: UpdateEntityInput): Promise<Entity>
+    delete(id: string): Promise<void>
   }
   note: {
     list(entityId: string): Promise<Note[]>
     create(input: CreateNoteInput): Promise<Note>
     update(id: string, patch: { content?: string }): Promise<Note>
+    delete(id: string): Promise<void>
   }
   event: {
     list(sessionId: string): Promise<EventLogEntry[]>
@@ -137,9 +139,11 @@ export const IPC = {
   entityGet: 'entity:get',
   entityCreate: 'entity:create',
   entityUpdate: 'entity:update',
+  entityDelete: 'entity:delete',
   noteList: 'note:list',
   noteCreate: 'note:create',
   noteUpdate: 'note:update',
+  noteDelete: 'note:delete',
   eventList: 'event:list',
   eventCreate: 'event:create',
   linkCreate: 'link:create',

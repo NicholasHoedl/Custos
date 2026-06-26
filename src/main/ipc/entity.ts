@@ -13,4 +13,5 @@ export function registerEntityHandlers(ctx: DbContext): void {
   ipcMain.handle(IPC.entityUpdate, (_e, id: string, patch: UpdateEntityInput) =>
     svc.updateEntity(ctx, id, patch)
   )
+  ipcMain.handle(IPC.entityDelete, (_e, id: string) => svc.deleteEntity(ctx, id))
 }

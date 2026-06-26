@@ -40,3 +40,7 @@ export function updateNote(ctx: DbContext, id: string, patch: { content?: string
   if (!r) throw new Error(`Note ${id} not found`)
   return rowToNote(r)
 }
+
+export function deleteNote(ctx: DbContext, id: string): void {
+  ctx.drizzle.delete(schema.note).where(eq(schema.note.id, id)).run()
+}

@@ -17,7 +17,7 @@ test.afterAll(async () => {
 
 // Drives the real UI through the preload bridge — proves SPEC Flows A + B end-to-end at runtime:
 // campaign → session → quick-add entities → session-linked note → typed relationship → local search.
-test('capture flow: campaign, session, entities, note, link, search', async () => {
+test('capture flow: campaign, session, entities, note, link, search, delete', async () => {
   // Flow A — create and activate a campaign.
   await page.getByRole('button', { name: 'New campaign' }).click()
   await page.getByLabel('Name').fill('Phandalin')
@@ -60,4 +60,11 @@ test('capture flow: campaign, session, entities, note, link, search', async () =
   // Local search finds the entity via its note content (note-hit → parent entity).
   await page.getByPlaceholder('Search…').fill('favor')
   await expect(page.getByText(/favor/i).last()).toBeVisible()
+  await page.getByPlaceholder('Search…').fill('')
+
+  // Delete the selected entity (with confirmation) — it cascades and clears from list + detail.
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Aldric Vane/ })).toHaveCount(0)
 })

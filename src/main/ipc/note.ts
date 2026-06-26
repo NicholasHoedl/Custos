@@ -9,4 +9,5 @@ export function registerNoteHandlers(ctx: DbContext): void {
   ipcMain.handle(IPC.noteUpdate, (_e, id: string, patch: { content?: string }) =>
     svc.updateNote(ctx, id, patch)
   )
+  ipcMain.handle(IPC.noteDelete, (_e, id: string) => svc.deleteNote(ctx, id))
 }

@@ -19,12 +19,14 @@ const api: LedgerApi = {
     list: (campaignId, type) => ipcRenderer.invoke(IPC.entityList, campaignId, type),
     get: (id) => ipcRenderer.invoke(IPC.entityGet, id),
     create: (input) => ipcRenderer.invoke(IPC.entityCreate, input),
-    update: (id, patch) => ipcRenderer.invoke(IPC.entityUpdate, id, patch)
+    update: (id, patch) => ipcRenderer.invoke(IPC.entityUpdate, id, patch),
+    delete: (id) => ipcRenderer.invoke(IPC.entityDelete, id)
   },
   note: {
     list: (entityId) => ipcRenderer.invoke(IPC.noteList, entityId),
     create: (input) => ipcRenderer.invoke(IPC.noteCreate, input),
-    update: (id, patch) => ipcRenderer.invoke(IPC.noteUpdate, id, patch)
+    update: (id, patch) => ipcRenderer.invoke(IPC.noteUpdate, id, patch),
+    delete: (id) => ipcRenderer.invoke(IPC.noteDelete, id)
   },
   event: {
     list: (sessionId) => ipcRenderer.invoke(IPC.eventList, sessionId),

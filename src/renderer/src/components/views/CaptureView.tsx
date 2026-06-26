@@ -63,6 +63,10 @@ export function CaptureView() {
               allEntities={entities}
               sessionId={activeSessionId}
               onEntityChanged={refresh}
+              onDeleted={() => {
+                setSelectedEntity(null)
+                refresh()
+              }}
             />
           ) : (
             <EventFeed sessionId={activeSessionId} />

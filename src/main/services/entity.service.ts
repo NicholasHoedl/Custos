@@ -55,3 +55,12 @@ export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInpu
   if (!e) throw new Error(`Entity ${id} not found`)
   return e
 }
+
+/**
+ * Deletes an entity. Foreign keys (with `foreign_keys = ON`) cascade the cleanup: its notes and all
+ * links touching it (either end) are removed, and any event_log reference is set to null (the session
+ * log entry survives). See schema.ts onDelete rules.
+ */
+export function deleteEntity(ctx: DbContext, id: string): void {
+  ctx.drizzle.delete(schema.entity).where(eq(schema.entity.id, id)).run()
+}

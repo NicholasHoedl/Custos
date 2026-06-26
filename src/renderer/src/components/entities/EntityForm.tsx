@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPES,
@@ -7,6 +7,7 @@ import {
   type Entity,
   type EntityType
 } from '@shared/entity-types'
+import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import { ledger } from '@renderer/lib/ipc'
 import {
   Dialog,
@@ -27,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { TagInput } from './TagInput'
+import { StatusCombobox } from './StatusCombobox'
 
 interface AttrRow {
   key: string
@@ -42,19 +45,15 @@ interface EntityFormProps {
   onSaved: (entity: Entity) => void
 }
 
-function toRows(attributes: Record<string, unknown>): AttrRow[] {
-  return Object.entries(attributes).map(([key, value]) => ({ key, value: String(value ?? '') }))
+function toRows(attributes: Record<string, unknown>, known: Set<string>): AttrRow[] {
+  return Object.entries(attributes)
+    .filter(([k]) => !known.has(k))
+    .map(([key, value]) => ({ key, value: String(value ?? '') }))
 }
 
-function splitList(text: string): string[] {
-  return text
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-// The richer "90s budget" entity editor — handles both create and edit. Traits/goals stay promoted
-// (Suggest reads them); everything else is generic key/value attribute rows.
+// The entity editor (create + edit). The visible fields are driven by the type's profile
+// (@shared/entity-profiles): promoted traits/goals/status plus type-specific fields stored in the
+// `attributes` JSON bag, with a collapsible escape hatch for ad-hoc / legacy attributes.
 export function EntityForm({
   open,
   onOpenChange,
@@ -67,28 +66,73 @@ export function EntityForm({
   const [name, setName] = useState('')
   const [type, setType] = useState<EntityType>(defaultType)
   const [description, setDescription] = useState('')
-  const [traits, setTraits] = useState('')
-  const [goals, setGoals] = useState('')
+  const [traits, setTraits] = useState<string[]>([])
+  const [goals, setGoals] = useState<string[]>([])
   const [status, setStatus] = useState('')
-  const [rows, setRows] = useState<AttrRow[]>([])
+  const [attributes, setAttributes] = useState<Record<string, unknown>>({})
+  const [extraRows, setExtraRows] = useState<AttrRow[]>([])
+  const [moreOpen, setMoreOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    setName(entity?.name ?? '')
-    setType(entity?.type ?? defaultType)
-    setDescription(entity?.description ?? '')
-    setTraits(entity?.traits.join(', ') ?? '')
-    setGoals(entity?.goals.join(', ') ?? '')
-    setStatus(entity?.status ?? '')
-    setRows(entity ? toRows(entity.attributes) : [])
+    const e = entity
+    const t = e?.type ?? defaultType
+    setName(e?.name ?? '')
+    setType(t)
+    setDescription(e?.description ?? '')
+    setTraits(e?.traits ?? [])
+    setGoals(e?.goals ?? [])
+    setStatus(e?.status ?? '')
+    const attrs = e?.attributes ?? {}
+    setAttributes(attrs)
+    const extras = toRows(attrs, profileKeys(t))
+    setExtraRows(extras)
+    setMoreOpen(extras.length > 0)
   }, [open, entity, defaultType])
 
+  const prof = profileFor(type)
+  const setAttr = (key: string, val: unknown): void =>
+    setAttributes((a) => ({ ...a, [key]: val }))
+
+  // Create-only: switching type re-derives which attribute keys are "extra" and clears a status that
+  // isn't valid for the new type. traits/goals are kept in state (gated at submit) so they survive
+  // a round-trip through an incompatible type.
+  function onTypeChange(next: EntityType): void {
+    setType(next)
+    setExtraRows(toRows(attributes, profileKeys(next)))
+    const opts = profileFor(next).status
+    setStatus((s) => (opts && opts.includes(s) ? s : ''))
+  }
+
+  // updateEntity replaces `attributes` wholesale, so the payload must re-emit every key worth keeping:
+  // the profile fields (non-empty) plus any ad-hoc rows whose key isn't owned by the profile.
   function buildAttributes(): Record<string, unknown> {
     const out: Record<string, unknown> = {}
-    for (const row of rows) {
-      const key = row.key.trim()
-      if (key) out[key] = row.value
+    for (const f of prof.fields) {
+      const v = attributes[f.key]
+      if (f.kind === 'list') {
+        // Normally an array; preserve a wrong-shaped legacy value (e.g. a string under a key that is
+        // now a list field) rather than silently dropping it on this wholesale-replace save.
+        if (Array.isArray(v)) {
+          if (v.length > 0) out[f.key] = v
+        } else if (v != null && v !== '') {
+          out[f.key] = v
+        }
+      } else if (f.kind === 'number') {
+        if (v !== '' && v != null) {
+          const n = Number(v)
+          out[f.key] = Number.isNaN(n) ? v : n // keep a non-numeric legacy value rather than drop it
+        }
+      } else {
+        const s = typeof v === 'string' ? v.trim() : v
+        if (s) out[f.key] = s
+      }
+    }
+    const known = profileKeys(type)
+    for (const row of extraRows) {
+      const k = row.key.trim()
+      if (k && !known.has(k)) out[k] = row.value
     }
     return out
   }
@@ -98,13 +142,16 @@ export function EntityForm({
     if (!trimmed || busy) return
     setBusy(true)
     try {
+      const attrs = buildAttributes()
+      const payloadTraits = prof.traits ? traits : []
+      const payloadGoals = prof.goals ? goals : []
       const saved = entity
         ? await ledger.entity.update(entity.id, {
             name: trimmed,
             description: description.trim() || null,
-            traits: splitList(traits),
-            goals: splitList(goals),
-            attributes: buildAttributes(),
+            traits: payloadTraits,
+            goals: payloadGoals,
+            attributes: attrs,
             status: status.trim() || null
           })
         : await ledger.entity.create({
@@ -112,9 +159,9 @@ export function EntityForm({
             type,
             name: trimmed,
             description: description.trim() || undefined,
-            traits: splitList(traits),
-            goals: splitList(goals),
-            attributes: buildAttributes(),
+            traits: payloadTraits,
+            goals: payloadGoals,
+            attributes: attrs,
             status: status.trim() || undefined
           })
       toast.success(editing ? 'Saved' : `Added ${ENTITY_TYPE_LABELS[type]}`, { description: trimmed })
@@ -125,6 +172,99 @@ export function EntityForm({
     } finally {
       setBusy(false)
     }
+  }
+
+  function renderField(field: ProfileField) {
+    const fid = `ef-attr-${field.key}`
+    const raw = attributes[field.key]
+    if (field.kind === 'list') {
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <Label htmlFor={fid}>{field.label}</Label>
+          <TagInput
+            id={fid}
+            value={Array.isArray(raw) ? (raw as string[]) : []}
+            onChange={(v) => setAttr(field.key, v)}
+            placeholder={field.placeholder}
+          />
+        </div>
+      )
+    }
+    if (field.kind === 'textarea') {
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <Label htmlFor={fid}>{field.label}</Label>
+          <Textarea
+            id={fid}
+            value={typeof raw === 'string' ? raw : ''}
+            onChange={(e) => setAttr(field.key, e.target.value)}
+            rows={3}
+            placeholder={field.placeholder}
+          />
+        </div>
+      )
+    }
+    if (field.kind === 'number') {
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <Label htmlFor={fid}>{field.label}</Label>
+          <Input
+            id={fid}
+            type="number"
+            inputMode="numeric"
+            value={raw == null ? '' : String(raw)}
+            onChange={(e) => setAttr(field.key, e.target.value)}
+            placeholder={field.placeholder}
+          />
+        </div>
+      )
+    }
+    if (field.kind === 'select') {
+      const current = typeof raw === 'string' ? raw : ''
+      const opts = field.options ?? []
+      const hasLegacy = Boolean(current) && !opts.includes(current)
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <Label htmlFor={fid}>{field.label}</Label>
+          <div className="flex items-center gap-2">
+            <Select value={current} onValueChange={(v) => setAttr(field.key, v)}>
+              <SelectTrigger id={fid} className="flex-1">
+                <SelectValue placeholder={`Choose ${field.label.toLowerCase()}…`} />
+              </SelectTrigger>
+              <SelectContent>
+                {hasLegacy && <SelectItem value={current}>{current}</SelectItem>}
+                {opts.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {current && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setAttr(field.key, '')}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div key={field.key} className="space-y-1.5">
+        <Label htmlFor={fid}>{field.label}</Label>
+        <Input
+          id={fid}
+          value={typeof raw === 'string' ? raw : ''}
+          onChange={(e) => setAttr(field.key, e.target.value)}
+          placeholder={field.placeholder}
+        />
+      </div>
+    )
   }
 
   return (
@@ -153,9 +293,13 @@ export function EntityForm({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Type</Label>
-              <Select value={type} onValueChange={(v) => setType(v as EntityType)} disabled={editing}>
-                <SelectTrigger>
+              <Label htmlFor="ef-type">Type</Label>
+              <Select
+                value={type}
+                onValueChange={(v) => onTypeChange(v as EntityType)}
+                disabled={editing}
+              >
+                <SelectTrigger id="ef-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -180,90 +324,98 @@ export function EntityForm({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {prof.traits && (
             <div className="space-y-1.5">
               <Label htmlFor="ef-traits">Traits</Label>
-              <Input
+              <TagInput
                 id="ef-traits"
                 value={traits}
-                onChange={(e) => setTraits(e.target.value)}
-                placeholder="gruff, loyal"
+                onChange={setTraits}
+                placeholder="Add a trait — e.g. gruff"
               />
             </div>
+          )}
+
+          {prof.goals && (
             <div className="space-y-1.5">
               <Label htmlFor="ef-goals">Goals</Label>
-              <Input
+              <TagInput
                 id="ef-goals"
                 value={goals}
-                onChange={(e) => setGoals(e.target.value)}
-                placeholder="protect the town"
+                onChange={setGoals}
+                placeholder="Add a goal — e.g. protect the town"
               />
             </div>
-          </div>
-          <p className="-mt-2 text-xs text-muted-foreground">
-            Separate multiple traits or goals with commas.
-          </p>
+          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="ef-status">Status</Label>
-            <Input
-              id="ef-status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              placeholder="alive, active, hidden…"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Attributes</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setRows((r) => [...r, { key: '', value: '' }])}
-              >
-                <Plus className="size-3.5" />
-                Add field
-              </Button>
+          {prof.status && (
+            <div className="space-y-1.5">
+              <Label htmlFor="ef-status">Status</Label>
+              <StatusCombobox id="ef-status" value={status} onChange={setStatus} options={prof.status} />
             </div>
-            {rows.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Optional type-specific fields (e.g. race, alignment, value).
-              </p>
+          )}
+
+          {prof.fields.map(renderField)}
+
+          <div className="space-y-2 border-t border-border pt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-ml-2"
+              onClick={() => setMoreOpen((o) => !o)}
+            >
+              {moreOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+              More fields{extraRows.length > 0 ? ` (${extraRows.length})` : ''}
+            </Button>
+            {moreOpen && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Custom attributes outside the {ENTITY_TYPE_LABELS[type]} profile.
+                </p>
+                {extraRows.map((row, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      value={row.key}
+                      onChange={(e) =>
+                        setExtraRows((rs) =>
+                          rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r))
+                        )
+                      }
+                      placeholder="field"
+                      className="w-1/3"
+                    />
+                    <Input
+                      value={row.value}
+                      onChange={(e) =>
+                        setExtraRows((rs) =>
+                          rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
+                        )
+                      }
+                      placeholder="value"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setExtraRows((rs) => rs.filter((_, j) => j !== i))}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExtraRows((r) => [...r, { key: '', value: '' }])}
+                >
+                  <Plus className="size-3.5" />
+                  Add field
+                </Button>
+              </div>
             )}
-            <div className="space-y-2">
-              {rows.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Input
-                    value={row.key}
-                    onChange={(e) =>
-                      setRows((rs) => rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)))
-                    }
-                    placeholder="field"
-                    className="w-1/3"
-                  />
-                  <Input
-                    value={row.value}
-                    onChange={(e) =>
-                      setRows((rs) =>
-                        rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
-                      )
-                    }
-                    placeholder="value"
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
