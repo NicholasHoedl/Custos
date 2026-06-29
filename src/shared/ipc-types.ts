@@ -19,6 +19,7 @@ import type {
   RecallError,
   RecallRequest
 } from './recall-types'
+import type { SuggestRequest, SuggestResult } from './suggest-types'
 
 // ---- Input payloads ----
 export interface CreateCampaignInput {
@@ -138,6 +139,9 @@ export interface LedgerApi {
     query(input: RecallRequest): Promise<{ requestId: string }>
     cancel(requestId: string): Promise<void>
   }
+  suggest: {
+    query(input: SuggestRequest): Promise<SuggestResult>
+  }
   persona: {
     get(entityId: string): Promise<PersonaBrief | null>
     generate(entityId: string): Promise<PersonaBrief>
@@ -194,6 +198,7 @@ export const IPC = {
   apikeyClear: 'apikey:clear',
   recallQuery: 'recall:query',
   recallCancel: 'recall:cancel',
+  suggestQuery: 'suggest:query',
   personaGet: 'persona:get',
   personaGenerate: 'persona:generate',
   personaUpdate: 'persona:update',
@@ -211,6 +216,3 @@ export const RECALL_DONE_CHANNEL = 'stream:done'
 export const RECALL_ERROR_CHANNEL = 'stream:error'
 /** One-way: main -> renderer, embedding-model download progress (onboarding). */
 export const MODEL_DOWNLOAD_PROGRESS_CHANNEL = 'onboarding:model-progress'
-
-// ---- Phase 3 (declared for reference; NOT wired yet) ----
-//   'suggest:query' -> SuggestResult (structured: 4 of 7 attitude recommendations)

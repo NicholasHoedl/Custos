@@ -91,5 +91,7 @@ export interface AppSettings {
   theme: ThemeMode
   fontSize: FontSize
   recallModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
+  suggestModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
+  suggestEffort: 'medium' | 'high'
   hotkey: string
 }

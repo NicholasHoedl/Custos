@@ -8,6 +8,8 @@ const DEFAULTS: AppSettings = {
   theme: 'dark',
   fontSize: 'md',
   recallModel: 'claude-sonnet-4-6',
+  suggestModel: 'claude-opus-4-8',
+  suggestEffort: 'high',
   hotkey: DEFAULT_HOTKEY
 }
 

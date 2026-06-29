@@ -1,5 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { RecallMode, RecallSource } from '@shared/recall-types'
+import {
+  ATTITUDES,
+  SUGGEST_CATEGORIES,
+  type AttitudeRecommendation,
+  type StorySuggestion
+} from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
 import type { RetrievedChunk } from './vector-store.service'
 import { getKey, keyExists } from './key.service'
@@ -273,4 +279,361 @@ export async function complete(system: string, user: string, model: string): Pro
     .map((b) => b.text)
     .join('')
     .trim()
+}
+
+// ---- Suggest prompt (Phase 3) ----
+
+const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks and what they value, a set of retrieved campaign notes, a snapshot of the current state, the known relationships among the people and things involved, and the situation facing the party right now.
+
+Your job: pick the FOUR attitudes, from the seven below, that THIS character is most likely to take in THIS moment, and for each write one concrete in-character ACTION and a one-line RATIONALE.
+
+THE SEVEN ATTITUDES (choose four, all different):
+- neutral — impartial, noncommittal; hold back and gather more before committing.
+- friendly — cooperative, trusting; reach for alliance and common ground.
+- hostile — confrontational, aggressive; oppose, threaten, or strike.
+- moral — principled; do what's right even at a cost, hold to a line.
+- selfish — self-serving; put this character's own gain or safety first.
+- compassionate — caring; protect or help others, even the vulnerable, at personal cost.
+- cynical — distrustful, skeptical; assume hidden motives and look for the angle.
+
+PICK WHAT FITS THIS CHARACTER. Choose the four attitudes this PC would realistically be torn between here — not a tidy spread of all seven. A blunt zealot and a greedy rogue facing the same scene should not get the same four. Let the brief's values, fears, wants, and stakes drive the choice. The four attitudes must be distinct.
+
+WRITE A REAL ACTION, NOT A LABEL. Each action is something the player could actually do or say at the table this turn — concrete and specific to this situation and this character. "Demand the mayor explain the missing shipments in front of the council" — not "be aggressive." Keep each action to a sentence or two, in this character's register (honor the brief's diction and attitude). The action embodies the attitude; don't restate the attitude's name.
+
+GROUND IT. Everything you treat as a world-fact — who's who, who holds or controls what, what's resolved, what's still open — must come from the notes, the current state, or the relationships. Don't invent events, possessions, alliances, or outcomes. The character may suspect, hope, or intend (that's theirs), but never assert an arrangement the notes don't establish. Read the current state as the present: don't propose acting on a quest already completed or confronting someone already dead or defeated.
+
+RATIONALE. One short line per option: why THIS attitude fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.`
+
+/**
+ * The structured-output schema for Suggest. JSON Schema cannot enforce array length or attitude
+ * uniqueness (minItems/maxItems/uniqueItems are unsupported) — `suggest.service` validates "exactly 4
+ * distinct" in code. The `attitude` enum and required action+rationale ARE enforced here. Every object
+ * needs additionalProperties:false for structured outputs.
+ */
+const SUGGEST_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    recommendations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          attitude: { type: 'string', enum: [...ATTITUDES] },
+          action: { type: 'string' },
+          rationale: { type: 'string' }
+        },
+        required: ['attitude', 'action', 'rationale']
+      }
+    }
+  },
+  required: ['recommendations']
+}
+
+export interface SuggestContext {
+  campaignName: string
+  campaignDescription: string | null
+  pcName: string | null
+  persona: string | null
+}
+
+/** Shared system prefix for both Suggest modes: instructions + campaign + persona brief (cached). */
+function suggestSystemBlocks(
+  ctx: SuggestContext,
+  instructions: string
+): Anthropic.TextBlockParam[] {
+  const campaign = `Campaign: ${ctx.campaignName}${
+    ctx.campaignDescription ? `\n${ctx.campaignDescription}` : ''
+  }`
+  return [
+    { type: 'text', text: instructions },
+    { type: 'text', text: campaign },
+    {
+      type: 'text',
+      text: `Character brief for ${ctx.pcName ?? 'the character'}:\n\n${ctx.persona ?? ''}`,
+      cache_control: { type: 'ephemeral' }
+    }
+  ]
+}
+
+/** System prompt for attitudes (closed-ended) mode. */
+export function buildSuggestSystem(ctx: SuggestContext): Anthropic.TextBlockParam[] {
+  return suggestSystemBlocks(ctx, SUGGEST_INSTRUCTIONS)
+}
+
+/** System prompt for directions (open-ended) mode. */
+export function buildDirectionsSystem(ctx: SuggestContext): Anthropic.TextBlockParam[] {
+  return suggestSystemBlocks(ctx, DIRECTIONS_INSTRUCTIONS)
+}
+
+/**
+ * The volatile user turn: retrieved notes as PLAIN TEXT blocks (NOT document/citations — citations are
+ * incompatible with output_config.format), then the current-state block, the relationships block, and
+ * finally the situation.
+ */
+export function buildSuggestUserContent(
+  situation: string,
+  chunks: RetrievedChunk[],
+  relationships?: string | null,
+  state?: string | null
+): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = []
+  if (chunks.length) {
+    const notes = chunks
+      .map((c) => {
+        const title = c.sessionLabel ? `${c.entityName} — ${c.sessionLabel}` : c.entityName
+        return `## ${title}\n${c.content}`
+      })
+      .join('\n\n')
+    content.push({
+      type: 'text',
+      text: `Relevant campaign notes — treat as FACT for anything about the world:\n\n${notes}`
+    })
+  }
+  if (state) {
+    content.push({
+      type: 'text',
+      text: `Current state — this is the present moment; treat as FACT. Anything resolved here is DONE:\n${state}`
+    })
+  }
+  if (relationships) {
+    content.push({
+      type: 'text',
+      text: `Known relationships among the people and things above — treat as FACT (who owns/controls/is connected to what):\n${relationships}`
+    })
+  }
+  content.push({ type: 'text', text: `The situation right now:\n${situation}` })
+  return content
+}
+
+export interface SuggestParams {
+  situation: string
+  chunks: RetrievedChunk[]
+  relationships?: string | null
+  state?: string | null
+  context: SuggestContext
+  model: string
+  effort: 'medium' | 'high'
+  signal?: AbortSignal
+}
+
+/**
+ * Shared single-shot structured call (ADR-008/009): Opus-class model + adaptive thinking + a
+ * json_schema output format. Returns the array found at `arrayKey` (UNVALIDATED — callers enforce
+ * count/shape rules). Throws on no key, refusal, truncation, or unparseable output.
+ */
+async function structuredArrayCall<T>(opts: {
+  model: string
+  effort: 'medium' | 'high'
+  schema: Record<string, unknown>
+  system: Anthropic.TextBlockParam[]
+  content: Anthropic.ContentBlockParam[]
+  arrayKey: string
+  signal?: AbortSignal
+}): Promise<T[]> {
+  const c = getClient()
+  if (!c) throw new Error('no_key')
+  const message = await c.messages.create(
+    {
+      model: opts.model,
+      max_tokens: 8192,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: opts.effort, format: { type: 'json_schema', schema: opts.schema } },
+      system: opts.system,
+      messages: [{ role: 'user', content: opts.content }]
+    },
+    { signal: opts.signal }
+  )
+  if (message.stop_reason === 'refusal') throw new Error('refusal')
+  if (message.stop_reason === 'max_tokens') throw new Error('truncated')
+  const text = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('unparseable')
+  }
+  const arr = (parsed as Record<string, unknown>)[opts.arrayKey]
+  if (!Array.isArray(arr)) throw new Error('unparseable')
+  return arr as T[]
+}
+
+/** Closed-ended attitudes call. Returns raw recommendations (caller enforces the 4-distinct rule). */
+export async function suggest(params: SuggestParams): Promise<AttitudeRecommendation[]> {
+  return structuredArrayCall<AttitudeRecommendation>({
+    model: params.model,
+    effort: params.effort,
+    schema: SUGGEST_SCHEMA,
+    system: buildSuggestSystem(params.context),
+    content: buildSuggestUserContent(
+      params.situation,
+      params.chunks,
+      params.relationships,
+      params.state
+    ),
+    arrayKey: 'recommendations',
+    signal: params.signal
+  })
+}
+
+// ---- Suggest: open-ended "directions" mode (Phase 3 addendum) ----
+
+const DIRECTIONS_INSTRUCTIONS = `You help a tabletop RPG player figure out what their character might DO NEXT to move the story forward — for an open, between-scenes moment ("we just got back to town", "we cleared the dungeon, now what?"), not a single charged decision. You'll be given a brief on how this player character (PC) thinks and what they value, the campaign's unfinished business (open quests and the other party members), retrieved notes, the current state, the known relationships, and (optionally) where things stand right now.
+
+Your job: propose a handful of concrete next moves — things the player could actually pursue this session — each tagged with one CATEGORY and a one-line RATIONALE, all chosen to fit THIS character.
+
+THE EIGHT CATEGORIES (use the ones that fit; you do NOT need all eight):
+- quest — pursue or advance an unfinished quest (named, from the open-quests list).
+- npc — seek out, talk to, or deal with a specific person.
+- location — go to or explore a specific place (a shop, a landmark, somewhere unvisited).
+- party — turn to another player character: ask, confide, plan, or settle something.
+- personal — chase this PC's OWN goal, backstory thread, or want (from the brief).
+- story — follow a rumor, lead, or larger thread; push the overarching plot.
+- faction — engage a group or organization (join, oppose, bargain, report in).
+- item — seek, use, sell, or investigate a notable item.
+
+GROUND IT IN REAL CONTENT. Name actual quests, people, places, and items from the provided material — "go finish <the real open quest>", "ask <the named NPC> about <a real thread>", "check out <the named shop>". Don't invent quests or people. Use the open-quests list for quest moves, the other-party-members list for party moves, the brief's goals for personal moves, and the notes/relationships for the rest. Read the current state as the present — don't propose a quest already Completed or talking to someone already Dead.
+
+FIT THE CHARACTER. These are the moves THIS PC would actually be drawn to — weight them by the brief's values, fears, and wants. A pious cleric and a greedy rogue, idle in the same town, should suggest different next steps. Each suggestion is a concrete action in the player's hands (a sentence), not a vague theme; the rationale (one line) says why it fits this character or the story.
+
+AIM for about six to eight suggestions spanning a few different categories — enough to give real choices without burying them. Quality over quantity; skip a category rather than pad it.`
+
+/** Structured-output schema for directions. Length isn't enforceable here — suggest.service validates. */
+const DIRECTIONS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    suggestions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          category: { type: 'string', enum: [...SUGGEST_CATEGORIES] },
+          suggestion: { type: 'string' },
+          rationale: { type: 'string' }
+        },
+        required: ['category', 'suggestion', 'rationale']
+      }
+    }
+  },
+  required: ['suggestions']
+}
+
+/**
+ * Render the campaign's open threads for directions mode: unfinished quests (with objectives) and the
+ * other party members, so the model can suggest real "go do X" / "talk to PC Y" moves. Bounded.
+ */
+export function formatCampaignThreads(
+  quests: { name: string; status: string | null; objective: string | null }[],
+  otherPcs: { name: string }[],
+  maxQuests = 8,
+  maxPcs = 6
+): string | null {
+  const lines: string[] = []
+  const openQuests = quests.slice(0, maxQuests)
+  if (openQuests.length) {
+    lines.push('Unfinished quests (open threads):')
+    for (const q of openQuests) {
+      const status = q.status ? ` (${q.status})` : ''
+      const obj = q.objective ? `: ${q.objective}` : ''
+      lines.push(`- ${q.name}${status}${obj}`)
+    }
+  }
+  const pcs = otherPcs.slice(0, maxPcs)
+  if (pcs.length) {
+    if (lines.length) lines.push('')
+    lines.push('Other party members you could turn to:')
+    for (const p of pcs) lines.push(`- ${p.name}`)
+  }
+  return lines.length ? lines.join('\n') : null
+}
+
+/**
+ * The volatile user turn for directions: the campaign-threads block, retrieved notes, current state,
+ * relationships — all as PLAIN TEXT (no citations) — then where things stand (or a between-scenes
+ * fallback when the situation is blank).
+ */
+export function buildDirectionsUserContent(
+  situation: string,
+  threads: string | null,
+  chunks: RetrievedChunk[],
+  relationships?: string | null,
+  state?: string | null
+): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = []
+  if (threads) {
+    content.push({
+      type: 'text',
+      text: `The campaign's unfinished business — draw your "next move" ideas from this real content:\n${threads}`
+    })
+  }
+  if (chunks.length) {
+    const notes = chunks
+      .map((c) => {
+        const title = c.sessionLabel ? `${c.entityName} — ${c.sessionLabel}` : c.entityName
+        return `## ${title}\n${c.content}`
+      })
+      .join('\n\n')
+    content.push({
+      type: 'text',
+      text: `Relevant campaign notes — treat as FACT for anything about the world:\n\n${notes}`
+    })
+  }
+  if (state) {
+    content.push({
+      type: 'text',
+      text: `Current state — this is the present moment; treat as FACT. Anything resolved here is DONE:\n${state}`
+    })
+  }
+  if (relationships) {
+    content.push({
+      type: 'text',
+      text: `Known relationships among the people and things above — treat as FACT (who owns/controls/is connected to what):\n${relationships}`
+    })
+  }
+  const trimmed = situation.trim()
+  content.push({
+    type: 'text',
+    text: trimmed
+      ? `Where things stand right now:\n${trimmed}`
+      : 'The party is between scenes with no specific prompt — suggest where this character would steer things next.'
+  })
+  return content
+}
+
+export interface SuggestDirectionsParams {
+  situation: string
+  threads: string | null
+  chunks: RetrievedChunk[]
+  relationships?: string | null
+  state?: string | null
+  context: SuggestContext
+  model: string
+  effort: 'medium' | 'high'
+  signal?: AbortSignal
+}
+
+/** Open-ended directions call. Returns raw suggestions (caller validates count/shape). */
+export async function suggestDirections(params: SuggestDirectionsParams): Promise<StorySuggestion[]> {
+  return structuredArrayCall<StorySuggestion>({
+    model: params.model,
+    effort: params.effort,
+    schema: DIRECTIONS_SCHEMA,
+    system: buildDirectionsSystem(params.context),
+    content: buildDirectionsUserContent(
+      params.situation,
+      params.threads,
+      params.chunks,
+      params.relationships,
+      params.state
+    ),
+    arrayKey: 'suggestions',
+    signal: params.signal
+  })
 }

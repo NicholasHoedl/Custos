@@ -76,6 +76,9 @@ const api: LedgerApi = {
     query: (input) => ipcRenderer.invoke(IPC.recallQuery, input),
     cancel: (requestId) => ipcRenderer.invoke(IPC.recallCancel, requestId)
   },
+  suggest: {
+    query: (input) => ipcRenderer.invoke(IPC.suggestQuery, input)
+  },
   persona: {
     get: (entityId) => ipcRenderer.invoke(IPC.personaGet, entityId),
     generate: (entityId) => ipcRenderer.invoke(IPC.personaGenerate, entityId),

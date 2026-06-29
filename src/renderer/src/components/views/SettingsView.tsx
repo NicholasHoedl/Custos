@@ -151,6 +151,48 @@ export function SettingsView() {
       <Separator />
 
       <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium text-foreground">Suggest</h2>
+        <p className="text-sm text-muted-foreground">
+          The model and reasoning depth used to suggest in-character actions. Opus reasons best; higher
+          effort is richer but slower at the table.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <div className="space-y-1.5">
+            <span className="block text-xs text-muted-foreground">Model</span>
+            <Select
+              value={settings?.suggestModel ?? 'claude-opus-4-8'}
+              onValueChange={(v) => update({ suggestModel: v as AppSettings['suggestModel'] })}
+            >
+              <SelectTrigger className="w-72">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claude-opus-4-8">Claude Opus 4.8 (default)</SelectItem>
+                <SelectItem value="claude-sonnet-4-6">Claude Sonnet 4.6 (faster)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <span className="block text-xs text-muted-foreground">Effort</span>
+            <Select
+              value={settings?.suggestEffort ?? 'high'}
+              onValueChange={(v) => update({ suggestEffort: v as AppSettings['suggestEffort'] })}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="high">High (default)</SelectItem>
+                <SelectItem value="medium">Medium (faster)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
         <h2 className="font-display text-lg font-medium text-foreground">Local search model</h2>
         <p className="text-sm text-muted-foreground">
           A small embedding model (~30 MB) powers semantic search. It runs entirely on your device.
