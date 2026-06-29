@@ -25,6 +25,7 @@ export function useSuggest(): SuggestState & {
   const [state, setState] = useState<SuggestState>(IDLE)
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
+  const scene = useAppStore((s) => s.scene)
   // Token to drop a stale in-flight result if the user resets or re-asks (e.g. toggles mode) first.
   const reqRef = useRef(0)
 
@@ -35,7 +36,13 @@ export function useSuggest(): SuggestState & {
       const token = ++reqRef.current
       setState({ status: 'thinking', result: null, error: null })
       ledger.suggest
-        .query({ campaignId: activeCampaignId, pcId: activePcId, situation: situation.trim(), mode })
+        .query({
+          campaignId: activeCampaignId,
+          pcId: activePcId,
+          situation: situation.trim(),
+          mode,
+          scene
+        })
         .then((result) => {
           if (reqRef.current === token) setState({ status: 'done', result, error: null })
         })
@@ -44,7 +51,7 @@ export function useSuggest(): SuggestState & {
             setState({ status: 'error', result: null, error: String(err) })
         })
     },
-    [activeCampaignId, activePcId]
+    [activeCampaignId, activePcId, scene]
   )
 
   const reset = useCallback(() => {

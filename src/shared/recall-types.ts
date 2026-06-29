@@ -1,4 +1,5 @@
 import type { EntityType } from './entity-types'
+import type { SceneContext } from './scene-types'
 
 // Shared types for Phase 2 Recall: the streaming request/response contract and the persona brief.
 
@@ -10,6 +11,8 @@ export interface RecallRequest {
   campaignId: string
   pcId: string | null
   mode: RecallMode
+  /** The current scene (location/time/party/quest/combat), folded into grounding. */
+  scene?: SceneContext
 }
 
 export interface RecallChunk {

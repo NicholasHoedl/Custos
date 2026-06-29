@@ -23,6 +23,7 @@ export function useRecall(): RecallState & {
   const [state, setState] = useState<RecallState>(IDLE)
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
+  const scene = useAppStore((s) => s.scene)
   const reqId = useRef<string | null>(null)
   const buffer = useRef('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -75,12 +76,19 @@ export function useRecall(): RecallState & {
       buffer.current = ''
       setState({ status: 'streaming', answer: '', sources: [], reason: null, error: null })
       ledger.recall
-        .query({ requestId, query: query.trim(), campaignId: activeCampaignId, pcId: activePcId, mode })
+        .query({
+          requestId,
+          query: query.trim(),
+          campaignId: activeCampaignId,
+          pcId: activePcId,
+          mode,
+          scene
+        })
         .catch((err) =>
           setState((s) => ({ ...s, status: 'error', error: { message: String(err), kind: 'unknown' } }))
         )
     },
-    [activeCampaignId, activePcId]
+    [activeCampaignId, activePcId, scene]
   )
 
   const cancel = useCallback(() => {

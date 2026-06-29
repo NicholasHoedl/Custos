@@ -2,6 +2,8 @@
 // action suggestions. Unlike Recall, Suggest is single-shot (request/response, not streaming) and
 // returns a structured set of recommendations (ADR-008, ADR-009).
 
+import type { SceneContext } from './scene-types'
+
 /** The seven roleplay attitudes a PC might adopt. The model picks the 4 most likely (SPEC §3). */
 export const ATTITUDES = [
   'neutral',
@@ -78,6 +80,8 @@ export interface SuggestRequest {
   situation: string
   /** Defaults to 'attitudes' when omitted (back-compat). */
   mode?: SuggestMode
+  /** The current scene (location/time/party/quest/combat), folded into grounding. */
+  scene?: SceneContext
 }
 
 export type SuggestFailureReason =

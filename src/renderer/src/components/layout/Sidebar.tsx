@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen,
+  Check,
+  ChevronsUpDown,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -8,10 +10,13 @@ import {
   Search,
   Settings,
   Sparkles,
-  Trash2
+  Swords,
+  Trash2,
+  X
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign, Session } from '@shared/entity-types'
+import { TIMES_OF_DAY, TIME_OF_DAY_LABELS, type TimeOfDay } from '@shared/scene-types'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { useCampaigns, useEntities, useSessions } from '@renderer/hooks/use-ledger'
@@ -37,6 +42,16 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { Badge } from '@renderer/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from '@renderer/components/ui/command'
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -78,6 +93,7 @@ export function Sidebar() {
         <CampaignSelector />
         {activeCampaignId && <SessionControl campaignId={activeCampaignId} />}
         {activeCampaignId && <ActivePcSelector campaignId={activeCampaignId} />}
+        {activeCampaignId && <SceneControls campaignId={activeCampaignId} />}
         {activeCampaignId && <SearchBox campaignId={activeCampaignId} />}
       </div>
 
@@ -744,5 +760,208 @@ function ActivePcSelector({ campaignId }: { campaignId: string }) {
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+const SCENE_NONE = '__none__'
+
+function isOpenQuestStatus(status: string | null): boolean {
+  return !status || !['completed', 'failed'].includes(status.toLowerCase())
+}
+
+// The "current scene" cluster: where the party is, the time, who's present, the quest in progress, and a
+// combat toggle. These feed the optional `scene` payload into Recall and Suggest (see use-recall /
+// use-suggest). Each entity-backed selector hides when its list is empty.
+function SceneControls({ campaignId }: { campaignId: string }) {
+  return (
+    <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          Scene
+        </span>
+        <CombatToggle />
+      </div>
+      <LocationSelector campaignId={campaignId} />
+      <EmbarkedQuestSelector campaignId={campaignId} />
+      <NearbyPcsSelector campaignId={campaignId} />
+      <TimeOfDaySelector />
+    </div>
+  )
+}
+
+function LocationSelector({ campaignId }: { campaignId: string }) {
+  const { entities: locations } = useEntities(campaignId, 'location')
+  const locationId = useAppStore((s) => s.scene.locationId)
+  const setSceneLocation = useAppStore((s) => s.setSceneLocation)
+  if (locations.length === 0) return null
+  return (
+    <Select
+      value={locationId ?? SCENE_NONE}
+      onValueChange={(v) => setSceneLocation(v === SCENE_NONE ? null : v)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Location" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SCENE_NONE}>No location</SelectItem>
+        {locations.map((l) => (
+          <SelectItem key={l.id} value={l.id}>
+            {l.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function EmbarkedQuestSelector({ campaignId }: { campaignId: string }) {
+  const { entities: quests } = useEntities(campaignId, 'quest')
+  const embarkedQuestId = useAppStore((s) => s.scene.embarkedQuestId)
+  const setEmbarkedQuest = useAppStore((s) => s.setEmbarkedQuest)
+
+  const openQuests = quests.filter((q) => isOpenQuestStatus(q.status))
+  // Keep the currently-selected quest visible even if it has since been completed/failed.
+  const options =
+    embarkedQuestId && !openQuests.some((q) => q.id === embarkedQuestId)
+      ? [...openQuests, ...quests.filter((q) => q.id === embarkedQuestId)]
+      : openQuests
+  if (options.length === 0) return null
+
+  return (
+    <Select
+      value={embarkedQuestId ?? SCENE_NONE}
+      onValueChange={(v) => setEmbarkedQuest(v === SCENE_NONE ? null : v)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Embarked quest" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SCENE_NONE}>No quest</SelectItem>
+        {options.map((q) => (
+          <SelectItem key={q.id} value={q.id}>
+            {q.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function TimeOfDaySelector() {
+  const timeOfDay = useAppStore((s) => s.scene.timeOfDay)
+  const setTimeOfDay = useAppStore((s) => s.setTimeOfDay)
+  return (
+    <Select
+      value={timeOfDay ?? SCENE_NONE}
+      onValueChange={(v) => setTimeOfDay(v === SCENE_NONE ? null : (v as TimeOfDay))}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Time of day" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SCENE_NONE}>Any time</SelectItem>
+        {TIMES_OF_DAY.map((t) => (
+          <SelectItem key={t} value={t}>
+            {TIME_OF_DAY_LABELS[t]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function NearbyPcsSelector({ campaignId }: { campaignId: string }) {
+  const { entities: pcs } = useEntities(campaignId, 'pc')
+  const activePcId = useAppStore((s) => s.activePcId)
+  const nearbyPcIds = useAppStore((s) => s.scene.nearbyPcIds)
+  const setNearbyPcs = useAppStore((s) => s.setNearbyPcs)
+  const [open, setOpen] = useState(false)
+
+  // The active PC is shown separately, never as "also present".
+  const options = pcs.filter((p) => p.id !== activePcId)
+  if (options.length === 0) return null
+
+  const selected = new Set(nearbyPcIds)
+  function toggle(id: string) {
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setNearbyPcs(options.filter((p) => next.has(p.id)).map((p) => p.id))
+  }
+  const selectedPcs = options.filter((p) => selected.has(p.id))
+  const label =
+    selectedPcs.length === 0
+      ? 'Party present'
+      : selectedPcs.length === 1
+        ? selectedPcs[0].name
+        : `${selectedPcs.length} present`
+
+  return (
+    <div className="space-y-1.5">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+          >
+            <span className={cn(selectedPcs.length === 0 && 'text-muted-foreground')}>{label}</span>
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search characters…" />
+            <CommandList>
+              <CommandEmpty>No characters.</CommandEmpty>
+              <CommandGroup>
+                {options.map((p) => (
+                  <CommandItem key={p.id} value={p.name} onSelect={() => toggle(p.id)}>
+                    <Check
+                      className={cn('size-4', selected.has(p.id) ? 'opacity-100' : 'opacity-0')}
+                    />
+                    {p.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {selectedPcs.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedPcs.map((p) => (
+            <Badge key={p.id} variant="secondary" className="gap-1 pr-1">
+              {p.name}
+              <button
+                type="button"
+                onClick={() => toggle(p.id)}
+                aria-label={`Remove ${p.name}`}
+                className="rounded-sm text-muted-foreground transition-colors hover:text-destructive"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CombatToggle() {
+  const inCombat = useAppStore((s) => s.scene.inCombat)
+  const setInCombat = useAppStore((s) => s.setInCombat)
+  return (
+    <Button
+      variant={inCombat ? 'destructive' : 'outline'}
+      size="sm"
+      className="h-7 gap-1.5 px-2 text-xs"
+      onClick={() => setInCombat(!inCombat)}
+    >
+      <Swords className="size-3.5" />
+      {inCombat ? 'In combat' : 'Out of combat'}
+    </Button>
   )
 }

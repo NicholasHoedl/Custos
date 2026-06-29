@@ -165,4 +165,50 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     expect(call.model).toBe('claude-opus-4-8')
     expect(call.effort).toBe('high')
   })
+
+  it('pins + states the current scene in the prompt', async () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
+    createSession(ctx, { campaignId })
+    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
+    updatePersona(ctx, pc.id, 'BRIEF')
+    const inn = createEntity(ctx, {
+      campaignId,
+      type: 'location',
+      name: 'Stonehill Inn',
+      status: 'Safe'
+    })
+    embedFn.mockResolvedValue(unit(0))
+    claudeSuggest.mockResolvedValue([
+      { attitude: 'moral', action: 'a', rationale: 'r' },
+      { attitude: 'hostile', action: 'a', rationale: 'r' },
+      { attitude: 'cynical', action: 'a', rationale: 'r' },
+      { attitude: 'friendly', action: 'a', rationale: 'r' }
+    ])
+
+    const res = await suggest(
+      ctx,
+      store,
+      {
+        campaignId,
+        pcId: pc.id,
+        situation: 'what now',
+        scene: {
+          locationId: inn.id,
+          embarkedQuestId: null,
+          nearbyPcIds: [],
+          timeOfDay: 'night',
+          inCombat: true
+        }
+      },
+      new AbortController().signal
+    )
+
+    expect(res.ok).toBe(true)
+    const call = claudeSuggest.mock.calls.at(-1)![0] as { scene: string | null; state: string | null }
+    expect(call.scene).toContain('Stonehill Inn')
+    expect(call.scene).toContain('In combat: yes')
+    expect(call.state).toContain('Stonehill Inn (location): Safe')
+  })
 })

@@ -147,4 +147,54 @@ describe('recall RAG pipeline (mocked AI)', () => {
     expect(call.relationships).toContain('Glasstaff') // edge gathered + formatted
     expect(call.relationships).toContain('Tresendar Manor')
   })
+
+  it('pins + states the current scene (location/quest) in the prompt', async () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
+    createSession(ctx, { campaignId })
+    const inn = createEntity(ctx, {
+      campaignId,
+      type: 'location',
+      name: 'Stonehill Inn',
+      status: 'Safe'
+    })
+    const quest = createEntity(ctx, {
+      campaignId,
+      type: 'quest',
+      name: 'Rescue Gundren',
+      status: 'Active',
+      attributes: { objective: 'Free Gundren' }
+    })
+    embedFn.mockResolvedValue(unit(0))
+    claudeRecall.mockResolvedValue([])
+
+    await ask(
+      ctx,
+      store,
+      () => {},
+      {
+        requestId: 'rs',
+        query: 'what now',
+        campaignId,
+        pcId: null,
+        mode: 'factual',
+        scene: {
+          locationId: inn.id,
+          embarkedQuestId: quest.id,
+          nearbyPcIds: [],
+          timeOfDay: 'evening',
+          inCombat: false
+        }
+      },
+      new AbortController().signal
+    )
+
+    const call = claudeRecall.mock.calls.at(-1)![0] as { scene: string | null; state: string | null }
+    expect(call.scene).toContain('Stonehill Inn')
+    expect(call.scene).toContain('Rescue Gundren')
+    expect(call.scene).toContain('When: Evening')
+    // The pinned location's status surfaces into the state grounding even though it wasn't retrieved.
+    expect(call.state).toContain('Stonehill Inn (location): Safe')
+  })
 })

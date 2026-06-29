@@ -8,7 +8,7 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
-const { buildSystem, buildUserContent, formatRelationships, formatState } = await import(
+const { buildSystem, buildUserContent, formatRelationships, formatState, formatScene } = await import(
   '../../../src/main/services/claude.service'
 )
 type Chunk = Parameters<typeof buildUserContent>[1][number]
@@ -137,5 +137,46 @@ describe('current-state grounding', () => {
     const text = content.map((b) => ('text' in b ? b.text : '')).join('\n')
     expect(text).toContain('Session 3')
     expect(text).toContain('present')
+  })
+})
+
+describe('scene grounding', () => {
+  it('formatScene renders where/when/combat/party/quest/here, and null when empty', () => {
+    const block = formatScene({
+      location: { name: 'Stonehill Inn', status: 'Safe', containerName: 'Phandalin' },
+      quest: { name: 'Rescue Gundren', objective: 'Find and free Gundren' },
+      nearbyPcNames: ['Elaria'],
+      hereNames: ['Toblen'],
+      timeOfDay: 'Evening',
+      inCombat: true,
+      sceneSet: true
+    })
+    expect(block).toContain('Where: Stonehill Inn (in Phandalin) — Safe')
+    expect(block).toContain('When: Evening')
+    expect(block).toContain('In combat: yes')
+    expect(block).toContain('Party present: Elaria')
+    expect(block).toContain('Pursuing: Rescue Gundren (Find and free Gundren)')
+    expect(block).toContain('Also here: Toblen')
+
+    expect(
+      formatScene({
+        location: null,
+        quest: null,
+        nearbyPcNames: [],
+        hereNames: [],
+        timeOfDay: null,
+        inCombat: false,
+        sceneSet: false
+      })
+    ).toBeNull()
+  })
+
+  it('buildUserContent inserts the scene block after state, before relationships', () => {
+    const content = buildUserContent('Q?', [], '- A owns B', '- state line', 'SCENE-BLOCK')
+    const texts = content.map((b) => ('text' in b ? b.text : ''))
+    const sceneIdx = texts.findIndex((t) => t === 'SCENE-BLOCK')
+    expect(sceneIdx).toBeGreaterThan(texts.findIndex((t) => t.includes('state line')))
+    expect(sceneIdx).toBeLessThan(texts.findIndex((t) => t.includes('A owns B')))
+    expect(content[content.length - 1]).toEqual({ type: 'text', text: 'Q?' })
   })
 })

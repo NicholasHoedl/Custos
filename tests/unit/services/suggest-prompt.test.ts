@@ -139,3 +139,28 @@ describe('directions prompt assembly', () => {
     expect((content[0] as { text: string }).text).toContain('between scenes')
   })
 })
+
+describe('scene block in suggest builders', () => {
+  it('buildSuggestUserContent inserts the scene after state, before relationships', () => {
+    const content = buildSuggestUserContent('S', [], '- A owns B', '- state line', 'SCENE-BLOCK')
+    const texts = content.map((b) => ('text' in b ? b.text : ''))
+    const sceneIdx = texts.findIndex((t) => t === 'SCENE-BLOCK')
+    expect(sceneIdx).toBeGreaterThan(texts.findIndex((t) => t.includes('state line')))
+    expect(sceneIdx).toBeLessThan(texts.findIndex((t) => t.includes('A owns B')))
+  })
+
+  it('buildDirectionsUserContent inserts the scene after state, before relationships', () => {
+    const content = buildDirectionsUserContent(
+      'S',
+      null,
+      [],
+      '- A owns B',
+      '- state line',
+      'SCENE-BLOCK'
+    )
+    const texts = content.map((b) => ('text' in b ? b.text : ''))
+    const sceneIdx = texts.findIndex((t) => t === 'SCENE-BLOCK')
+    expect(sceneIdx).toBeGreaterThan(texts.findIndex((t) => t.includes('state line')))
+    expect(sceneIdx).toBeLessThan(texts.findIndex((t) => t.includes('A owns B')))
+  })
+})

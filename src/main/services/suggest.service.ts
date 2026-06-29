@@ -31,6 +31,7 @@ import {
   suggestDirections as claudeSuggestDirections,
   type SuggestContext
 } from './claude.service'
+import { gatherPinned, resolveScene } from './scene.service'
 
 const TOP_K = 8
 const ATTITUDE_SET = new Set<string>(ATTITUDES)
@@ -165,9 +166,12 @@ export async function suggest(
 
     // Per retrieved entity: its relationships (ownership/alliances from entity_link, invisible to
     // embeddings) and current status, plus the latest session as the present-moment anchor.
+    const scene = resolveScene(ctx, req.scene, pcId)
     const seen = new Set<string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
     const stateItems: { name: string; type: string; status: string | null }[] = []
+    // Pin the current-scene entities into grounding first so they're always present, even off-vector.
+    gatherPinned(ctx, scene.pinned, seen, relItems, stateItems)
     for (const c of chunks) {
       if (seen.has(c.entityId)) continue
       seen.add(c.entityId)
@@ -189,9 +193,19 @@ export async function suggest(
 
     if (mode === 'directions') {
       // Open-ended: ground in the campaign's unfinished business + the rest of the party.
-      const openQuests = listEntities(ctx, campaignId, 'quest')
-        .filter((q) => isOpenQuest(q.status))
-        .map((q) => ({ name: q.name, status: q.status, objective: questObjective(q) }))
+      const openQuestEntities = listEntities(ctx, campaignId, 'quest').filter((q) =>
+        isOpenQuest(q.status)
+      )
+      // Pin the embarked quest even if it has been completed/failed, so directions can build on it.
+      const sceneQuest = scene.quest
+      if (sceneQuest && !openQuestEntities.some((q) => q.id === sceneQuest.id)) {
+        openQuestEntities.push(sceneQuest)
+      }
+      const openQuests = openQuestEntities.map((q) => ({
+        name: q.name,
+        status: q.status,
+        objective: questObjective(q)
+      }))
       const otherPcs = listEntities(ctx, campaignId, 'pc')
         .filter((p) => p.id !== pcId)
         .map((p) => ({ name: p.name }))
@@ -203,6 +217,7 @@ export async function suggest(
           chunks,
           relationships,
           state,
+          scene: scene.block,
           context,
           model: suggestModel,
           effort: suggestEffort,
@@ -221,6 +236,7 @@ export async function suggest(
         chunks,
         relationships,
         state,
+        scene: scene.block,
         context,
         model: suggestModel,
         effort: suggestEffort,

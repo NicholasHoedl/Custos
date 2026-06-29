@@ -75,7 +75,9 @@ RESTRAINT. The line isn't "less feeling" — it's "no FAKE feeling." Earned, spe
 
 RIGHT-SIZE IT. Match the length to the question and to how much this character truly has at stake in it. A small question — or a subject they barely know — gets a tight answer: a few sentences, sometimes one. Let it run longer only when the question genuinely opens up — real history with someone, a live stake, several threads at once. Length is earned by content, never by padding or by being thorough for its own sake; depth is specificity and honesty, not word count. When you don't have much, say the little you have and stop.
 
-FORM. Write as flowing inner monologue — continuous prose, the way a mind actually moves. NEVER use bullet points, numbered lists, headings, or any markdown. NEVER organize the answer into labelled items or a catalogue ("Item:", "First… Second…", "The smaller errands…", "Four threads:"). Even when the question spans many things, let them flow as one connected reflection, weighted toward what this character actually cares about — linger on what matters to them, pass quickly over what doesn't, and never give everything the same dutiful equal-weight tour. Output only the monologue — no headings, no inline source citations (the app shows sources separately).`
+FORM. Write as flowing inner monologue — continuous prose, the way a mind actually moves. NEVER use bullet points, numbered lists, headings, or any markdown. NEVER organize the answer into labelled items or a catalogue ("Item:", "First… Second…", "The smaller errands…", "Four threads:"). Even when the question spans many things, let them flow as one connected reflection, weighted toward what this character actually cares about — linger on what matters to them, pass quickly over what doesn't, and never give everything the same dutiful equal-weight tour. Output only the monologue — no headings, no inline source citations (the app shows sources separately).
+
+PRESENT SCENE. A "present scene" block may tell you where you are, the time of day, who's here with you, what you're pursuing, and whether you're in a fight — treat it as your immediate now. Let it pull your attention: mid-fight your thoughts run fast, urgent, physical; at rest they drift to the people around you and the threads still open.`
 
 const FEW_SHOT = `Example — the DEPTH and FORM to reach (a different character and campaign; borrow none of its facts, and do NOT copy its melancholy register — a blunt, cheerful, or ice-cold character reaches the same depth in their OWN words).
 
@@ -84,7 +86,7 @@ Cyrus Mordrane, a proud draconic sorcerer, asked "Who is Marduk?":
 
 Why it works: it FLOWS as one unbroken thought — no lists, no labels, no inventory. It reaches for the sensory and specific (the candlelight, the rings, the corrected hands) and lets the feeling stay complicated (what he wishes were true vs. what is; "harder to say aloud"). The WORLD-fact is grounded — Marduk holds the gate, can't be trusted — while the private history and its ache are Cyrus's own to render. Reach that depth and that flow, in your character's voice — and only at the length the subject earns (Cyrus has years with Marduk; a near-stranger would get a few honest lines, not a tour). And remember: wanting is not having — Cyrus could covet Marduk's staff, but never claim it's his unless the notes or relationships say so.`
 
-const FACTUAL_INSTRUCTIONS = `You are a campaign-notes assistant for a tabletop RPG. Answer the question using ONLY the retrieved notes, the current-state block, and the relationships provided. Be direct, concise, and neutral. Do not speculate or invent anything they do not support. Treat the current-state block as the present: completed or failed quests and dead, defeated, or disbanded entities are RESOLVED — describe them as done, not ongoing. If the notes do not contain the answer, say so plainly. Write in plain prose — no bullet points, numbered lists, headings, or markdown. Do not add inline citations — the application displays sources separately.`
+const FACTUAL_INSTRUCTIONS = `You are a campaign-notes assistant for a tabletop RPG. Answer the question using ONLY the retrieved notes, the current-state block, and the relationships provided. Be direct, concise, and neutral. Do not speculate or invent anything they do not support. Treat the current-state block as the present: completed or failed quests and dead, defeated, or disbanded entities are RESOLVED — describe them as done, not ongoing. If the notes do not contain the answer, say so plainly. Write in plain prose — no bullet points, numbered lists, headings, or markdown. Do not add inline citations — the application displays sources separately. A "present scene" block may state where the party is, the time of day, who's present, the active quest, and whether they're in combat — treat it as the present moment.`
 
 export interface RecallContext {
   campaignName: string
@@ -165,6 +167,42 @@ export function formatState(
   return lines.length ? lines.join('\n') : null
 }
 
+export interface SceneFacts {
+  location: { name: string; status: string | null; containerName: string | null } | null
+  quest: { name: string; objective: string | null } | null
+  nearbyPcNames: string[]
+  hereNames: string[]
+  timeOfDay: string | null
+  inCombat: boolean
+  sceneSet: boolean
+}
+
+/**
+ * Render the CURRENT SCENE — the table's present moment (where the party is, the time, who's present,
+ * the quest in progress, whether they're in a fight, and who/what is here). A concise, factual,
+ * present-tense block (sibling of formatState). Returns null when nothing meaningful is set.
+ */
+export function formatScene(facts: SceneFacts): string | null {
+  if (!facts.sceneSet) return null
+  const lines: string[] = ['The present scene — treat as FACT (this is the immediate now):']
+  if (facts.location) {
+    const where = facts.location.containerName
+      ? `${facts.location.name} (in ${facts.location.containerName})`
+      : facts.location.name
+    const status = facts.location.status ? ` — ${facts.location.status}` : ''
+    lines.push(`- Where: ${where}${status}`)
+  }
+  if (facts.timeOfDay) lines.push(`- When: ${facts.timeOfDay}`)
+  lines.push(`- In combat: ${facts.inCombat ? 'yes' : 'no'}`)
+  if (facts.nearbyPcNames.length) lines.push(`- Party present: ${facts.nearbyPcNames.join(', ')}`)
+  if (facts.quest) {
+    const objective = facts.quest.objective ? ` (${facts.quest.objective})` : ''
+    lines.push(`- Pursuing: ${facts.quest.name}${objective}`)
+  }
+  if (facts.hereNames.length) lines.push(`- Also here: ${facts.hereNames.join(', ')}`)
+  return lines.join('\n')
+}
+
 /**
  * The volatile user turn: retrieved notes as citeable document blocks, then (if any) the current-state
  * block, the relationships block, and finally the question.
@@ -173,7 +211,8 @@ export function buildUserContent(
   query: string,
   chunks: RetrievedChunk[],
   relationships?: string | null,
-  state?: string | null
+  state?: string | null,
+  scene?: string | null
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = chunks.map((c) => ({
     type: 'document',
@@ -186,6 +225,9 @@ export function buildUserContent(
       type: 'text',
       text: `Current state — this is the present moment; treat as FACT. Anything resolved here is DONE:\n${state}`
     })
+  }
+  if (scene) {
+    content.push({ type: 'text', text: scene })
   }
   if (relationships) {
     content.push({
@@ -234,6 +276,7 @@ export interface RecallParams {
   chunks: RetrievedChunk[]
   relationships?: string | null
   state?: string | null
+  scene?: string | null
   mode: RecallMode
   context: RecallContext
   model: string
@@ -253,7 +296,13 @@ export async function recall(params: RecallParams): Promise<RecallSource[]> {
       messages: [
         {
           role: 'user',
-          content: buildUserContent(params.query, params.chunks, params.relationships, params.state)
+          content: buildUserContent(
+            params.query,
+            params.chunks,
+            params.relationships,
+            params.state,
+            params.scene
+          )
         }
       ]
     },
@@ -302,7 +351,9 @@ WRITE A REAL ACTION, NOT A LABEL. Each action is something the player could actu
 
 GROUND IT. Everything you treat as a world-fact — who's who, who holds or controls what, what's resolved, what's still open — must come from the notes, the current state, or the relationships. Don't invent events, possessions, alliances, or outcomes. The character may suspect, hope, or intend (that's theirs), but never assert an arrangement the notes don't establish. Read the current state as the present: don't propose acting on a quest already completed or confronting someone already dead or defeated.
 
-RATIONALE. One short line per option: why THIS attitude fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.`
+RATIONALE. One short line per option: why THIS attitude fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
+
+PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them, the quest in progress, and whether they're in a fight — weight the four options to that moment: in combat, lean to immediate, physical, tactical choices; at rest, to social or exploratory ones.`
 
 /**
  * The structured-output schema for Suggest. JSON Schema cannot enforce array length or attitude
@@ -376,7 +427,8 @@ export function buildSuggestUserContent(
   situation: string,
   chunks: RetrievedChunk[],
   relationships?: string | null,
-  state?: string | null
+  state?: string | null,
+  scene?: string | null
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (chunks.length) {
@@ -397,6 +449,9 @@ export function buildSuggestUserContent(
       text: `Current state — this is the present moment; treat as FACT. Anything resolved here is DONE:\n${state}`
     })
   }
+  if (scene) {
+    content.push({ type: 'text', text: scene })
+  }
   if (relationships) {
     content.push({
       type: 'text',
@@ -412,6 +467,7 @@ export interface SuggestParams {
   chunks: RetrievedChunk[]
   relationships?: string | null
   state?: string | null
+  scene?: string | null
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
@@ -474,7 +530,8 @@ export async function suggest(params: SuggestParams): Promise<AttitudeRecommenda
       params.situation,
       params.chunks,
       params.relationships,
-      params.state
+      params.state,
+      params.scene
     ),
     arrayKey: 'recommendations',
     signal: params.signal
@@ -501,7 +558,9 @@ GROUND IT IN REAL CONTENT. Name actual quests, people, places, and items from th
 
 FIT THE CHARACTER. These are the moves THIS PC would actually be drawn to — weight them by the brief's values, fears, and wants. A pious cleric and a greedy rogue, idle in the same town, should suggest different next steps. Each suggestion is a concrete action in the player's hands (a sentence), not a vague theme; the rationale (one line) says why it fits this character or the story.
 
-AIM for about six to eight suggestions spanning a few different categories — enough to give real choices without burying them. Quality over quantity; skip a category rather than pad it.`
+AIM for about six to eight suggestions spanning a few different categories — enough to give real choices without burying them. Quality over quantity; skip a category rather than pad it.
+
+PRESENT SCENE. If a "present scene" block is given, prefer moves that fit where the party is, the time of day, who's present, and the quest in progress; if they're in a fight, lean toward immediate, in-the-moment moves rather than errands or travel.`
 
 /** Structured-output schema for directions. Length isn't enforceable here — suggest.service validates. */
 const DIRECTIONS_SCHEMA = {
@@ -564,7 +623,8 @@ export function buildDirectionsUserContent(
   threads: string | null,
   chunks: RetrievedChunk[],
   relationships?: string | null,
-  state?: string | null
+  state?: string | null,
+  scene?: string | null
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (threads) {
@@ -591,6 +651,9 @@ export function buildDirectionsUserContent(
       text: `Current state — this is the present moment; treat as FACT. Anything resolved here is DONE:\n${state}`
     })
   }
+  if (scene) {
+    content.push({ type: 'text', text: scene })
+  }
   if (relationships) {
     content.push({
       type: 'text',
@@ -613,6 +676,7 @@ export interface SuggestDirectionsParams {
   chunks: RetrievedChunk[]
   relationships?: string | null
   state?: string | null
+  scene?: string | null
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
@@ -631,7 +695,8 @@ export async function suggestDirections(params: SuggestDirectionsParams): Promis
       params.threads,
       params.chunks,
       params.relationships,
-      params.state
+      params.state,
+      params.scene
     ),
     arrayKey: 'suggestions',
     signal: params.signal
