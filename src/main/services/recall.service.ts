@@ -86,7 +86,17 @@ export async function ask(
     }
 
     const queryVec = await embed(query)
-    const chunks = store.search(queryVec, campaignId, TOP_K)
+    const denseChunks = store.search(queryVec, campaignId, TOP_K)
+    // Hybrid retrieval: dense embeddings miss a misspelled proper noun ("glastav" → "Glasstaff").
+    // Fuzzy-match the query against entity NAMES and fold those entities in (description + a few notes)
+    // so the thing the player named always surfaces, even when the spelling is off.
+    const fuzzy = store.fuzzyEntityChunks(
+      campaignId,
+      query,
+      new Set(denseChunks.map((c) => c.entityId)),
+      2
+    )
+    const chunks = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
 
     // Resolve effective mode + persona (fall back to factual when there's no active PC / no persona).
     let effectiveMode: RecallMode = 'factual'
