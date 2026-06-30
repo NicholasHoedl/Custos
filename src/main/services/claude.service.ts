@@ -1,9 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { RecallMode, RecallSource } from '@shared/recall-types'
 import {
-  ATTITUDES,
+  SUGGEST_TAGS,
   SUGGEST_CATEGORIES,
-  type AttitudeRecommendation,
+  type MomentSuggestion,
   type StorySuggestion
 } from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
@@ -334,34 +334,36 @@ export async function complete(system: string, user: string, model: string): Pro
 
 // ---- Suggest prompt (Phase 3) ----
 
-const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks and what they value, a set of retrieved campaign notes, a snapshot of the current state, the known relationships among the people and things involved, and the situation facing the party right now.
+const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks and what they value, the character's race and class, a set of retrieved campaign notes, a snapshot of the current state, the known relationships among the people and things involved, and the situation facing the party right now.
 
-Your job: pick the FOUR attitudes, from the seven below, that THIS character is most likely to take in THIS moment, and for each write one concrete in-character ACTION and a one-line RATIONALE.
+Your job: give EIGHT different ways THIS character might play THIS moment. Each option is one concrete in-character ACTION, tagged with ONE primary tag (its dominant flavor) plus up to TWO secondary tags, and a one-line RATIONALE. The eight PRIMARY tags must all be different, so the eight options feel genuinely distinct — not eight shades of the same move.
 
-THE SEVEN ATTITUDES (choose four, all different):
-- neutral — impartial, noncommittal; hold back and gather more before committing.
-- friendly — cooperative, trusting; reach for alliance and common ground.
-- hostile — confrontational, aggressive; oppose, threaten, or strike.
-- moral — principled; do what's right even at a cost, hold to a line.
-- selfish — self-serving; put this character's own gain or safety first.
-- compassionate — caring; protect or help others, even the vulnerable, at personal cost.
-- cynical — distrustful, skeptical; assume hidden motives and look for the angle.
+TAGS NAME THE KIND OF MOVE. Choose from this vocabulary:
+- Social stance: friendly, hostile, diplomatic, defiant, intimidating, suspicious, forthright, inspiring
+- Risk & nerve: cautious, reckless, patient, impatient, bold
+- Physical: forceful, nimble, defensive
+- Method: stealthy, deceptive, cunning, resourceful, tactical, analytical, investigative, pragmatic
+- Mind: insightful, perceptive, educated, curious
+- Values: religious, primal, honorable, merciful, vengeful, protective, loyal, sacrificial
+- Self-interest: selfish, greedy
+- Other: playful, survival
+You MAY also tag a move with the character's OWN race or class when it leans into who they are (a cleric calling on faith → "cleric"; a dwarf's stonecraft → "dwarf"). Use ONLY this character's race and class — never another race or class. The primary tag is the move's main flavor; secondary tags add nuance — include 0, 1, or 2 only when they genuinely apply, and never repeat the primary tag.
 
-PICK WHAT FITS THIS CHARACTER. Choose the four attitudes this PC would realistically be torn between here — not a tidy spread of all seven. A blunt zealot and a greedy rogue facing the same scene should not get the same four. Let the brief's values, fears, wants, and stakes drive the choice. The four attitudes must be distinct.
+PICK WHAT FITS THIS CHARACTER. Choose the eight moves this PC would realistically weigh here — let the brief's values, fears, wants, and stakes drive them. A blunt zealot and a greedy rogue facing the same scene should not get the same eight. Lean on the tags that suit who they are; not every option needs a race or class tag.
 
-WRITE A REAL ACTION, NOT A LABEL. Each action is something the player could actually do or say at the table this turn — concrete and specific to this situation and this character. "Demand the mayor explain the missing shipments in front of the council" — not "be aggressive." Keep each action to a sentence or two, in this character's register (honor the brief's diction and attitude). The action embodies the attitude; don't restate the attitude's name.
+WRITE A REAL ACTION, NOT A LABEL. Each action is something the player could actually do or say at the table this turn — concrete and specific to this situation and this character. "Demand the mayor explain the missing shipments in front of the council" — not "be aggressive." Keep each action to a sentence or two, in this character's register (honor the brief's diction and attitude). The action embodies the tags; don't just restate them.
 
 GROUND IT. Everything you treat as a world-fact — who's who, who holds or controls what, what's resolved, what's still open — must come from the notes, the current state, or the relationships. Don't invent events, possessions, alliances, or outcomes. The character may suspect, hope, or intend (that's theirs), but never assert an arrangement the notes don't establish. Read the current state as the present: don't propose acting on a quest already completed or confronting someone already dead or defeated.
 
-RATIONALE. One short line per option: why THIS attitude fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
+RATIONALE. One short line per option: why THIS move fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
 
 PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them (party) and who they're facing (NPCs/factions), the quest in progress, and the scene's MODE. Let the mode steer the kind of action — Combat: immediate, physical, tactical; Social: persuasion, leverage, reading people; Stealth: avoid notice, scout, misdirect; Exploration: investigate, search, press deeper; Downtime: rest, personal threads, prepare; Travel: on the road, plan ahead — and aim the options at whoever the character is facing.`
 
 /**
- * The structured-output schema for Suggest. JSON Schema cannot enforce array length or attitude
- * uniqueness (minItems/maxItems/uniqueItems are unsupported) — `suggest.service` validates "exactly 4
- * distinct" in code. The `attitude` enum and required action+rationale ARE enforced here. Every object
- * needs additionalProperties:false for structured outputs.
+ * The structured-output schema for Suggest's "in the moment" mode. JSON Schema cannot enforce array
+ * length or tag uniqueness (minItems/maxItems/uniqueItems are unsupported) — `suggest.service`
+ * validates "exactly 5 with distinct primary tags" and cleans the secondary tags in code. The tag
+ * enums and required fields ARE enforced here. Every object needs additionalProperties:false.
  */
 const SUGGEST_SCHEMA = {
   type: 'object',
@@ -373,11 +375,12 @@ const SUGGEST_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          attitude: { type: 'string', enum: [...ATTITUDES] },
+          primaryTag: { type: 'string', enum: [...SUGGEST_TAGS] },
+          secondaryTags: { type: 'array', items: { type: 'string', enum: [...SUGGEST_TAGS] } },
           action: { type: 'string' },
           rationale: { type: 'string' }
         },
-        required: ['attitude', 'action', 'rationale']
+        required: ['primaryTag', 'secondaryTags', 'action', 'rationale']
       }
     }
   },
@@ -388,10 +391,16 @@ export interface SuggestContext {
   campaignName: string
   campaignDescription: string | null
   pcName: string | null
+  pcRace: string | null
+  pcClass: string | null
   persona: string | null
 }
 
-/** Shared system prefix for both Suggest modes: instructions + campaign + persona brief (cached). */
+/**
+ * Shared system prefix for both Suggest modes: instructions + campaign + (race/class) + persona brief.
+ * The race/class line is a bare fact so the "in the moment" prompt knows which race/class tags are
+ * legal; it's harmless context for directions mode. The persona stays last (the cached prefix boundary).
+ */
 function suggestSystemBlocks(
   ctx: SuggestContext,
   instructions: string
@@ -399,18 +408,23 @@ function suggestSystemBlocks(
   const campaign = `Campaign: ${ctx.campaignName}${
     ctx.campaignDescription ? `\n${ctx.campaignDescription}` : ''
   }`
-  return [
+  const blocks: Anthropic.TextBlockParam[] = [
     { type: 'text', text: instructions },
-    { type: 'text', text: campaign },
-    {
-      type: 'text',
-      text: `Character brief for ${ctx.pcName ?? 'the character'}:\n\n${ctx.persona ?? ''}`,
-      cache_control: { type: 'ephemeral' }
-    }
+    { type: 'text', text: campaign }
   ]
+  const traits = [ctx.pcRace, ctx.pcClass].filter(Boolean).join(' ')
+  if (traits) {
+    blocks.push({ type: 'text', text: `This character is a ${traits}.` })
+  }
+  blocks.push({
+    type: 'text',
+    text: `Character brief for ${ctx.pcName ?? 'the character'}:\n\n${ctx.persona ?? ''}`,
+    cache_control: { type: 'ephemeral' }
+  })
+  return blocks
 }
 
-/** System prompt for attitudes (closed-ended) mode. */
+/** System prompt for the "in the moment" (attitudes) mode. */
 export function buildSuggestSystem(ctx: SuggestContext): Anthropic.TextBlockParam[] {
   return suggestSystemBlocks(ctx, SUGGEST_INSTRUCTIONS)
 }
@@ -521,9 +535,9 @@ async function structuredArrayCall<T>(opts: {
   return arr as T[]
 }
 
-/** Closed-ended attitudes call. Returns raw recommendations (caller enforces the 4-distinct rule). */
-export async function suggest(params: SuggestParams): Promise<AttitudeRecommendation[]> {
-  return structuredArrayCall<AttitudeRecommendation>({
+/** "In the moment" call. Returns raw suggestions (caller enforces the 8-distinct-primary rule). */
+export async function suggest(params: SuggestParams): Promise<MomentSuggestion[]> {
+  return structuredArrayCall<MomentSuggestion>({
     model: params.model,
     effort: params.effort,
     schema: SUGGEST_SCHEMA,

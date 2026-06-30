@@ -31,20 +31,26 @@ function chunk(over: Partial<Chunk> = {}): Chunk {
   }
 }
 
-describe('suggest prompt assembly (attitudes)', () => {
-  it('system carries campaign + persona brief (cached at the end) and the attitude taxonomy', () => {
+describe('suggest prompt assembly (in the moment)', () => {
+  it('system carries campaign + persona brief (cached at the end), race/class, and the tag vocabulary', () => {
     const sys = buildSuggestSystem({
       campaignName: 'Phandelver',
       campaignDescription: 'a frontier town',
       pcName: 'Vargas',
+      pcRace: 'elf',
+      pcClass: 'wizard',
       persona: 'THE-CHARACTER-BRIEF'
     })
     const text = sys.map((b) => b.text).join('\n')
     expect(text).toContain('Phandelver')
     expect(text).toContain('THE-CHARACTER-BRIEF')
-    // the seven-attitude taxonomy lives in the instructions
-    expect(text).toContain('compassionate')
-    expect(text).toContain('cynical')
+    // the moment-tag vocabulary + eight-options framing live in the instructions
+    expect(text).toContain('EIGHT')
+    expect(text).toContain('religious')
+    expect(text).toContain('investigative')
+    expect(text).toContain('forceful') // an expansion tag is present in the vocabulary
+    // the PC's race/class are stated so the model knows which race/class tags are legal
+    expect(text).toContain('elf wizard')
     // the cacheable breakpoint is on the last (persona) block
     expect(sys[sys.length - 1].cache_control).toEqual({ type: 'ephemeral' })
   })
@@ -84,6 +90,8 @@ describe('directions prompt assembly', () => {
       campaignName: 'Phandelver',
       campaignDescription: null,
       pcName: 'Vargas',
+      pcRace: null,
+      pcClass: null,
       persona: 'THE-BRIEF'
     })
     const text = sys.map((b) => b.text).join('\n')

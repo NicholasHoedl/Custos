@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { AttitudeRecommendation, StorySuggestion } from '@shared/suggest-types'
+import type { MomentSuggestion, StorySuggestion } from '@shared/suggest-types'
 
 // Exercise the REAL suggest orchestration + validation + vector store on an in-memory DB; mock only the
 // modules that touch electron / the network / the Claude SDK. The hoisted fns are controllable per test.
@@ -67,11 +67,17 @@ import { BruteForceVectorStore } from '../../../src/main/services/vector-store.s
 import { suggest } from '../../../src/main/services/suggest.service'
 
 function rec(
-  attitude: string,
+  primaryTag: string,
   action = 'do the thing',
-  rationale = 'fits them'
-): AttitudeRecommendation {
-  return { attitude: attitude as AttitudeRecommendation['attitude'], action, rationale }
+  rationale = 'fits them',
+  secondaryTags: string[] = []
+): MomentSuggestion {
+  return {
+    primaryTag: primaryTag as MomentSuggestion['primaryTag'],
+    secondaryTags: secondaryTags as MomentSuggestion['secondaryTags'],
+    action,
+    rationale
+  }
 }
 
 function dir(
@@ -100,40 +106,52 @@ beforeEach(() => {
   embedFn.mockResolvedValue(new Float32Array(384))
 })
 
-describe('suggest.service — attitudes mode', () => {
-  it('returns 4 distinct recommendations on a valid response', async () => {
+describe('suggest.service — in-the-moment mode', () => {
+  // eight valid, distinct primary tags — the happy-path response shape
+  const EIGHT = [
+    'religious',
+    'hostile',
+    'cunning',
+    'friendly',
+    'protective',
+    'merciful',
+    'honorable',
+    'bold'
+  ]
+
+  it('returns 8 distinct-primary suggestions on a valid response', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue([rec('moral'), rec('hostile'), rec('cynical'), rec('friendly')])
+    claudeSuggestFn.mockResolvedValue(EIGHT.map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     if (res.ok && res.mode === 'attitudes')
-      expect(res.recommendations.map((r) => r.attitude)).toEqual([
-        'moral',
-        'hostile',
-        'cynical',
-        'friendly'
-      ])
+      expect(res.recommendations.map((r) => r.primaryTag)).toEqual(EIGHT)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(1)
   })
 
-  it('trims a 5+ response down to the first 4 distinct', async () => {
+  it('trims a 9+ response down to the first 8 distinct primaries', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue([
-      rec('moral'),
-      rec('hostile'),
-      rec('cynical'),
-      rec('friendly'),
-      rec('selfish')
-    ])
+    claudeSuggestFn.mockResolvedValue([...EIGHT, 'selfish'].map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(4)
+    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(8)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(1)
   })
 
-  it('retries once, then fails with reason "invalid" when distinct attitudes < 4', async () => {
+  it('retries once, then fails with reason "invalid" when distinct primaries < 8', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue([rec('moral'), rec('moral'), rec('hostile'), rec('')])
+    // a duplicate and an invalid tag drop out, leaving only 7 distinct → short of 8
+    claudeSuggestFn.mockResolvedValue([
+      rec('religious'),
+      rec('religious'), // duplicate primary → dropped
+      rec('hostile'),
+      rec('cunning'),
+      rec('friendly'),
+      rec('protective'),
+      rec('merciful'),
+      rec('honorable'),
+      rec('') // invalid primary → dropped
+    ])
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toBe('invalid')
@@ -143,26 +161,51 @@ describe('suggest.service — attitudes mode', () => {
   it('recovers on the retry when the first response is short', async () => {
     const { ctx, store, campaignId, pc } = setup()
     claudeSuggestFn
-      .mockResolvedValueOnce([rec('moral'), rec('hostile')])
-      .mockResolvedValueOnce([rec('moral'), rec('hostile'), rec('cynical'), rec('friendly')])
+      .mockResolvedValueOnce([rec('religious'), rec('hostile')])
+      .mockResolvedValueOnce(EIGHT.map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(2)
   })
 
-  it('drops entries with a blank action or unknown attitude', async () => {
+  it('drops entries with a blank action or unknown primary tag', async () => {
     const { ctx, store, campaignId, pc } = setup()
     claudeSuggestFn.mockResolvedValue([
-      rec('moral'),
+      rec('religious'),
       rec('hostile', '   '), // blank action → dropped
-      rec('bogus'), // not an attitude → dropped
-      rec('cynical'),
-      rec('friendly')
+      rec('bogus'), // not a tag → dropped
+      rec('cunning'),
+      rec('friendly'),
+      rec('protective'),
+      rec('merciful'),
+      rec('honorable')
     ])
-    // moral, cynical, friendly survive (3 distinct) → invalid both attempts
+    // six valid distinct survive (< 8) → invalid both attempts
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toBe('invalid')
+  })
+
+  it('cleans secondary tags: dedupes, drops invalid + primary-equal, caps at 2', async () => {
+    const { ctx, store, campaignId, pc } = setup()
+    claudeSuggestFn.mockResolvedValue([
+      rec('religious', 'a', 'r', ['merciful', 'merciful', 'bogus', 'religious', 'honorable', 'bold']),
+      rec('hostile'),
+      rec('cunning'),
+      rec('friendly'),
+      rec('protective'),
+      rec('merciful'),
+      rec('honorable'),
+      rec('bold')
+    ])
+    const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
+    expect(res.ok).toBe(true)
+    if (res.ok && res.mode === 'attitudes') {
+      const first = res.recommendations[0]
+      expect(first.primaryTag).toBe('religious')
+      // deduped, 'bogus' dropped, primary ('religious') dropped, capped at 2
+      expect(first.secondaryTags).toEqual(['merciful', 'honorable'])
+    }
   })
 })
 

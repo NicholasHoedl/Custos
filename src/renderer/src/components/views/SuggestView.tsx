@@ -2,33 +2,25 @@ import { useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   BookOpen,
-  Coins,
   Download,
-  Eye,
   Flag,
-  Handshake,
   Heart,
-  HeartHandshake,
   KeyRound,
   MapPin,
   Package,
   RotateCcw,
-  Scale,
   ScrollText,
-  ShieldCheck,
   Sparkles,
-  Swords,
   User,
   Users,
   WifiOff,
   type LucideIcon
 } from 'lucide-react'
 import {
-  ATTITUDE_LABELS,
   CATEGORY_LABELS,
   SUGGEST_CATEGORIES,
-  type Attitude,
-  type AttitudeRecommendation,
+  tagLabel,
+  type MomentSuggestion,
   type StorySuggestion,
   type SuggestCategory,
   type SuggestFailureReason,
@@ -41,16 +33,6 @@ import { useSuggest } from '@renderer/hooks/use-suggest'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
-
-const ATTITUDE_ICONS: Record<Attitude, LucideIcon> = {
-  neutral: Scale,
-  friendly: Handshake,
-  hostile: Swords,
-  moral: ShieldCheck,
-  selfish: Coins,
-  compassionate: HeartHandshake,
-  cynical: Eye
-}
 
 const CATEGORY_ICONS: Record<SuggestCategory, LucideIcon> = {
   quest: ScrollText,
@@ -194,7 +176,7 @@ export function SuggestView() {
         </div>
         <p className="text-xs text-muted-foreground">
           {mode === 'attitudes'
-            ? 'Four ways to react to this moment, in your character’s voice.'
+            ? 'Eight tagged ways to react to this moment, in your character’s voice.'
             : 'Ways to move the story forward — grounded in your open quests and the party.'}
         </p>
       </div>
@@ -203,7 +185,7 @@ export function SuggestView() {
         {suggest.status === 'idle' && (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
             {mode === 'attitudes'
-              ? 'Four attitude options will appear here, drawn from who your character is and what’s happened.'
+              ? 'Eight tagged options will appear here, drawn from who your character is and what’s happened.'
               : 'Story directions will appear here — grouped by kind, drawn from your open quests, the party, and where you are.'}
           </p>
         )}
@@ -230,7 +212,7 @@ export function SuggestView() {
         {suggest.status === 'done' && suggest.result?.ok && suggest.result.mode === 'attitudes' && (
           <div className="grid gap-3 sm:grid-cols-2">
             {suggest.result.recommendations.map((r) => (
-              <AttitudeCard key={r.attitude} rec={r} />
+              <MomentCard key={r.primaryTag} rec={r} />
             ))}
           </div>
         )}
@@ -280,15 +262,21 @@ function ModeToggle({
   )
 }
 
-function AttitudeCard({ rec }: { rec: AttitudeRecommendation }) {
-  const Icon = ATTITUDE_ICONS[rec.attitude]
+function MomentCard({ rec }: { rec: MomentSuggestion }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card/60 p-4">
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 text-primary" />
-        <h3 className="font-display text-lg font-medium text-foreground">
-          {ATTITUDE_LABELS[rec.attitude]}
-        </h3>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="rounded-md bg-primary/15 px-2 py-0.5 font-display text-sm font-medium text-primary">
+          {tagLabel(rec.primaryTag)}
+        </span>
+        {rec.secondaryTags.map((t) => (
+          <span
+            key={t}
+            className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+          >
+            {tagLabel(t)}
+          </span>
+        ))}
       </div>
       <p className="text-[15px] leading-relaxed text-foreground/90">{rec.action}</p>
       <p className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">

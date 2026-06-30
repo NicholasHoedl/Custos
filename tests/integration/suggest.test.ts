@@ -60,7 +60,12 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId }) // Session 1 — the present anchor
-    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
+    const pc = createEntity(ctx, {
+      campaignId,
+      type: 'pc',
+      name: 'Vargas',
+      attributes: { ancestry: 'half-elf', class: 'paladin' }
+    })
     updatePersona(ctx, pc.id, 'PC BRIEF: greedy and bold')
     const glasstaff = createEntity(ctx, {
       campaignId,
@@ -80,10 +85,14 @@ describe('suggest RAG pipeline (mocked AI)', () => {
 
     embedFn.mockResolvedValue(unit(0)) // the situation embeds toward the Glasstaff note
     claudeSuggest.mockResolvedValue([
-      { attitude: 'moral', action: 'a', rationale: 'r' },
-      { attitude: 'hostile', action: 'a', rationale: 'r' },
-      { attitude: 'cynical', action: 'a', rationale: 'r' },
-      { attitude: 'friendly', action: 'a', rationale: 'r' }
+      { primaryTag: 'religious', secondaryTags: ['merciful'], action: 'a', rationale: 'r' },
+      { primaryTag: 'hostile', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'cunning', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'friendly', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'protective', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'merciful', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'honorable', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'bold', secondaryTags: [], action: 'a', rationale: 'r' }
     ])
 
     const res = await suggest(
@@ -94,11 +103,16 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     )
 
     expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(4)
+    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(8)
 
     expect(claudeSuggest).toHaveBeenCalledTimes(1)
     const call = claudeSuggest.mock.calls[0][0] as {
-      context: { persona: string | null; pcName: string | null }
+      context: {
+        persona: string | null
+        pcName: string | null
+        pcRace: string | null
+        pcClass: string | null
+      }
       chunks: Array<{ content: string }>
       state: string | null
       relationships: string | null
@@ -107,6 +121,8 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     }
     expect(call.context.persona).toBe('PC BRIEF: greedy and bold')
     expect(call.context.pcName).toBe('Vargas')
+    expect(call.context.pcRace).toBe('half-elf') // from pc.attributes.ancestry
+    expect(call.context.pcClass).toBe('paladin') // from pc.attributes.class
     expect(call.chunks.some((c) => c.content.includes('Redbrands'))).toBe(true)
     expect(call.state).toContain('Glasstaff (npc): Defeated') // resolved status surfaced
     expect(call.state).toMatch(/most recent session is Session 1/) // present anchor
@@ -181,10 +197,14 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     })
     embedFn.mockResolvedValue(unit(0))
     claudeSuggest.mockResolvedValue([
-      { attitude: 'moral', action: 'a', rationale: 'r' },
-      { attitude: 'hostile', action: 'a', rationale: 'r' },
-      { attitude: 'cynical', action: 'a', rationale: 'r' },
-      { attitude: 'friendly', action: 'a', rationale: 'r' }
+      { primaryTag: 'religious', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'hostile', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'cunning', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'friendly', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'protective', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'merciful', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'honorable', secondaryTags: [], action: 'a', rationale: 'r' },
+      { primaryTag: 'bold', secondaryTags: [], action: 'a', rationale: 'r' }
     ])
 
     const res = await suggest(

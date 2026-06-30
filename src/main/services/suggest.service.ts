@@ -1,15 +1,15 @@
 import { lookup } from 'node:dns/promises'
 import { eq } from 'drizzle-orm'
 import {
-  ATTITUDES,
+  SUGGEST_TAGS,
   SUGGEST_CATEGORIES,
-  type Attitude,
-  type AttitudeRecommendation,
+  type MomentSuggestion,
   type StorySuggestion,
   type SuggestCategory,
   type SuggestFailureReason,
   type SuggestRequest,
-  type SuggestResult
+  type SuggestResult,
+  type SuggestTag
 } from '@shared/suggest-types'
 import type { Entity } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
@@ -34,7 +34,7 @@ import {
 import { gatherPinned, resolveScene } from './scene.service'
 
 const TOP_K = 8
-const ATTITUDE_SET = new Set<string>(ATTITUDES)
+const TAG_SET = new Set<string>(SUGGEST_TAGS)
 
 async function isOnline(): Promise<boolean> {
   try {
@@ -57,27 +57,39 @@ function fail(reason: SuggestFailureReason): SuggestResult {
 }
 
 /**
- * Enforce the rule the JSON schema can't: exactly 4 recommendations with DISTINCT attitudes and
- * non-empty action + rationale. Drops malformed/duplicate entries and trims extras; returns null if
- * fewer than 4 valid distinct attitudes survive (caller then retries / fails).
+ * Enforce the rules the JSON schema can't: exactly 8 suggestions with DISTINCT primary tags and
+ * non-empty action + rationale. Secondary tags are cleaned (valid enum, deduped, ≤2, never equal to the
+ * primary). Drops malformed/duplicate-primary entries and trims extras; returns null if fewer than 8
+ * valid distinct-primary suggestions survive (caller then retries / fails).
  */
-function validateAttitudes(recs: AttitudeRecommendation[]): AttitudeRecommendation[] | null {
+function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
   const seen = new Set<string>()
-  const clean: AttitudeRecommendation[] = []
+  const clean: MomentSuggestion[] = []
   for (const r of recs) {
-    if (!r || typeof r.attitude !== 'string' || !ATTITUDE_SET.has(r.attitude)) continue
+    if (!r || typeof r.primaryTag !== 'string' || !TAG_SET.has(r.primaryTag)) continue
     if (typeof r.action !== 'string' || !r.action.trim()) continue
     if (typeof r.rationale !== 'string' || !r.rationale.trim()) continue
-    if (seen.has(r.attitude)) continue
-    seen.add(r.attitude)
+    if (seen.has(r.primaryTag)) continue
+    const primary = r.primaryTag as SuggestTag
+    const secondary: SuggestTag[] = []
+    if (Array.isArray(r.secondaryTags)) {
+      for (const t of r.secondaryTags) {
+        if (typeof t !== 'string' || !TAG_SET.has(t)) continue
+        if (t === primary || secondary.includes(t as SuggestTag)) continue
+        secondary.push(t as SuggestTag)
+        if (secondary.length === 2) break
+      }
+    }
+    seen.add(primary)
     clean.push({
-      attitude: r.attitude as Attitude,
+      primaryTag: primary,
+      secondaryTags: secondary,
       action: r.action.trim(),
       rationale: r.rationale.trim()
     })
-    if (clean.length === 4) break
+    if (clean.length === 8) break
   }
-  return clean.length === 4 ? clean : null
+  return clean.length === 8 ? clean : null
 }
 
 const CATEGORY_SET = new Set<string>(SUGGEST_CATEGORIES)
@@ -116,7 +128,7 @@ function validateDirections(suggestions: StorySuggestion[]): StorySuggestion[] |
 /**
  * Run a Suggest query: resolve the PC + persona (regenerating a stale brief) → embed the situation →
  * vector search + fuzzy name match → gather relationships/state → ask Claude (structured, single-shot)
- * for 4 attitude-based actions → validate (retry once). Returns a discriminated SuggestResult so the
+ * for 8 tagged actions → validate (retry once). Returns a discriminated SuggestResult so the
  * renderer can show offline / no-key / no-PC states without try/catch (ADR-008, ADR-009).
  */
 export async function suggest(
@@ -157,10 +169,18 @@ export async function suggest(
       .from(schema.campaign)
       .where(eq(schema.campaign.id, campaignId))
       .get()
+    // Race/class come from the PC's profile attributes; they tell the prompt which race/class tags are
+    // legal for this character (a dwarf paladin may be tagged "dwarf"/"paladin", never "elf").
+    const attrStr = (k: string): string | null => {
+      const v = pc.attributes[k]
+      return typeof v === 'string' && v.trim() ? v.trim() : null
+    }
     const context: SuggestContext = {
       campaignName: campaign?.name ?? 'the campaign',
       campaignDescription: campaign?.description ?? null,
       pcName: pc.name,
+      pcRace: attrStr('ancestry'),
+      pcClass: attrStr('class'),
       persona: persona.brief
     }
 
@@ -230,7 +250,7 @@ export async function suggest(
       return { ok: true, mode: 'directions', suggestions }
     }
 
-    const callOnce = (): Promise<AttitudeRecommendation[]> =>
+    const callOnce = (): Promise<MomentSuggestion[]> =>
       claudeSuggest({
         situation,
         chunks,
@@ -242,9 +262,9 @@ export async function suggest(
         effort: suggestEffort,
         signal
       })
-    // One retry: the model occasionally returns fewer than 4 or a duplicate attitude.
-    let recs = validateAttitudes(await callOnce())
-    if (!recs) recs = validateAttitudes(await callOnce())
+    // One retry: the model occasionally returns fewer than 8 or a duplicate primary tag.
+    let recs = validateMoment(await callOnce())
+    if (!recs) recs = validateMoment(await callOnce())
     if (!recs) return fail('invalid')
     return { ok: true, mode: 'attitudes', recommendations: recs }
   } catch (err) {

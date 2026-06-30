@@ -4,40 +4,110 @@
 
 import type { SceneContext } from './scene-types'
 
-/** The seven roleplay attitudes a PC might adopt. The model picks the 4 most likely (SPEC §3). */
-export const ATTITUDES = [
-  'neutral',
+// The "in the moment" tag vocabulary. Each suggestion gets ONE primary tag (its dominant flavor) plus
+// up to two secondary tags, drawn from this pool. Disposition tags describe the KIND of move; the
+// race/class tags let a move lean into who the PC is (the model only ever applies the PC's OWN race
+// and class — see SUGGEST_INSTRUCTIONS / suggest.service).
+export const DISPOSITION_TAGS = [
   'friendly',
   'hostile',
-  'moral',
+  'diplomatic',
+  'defiant',
+  'intimidating',
+  'cautious',
+  'reckless',
+  'impatient',
+  'patient',
+  'stealthy',
+  'deceptive',
+  'cunning',
+  'resourceful',
+  'tactical',
+  'bold',
+  'insightful',
+  'investigative',
+  'educated',
+  'analytical',
+  'religious',
+  'honorable',
+  'merciful',
+  'vengeful',
+  'protective',
   'selfish',
-  'compassionate',
-  'cynical'
+  'greedy',
+  'curious',
+  'loyal',
+  'playful',
+  'survival',
+  'sacrificial',
+  // Expansion: distrust, candor, leadership, the body (forceful/nimble/defensive), keen senses,
+  // results-over-principle, and a tie to the wild.
+  'suspicious',
+  'forthright',
+  'inspiring',
+  'forceful',
+  'nimble',
+  'defensive',
+  'perceptive',
+  'pragmatic',
+  'primal'
 ] as const
 
-export type Attitude = (typeof ATTITUDES)[number]
+/** Standard player races — a move may be tagged with the PC's OWN race (never another's). */
+export const RACE_TAGS = [
+  'human',
+  'elf',
+  'drow',
+  'half-elf',
+  'dwarf',
+  'halfling',
+  'gnome',
+  'half-orc',
+  'tiefling',
+  'dragonborn'
+] as const
 
-/** Human labels for the attitude cards (UI). */
-export const ATTITUDE_LABELS: Record<Attitude, string> = {
-  neutral: 'Neutral',
-  friendly: 'Friendly',
-  hostile: 'Hostile',
-  moral: 'Moral',
-  selfish: 'Selfish',
-  compassionate: 'Compassionate',
-  cynical: 'Cynical'
+/** Standard player classes — a move may be tagged with the PC's OWN class. */
+export const CLASS_TAGS = [
+  'barbarian',
+  'bard',
+  'cleric',
+  'druid',
+  'fighter',
+  'monk',
+  'paladin',
+  'ranger',
+  'rogue',
+  'sorcerer',
+  'warlock',
+  'wizard'
+] as const
+
+export const SUGGEST_TAGS = [...DISPOSITION_TAGS, ...RACE_TAGS, ...CLASS_TAGS] as const
+export type SuggestTag = (typeof SUGGEST_TAGS)[number]
+
+/** Display label for a tag — title-cased and hyphen-aware (e.g. "half-elf" → "Half-Elf"). */
+export function tagLabel(tag: string): string {
+  return tag
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('-')
 }
 
-/** One suggested stance: the attitude, a concrete in-character action, and why it fits this PC. */
-export interface AttitudeRecommendation {
-  attitude: Attitude
+/**
+ * One "in the moment" suggestion: a concrete in-character action, its dominant PRIMARY tag, up to two
+ * SECONDARY tags for nuance, and a one-line rationale tying it to the character.
+ */
+export interface MomentSuggestion {
+  primaryTag: SuggestTag
+  secondaryTags: SuggestTag[]
   action: string
   rationale: string
 }
 
 /**
- * Suggest has two modes: 'attitudes' (closed-ended — 4 ways to react to a charged moment) and
- * 'directions' (open-ended — story-progression moves to keep things going).
+ * Suggest has two modes: 'attitudes' (the "in the moment" mode — 8 tagged ways to react to a charged
+ * moment) and 'directions' (open-ended — story-progression moves to keep things going).
  */
 export type SuggestMode = 'attitudes' | 'directions'
 
@@ -94,11 +164,11 @@ export type SuggestFailureReason =
   | 'unknown'
 
 /**
- * The result of a Suggest query, discriminated by `mode`. Attitudes mode returns exactly 4 distinct
- * recommendations; directions mode returns a grouped set of story suggestions. On failure, a reason the
- * renderer can render without try/catch (mirrors RecallDone.reason).
+ * The result of a Suggest query, discriminated by `mode`. Attitudes ("in the moment") mode returns
+ * exactly 8 multi-tagged suggestions; directions mode returns a grouped set of story suggestions. On
+ * failure, a reason the renderer can render without try/catch (mirrors RecallDone.reason).
  */
 export type SuggestResult =
-  | { ok: true; mode: 'attitudes'; recommendations: AttitudeRecommendation[] }
+  | { ok: true; mode: 'attitudes'; recommendations: MomentSuggestion[] }
   | { ok: true; mode: 'directions'; suggestions: StorySuggestion[] }
   | { ok: false; reason: SuggestFailureReason; message?: string }
