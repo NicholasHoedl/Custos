@@ -31,14 +31,12 @@ test('capture flow: campaign, session, entities, note, link, search, delete', as
   await page.getByRole('button', { name: 'New session' }).click()
   await expect(page.getByText(/Session 1/).first()).toBeVisible()
 
-  // Flow B — quick-add an NPC; it opens in the detail panel.
+  // Flow B — quick-add an NPC with an optional session-linked first note; it opens in the detail panel.
   await quickAdd.fill('Aldric Vane')
+  await page.getByPlaceholder('First note (optional)').fill('Owes the party a favor.')
   await quickAdd.press('Enter')
   await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
-
-  // Add a timestamped, session-linked note.
-  await page.getByPlaceholder(/Add a note/).fill('Owes the party a favor.')
-  await page.getByRole('button', { name: 'Add note' }).click()
+  // The note shows under the entity in its (now read-only) note list.
   await expect(page.getByText('Owes the party a favor.')).toBeVisible()
 
   // A second NPC, so we have something to link to.

@@ -12,7 +12,6 @@ import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
 import { PersonaEditor } from './PersonaEditor'
 import { Button } from '@renderer/components/ui/button'
-import { Textarea } from '@renderer/components/ui/textarea'
 import { Separator } from '@renderer/components/ui/separator'
 import {
   AlertDialog,
@@ -28,27 +27,18 @@ import {
 interface EntityDetailProps {
   entityId: string
   allEntities: Entity[]
-  sessionId: string | null
   onEntityChanged: () => void
   onDeleted: () => void
 }
 
 // The full record for a single entity: identity, hierarchy breadcrumb, traits/goals/attributes,
-// relationships, and the session-linked note stream. This is where the 90s-budget capture happens.
-export function EntityDetail({
-  entityId,
-  allEntities,
-  sessionId,
-  onEntityChanged,
-  onDeleted
-}: EntityDetailProps) {
+// relationships, and its note stream (read-only here — notes are authored on the Notes page).
+export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted }: EntityDetailProps) {
   const { entity, refresh: refreshEntity } = useEntity(entityId)
   const { notes, refresh: refreshNotes } = useNotes(entityId)
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [noteText, setNoteText] = useState('')
-  const [savingNote, setSavingNote] = useState(false)
   const [hierarchy, setHierarchy] = useState<HierarchyView | null>(null)
 
   const isHierarchical = entity?.type === 'location' || entity?.type === 'faction'
@@ -71,25 +61,6 @@ export function EntityDetail({
         Loading…
       </div>
     )
-  }
-
-  async function addNote() {
-    const content = noteText.trim()
-    if (!content || savingNote) return
-    setSavingNote(true)
-    try {
-      await ledger.note.create({
-        entityId: entity!.id,
-        sessionId: sessionId ?? undefined,
-        content
-      })
-      setNoteText('')
-      refreshNotes()
-    } catch (err) {
-      toast.error('Could not add note', { description: String(err) })
-    } finally {
-      setSavingNote(false)
-    }
   }
 
   async function removeNote(id: string) {
@@ -187,25 +158,6 @@ export function EntityDetail({
 
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Notes</h3>
-          <div className="flex flex-col gap-2">
-            <Textarea
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              rows={2}
-              placeholder="Add a note…  (Ctrl+Enter to save)"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault()
-                  addNote()
-                }
-              }}
-            />
-            <div className="flex justify-end">
-              <Button size="sm" onClick={addNote} disabled={!noteText.trim() || savingNote}>
-                Add note
-              </Button>
-            </div>
-          </div>
           {notes.length === 0 ? (
             <p className="text-xs text-muted-foreground">No notes yet.</p>
           ) : (

@@ -9,10 +9,18 @@ import {
 } from '../../../src/main/services/campaign.service'
 import { createEntity, getEntity, listEntities } from '../../../src/main/services/entity.service'
 import { createSession, listSessions } from '../../../src/main/services/session.service'
-import { createNote, listNotes } from '../../../src/main/services/note.service'
+import { createNote, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
 import { createLink } from '../../../src/main/services/link.service'
+import { BruteForceVectorStore } from '../../../src/main/services/vector-store.service'
 import { makeTestDb } from '../../helpers/test-db'
+
+// A deterministic unit vector so the cascade test can prove a note's embedding is swept on delete.
+function unit(i: number): Float32Array {
+  const v = new Float32Array(384)
+  v[i] = 1
+  return v
+}
 
 describe('campaign.service', () => {
   let ctx: DbContext
@@ -34,7 +42,13 @@ describe('campaign.service', () => {
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
     const inn = createEntity(ctx, { campaignId, type: 'location', name: 'Copper Kettle' })
     const session = createSession(ctx, { campaignId })
-    createNote(ctx, { entityId: npc.id, sessionId: session.id, content: 'owes a favor' })
+    const store = new BruteForceVectorStore(ctx)
+    const note = createNote(ctx, {
+      entityIds: [npc.id],
+      sessionId: session.id,
+      content: 'owes a favor'
+    })
+    store.upsertNote(note.id, unit(0), 'h')
     createLink(ctx, { campaignId, fromEntityId: npc.id, toEntityId: inn.id, relation: 'located_in' })
     createEvent(ctx, { sessionId: session.id, content: 'Aldric appears', entityId: npc.id })
 
@@ -48,7 +62,8 @@ describe('campaign.service', () => {
     expect(listSessions(ctx, campaignId)).toHaveLength(0)
     expect(listEntities(ctx, campaignId)).toHaveLength(0)
     expect(getEntity(ctx, npc.id)).toBeNull()
-    expect(listNotes(ctx, npc.id)).toHaveLength(0)
+    expect(listNotesForEntity(ctx, npc.id)).toHaveLength(0)
+    expect(store.noteHash(note.id)).toBeNull() // note row swept (no campaign FK) + embedding cascaded
     expect(listEvents(ctx, session.id)).toHaveLength(0)
 
     // The other campaign survives intact.

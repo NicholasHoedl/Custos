@@ -42,11 +42,12 @@ export function searchText(ctx: DbContext, query: string, campaignId: string): E
     })
   }
 
-  // Note-content hits surface their parent entity.
+  // Note-content hits surface every in-campaign entity the note is associated with (M2M via note_entity).
   const noteHits = ctx.drizzle
     .select({ entity: schema.entity, note: schema.note })
     .from(schema.note)
-    .innerJoin(schema.entity, eq(schema.note.entityId, schema.entity.id))
+    .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
+    .innerJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
     .where(and(eq(schema.entity.campaignId, campaignId), like(schema.note.content, pattern)))
     .all()
   for (const { entity: e, note: n } of noteHits) {

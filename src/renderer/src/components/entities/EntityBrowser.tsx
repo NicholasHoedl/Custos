@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollText, Search } from 'lucide-react'
+import { ScrollText, Search, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -10,6 +10,8 @@ import { cn } from '@renderer/lib/utils'
 import { Input } from '@renderer/components/ui/input'
 
 export type EntityFilter = EntityType | 'all'
+/** Which non-entity pane the capture detail area shows when no entity is selected. */
+export type CapturePanel = 'session' | 'notes'
 
 const FILTERS: EntityFilter[] = ['all', ...ENTITY_TYPES]
 
@@ -19,8 +21,12 @@ interface EntityBrowserProps {
   filter: EntityFilter
   onFilterChange: (filter: EntityFilter) => void
   onSelect: (id: string) => void
-  /** Clear the selection and return the detail pane to the session log. */
+  /** The active non-entity pane (drives the header highlight when nothing is selected). */
+  panel: CapturePanel
+  /** Clear the selection and show the session log in the detail pane. */
   onShowSessionLog: () => void
+  /** Clear the selection and show the notes pane in the detail pane. */
+  onShowNotes: () => void
 }
 
 // Master list of all entities in the campaign, filtered client-side by type (chips, with live counts)
@@ -32,7 +38,9 @@ export function EntityBrowser({
   filter,
   onFilterChange,
   onSelect,
-  onShowSessionLog
+  panel,
+  onShowSessionLog,
+  onShowNotes
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
 
@@ -47,18 +55,30 @@ export function EntityBrowser({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border p-2">
+      <div className="space-y-1 border-b border-border p-2">
         <button
           onClick={onShowSessionLog}
           className={cn(
             'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-            selectedId
-              ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-              : 'bg-primary/15 text-primary'
+            !selectedId && panel === 'session'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
           )}
         >
           <ScrollText className="size-4" />
           Session Log
+        </button>
+        <button
+          onClick={onShowNotes}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+            !selectedId && panel === 'notes'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+          )}
+        >
+          <StickyNote className="size-4" />
+          Notes
         </button>
       </div>
       <div className="border-b border-border">

@@ -66,10 +66,10 @@ export function rowToEntity(r: typeof schema.entity.$inferSelect): Entity {
   }
 }
 
-export function rowToNote(r: typeof schema.note.$inferSelect): Note {
+export function rowToNote(r: typeof schema.note.$inferSelect, entityIds: string[]): Note {
   return {
     id: r.id,
-    entityId: r.entityId,
+    entityIds,
     sessionId: r.sessionId,
     content: r.content,
     tags: parseArray(r.tags),

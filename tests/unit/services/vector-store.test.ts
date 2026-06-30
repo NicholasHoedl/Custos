@@ -28,8 +28,8 @@ describe('vector-store (brute-force cosine)', () => {
   })
 
   it('ranks the closest note first and is campaign-scoped', () => {
-    const n1 = createNote(ctx, { entityId: npc.id, content: 'the north road ambush' })
-    const n2 = createNote(ctx, { entityId: npc.id, content: 'turnip prices' })
+    const n1 = createNote(ctx, { entityIds: [npc.id], content: 'the north road ambush' })
+    const n2 = createNote(ctx, { entityIds: [npc.id], content: 'turnip prices' })
     store.upsertNote(n1.id, vec(0), 'h1')
     store.upsertNote(n2.id, vec(1), 'h2')
 
@@ -47,8 +47,21 @@ describe('vector-store (brute-force cosine)', () => {
     expect(entityChunk?.entityId).toBe(npc.id)
   })
 
+  it('emits ONE note chunk per note even when shared, attributed to the first entity by name', () => {
+    // A note tagged to two entities must not produce two identical chunks (no prompt duplication).
+    const zara = createEntity(ctx, { campaignId, type: 'npc', name: 'Zara' })
+    const aldous = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldous' })
+    const shared = createNote(ctx, { entityIds: [zara.id, aldous.id], content: 'a shared secret' })
+    store.upsertNote(shared.id, vec(3), 'h')
+
+    const noteChunks = store.search(vec(3), campaignId, 10).filter((c) => c.kind === 'note')
+    expect(noteChunks).toHaveLength(1)
+    expect(noteChunks[0].noteId).toBe(shared.id)
+    expect(noteChunks[0].entityName).toBe('Aldous') // representative = first by name (Aldous < Zara)
+  })
+
   it('tracks content hashes and removes', () => {
-    const n = createNote(ctx, { entityId: npc.id, content: 'x' })
+    const n = createNote(ctx, { entityIds: [npc.id], content: 'x' })
     store.upsertNote(n.id, vec(0), 'h1')
     expect(store.noteHash(n.id)).toBe('h1')
     store.upsertNote(n.id, vec(2), 'h2') // re-embed updates the hash
@@ -79,7 +92,7 @@ describe('fuzzy entity matching (typo-tolerant retrieval)', () => {
       name: 'Iarno "Glasstaff" Albrek',
       description: 'The masked Redbrand leader.'
     })
-    createNote(ctx, { entityId: glass.id, content: 'We took his staff and he begged.' })
+    createNote(ctx, { entityIds: [glass.id], content: 'We took his staff and he begged.' })
     createEntity(ctx, { campaignId, type: 'npc', name: 'Sildar Hallwinter' }) // should NOT match
 
     const hits = store.fuzzyEntityChunks(campaignId, 'who is glastav?', new Set(), 2)

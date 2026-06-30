@@ -53,9 +53,14 @@ export type UpdateEntityInput = Partial<
   Pick<Entity, 'name' | 'description' | 'traits' | 'goals' | 'attributes' | 'status'>
 >
 export interface CreateNoteInput {
-  entityId: string
+  entityIds: string[] // the note is associated with one or more entities (M2M); must be non-empty
   sessionId?: string
   content: string
+  tags?: string[]
+}
+export interface UpdateNoteInput {
+  content?: string
+  entityIds?: string[] // when present, replaces the note's entity associations (must be non-empty)
   tags?: string[]
 }
 export interface CreateEventInput {
@@ -105,8 +110,9 @@ export interface LedgerApi {
   }
   note: {
     list(entityId: string): Promise<Note[]>
+    listAll(campaignId: string): Promise<Note[]>
     create(input: CreateNoteInput): Promise<Note>
-    update(id: string, patch: { content?: string }): Promise<Note>
+    update(id: string, patch: UpdateNoteInput): Promise<Note>
     delete(id: string): Promise<void>
   }
   event: {
@@ -179,6 +185,7 @@ export const IPC = {
   entityUpdate: 'entity:update',
   entityDelete: 'entity:delete',
   noteList: 'note:list',
+  noteListAll: 'note:listAll',
   noteCreate: 'note:create',
   noteUpdate: 'note:update',
   noteDelete: 'note:delete',

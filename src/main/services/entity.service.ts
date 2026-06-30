@@ -3,6 +3,7 @@ import type { Entity, EntityType } from '@shared/entity-types'
 import type { CreateEntityInput, UpdateEntityInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
+import { deleteOrphanNotes } from './note.service'
 import { newId, now, rowToEntity, serializeArray, serializeObject } from './serialize'
 
 export function listEntities(ctx: DbContext, campaignId: string, type?: EntityType): Entity[] {
@@ -57,10 +58,12 @@ export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInpu
 }
 
 /**
- * Deletes an entity. Foreign keys (with `foreign_keys = ON`) cascade the cleanup: its notes and all
- * links touching it (either end) are removed, and any event_log reference is set to null (the session
- * log entry survives). See schema.ts onDelete rules.
+ * Deletes an entity. Foreign keys (with `foreign_keys = ON`) cascade the cleanup: its note_entity
+ * links and every entity_link touching it (either end) are removed, and any event_log reference is set
+ * to null (the session log entry survives). Notes are M2M, so a shared note survives losing this one
+ * entity; a note then left with no entities is removed by deleteOrphanNotes. See schema.ts onDelete.
  */
 export function deleteEntity(ctx: DbContext, id: string): void {
   ctx.drizzle.delete(schema.entity).where(eq(schema.entity.id, id)).run()
+  deleteOrphanNotes(ctx)
 }

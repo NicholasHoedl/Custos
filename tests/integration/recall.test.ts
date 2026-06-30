@@ -50,11 +50,11 @@ describe('recall RAG pipeline (mocked AI)', () => {
     const session = createSession(ctx, { campaignId })
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric Vane' })
     const relevant = createNote(ctx, {
-      entityId: npc.id,
+      entityIds: [npc.id],
       sessionId: session.id,
       content: 'Aldric warned the party about the north road ambush.'
     })
-    const other = createNote(ctx, { entityId: npc.id, content: 'Aldric mentioned turnip prices.' })
+    const other = createNote(ctx, { entityIds: [npc.id], content: 'Aldric mentioned turnip prices.' })
     store.upsertNote(relevant.id, unit(0), 'h1')
     store.upsertNote(other.id, unit(1), 'h2')
 
@@ -124,7 +124,7 @@ describe('recall RAG pipeline (mocked AI)', () => {
       toEntityId: manor.id,
       relation: 'located_in'
     })
-    const note = createNote(ctx, { entityId: glasstaff.id, content: 'Glasstaff led the Redbrands.' })
+    const note = createNote(ctx, { entityIds: [glasstaff.id], content: 'Glasstaff led the Redbrands.' })
     store.upsertNote(note.id, unit(0), 'h')
     embedFn.mockResolvedValue(unit(0))
     claudeRecall.mockResolvedValue([])

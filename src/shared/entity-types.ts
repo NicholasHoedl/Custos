@@ -58,7 +58,7 @@ export interface Entity {
 
 export interface Note {
   id: string
-  entityId: string
+  entityIds: string[] // the entities this note is associated with (M2M); always ≥1
   sessionId: string | null
   content: string
   tags: string[]

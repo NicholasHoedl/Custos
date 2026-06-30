@@ -42,6 +42,7 @@ const api: LedgerApi = {
   },
   note: {
     list: (entityId) => ipcRenderer.invoke(IPC.noteList, entityId),
+    listAll: (campaignId) => ipcRenderer.invoke(IPC.noteListAll, campaignId),
     create: (input) => ipcRenderer.invoke(IPC.noteCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.noteUpdate, id, patch),
     delete: (id) => ipcRenderer.invoke(IPC.noteDelete, id)

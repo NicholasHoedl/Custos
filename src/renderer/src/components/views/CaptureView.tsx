@@ -4,8 +4,13 @@ import { useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { QuickAddBar } from '@renderer/components/capture/QuickAddBar'
 import { EventFeed } from '@renderer/components/capture/EventFeed'
-import { EntityBrowser, type EntityFilter } from '@renderer/components/entities/EntityBrowser'
+import {
+  EntityBrowser,
+  type CapturePanel,
+  type EntityFilter
+} from '@renderer/components/entities/EntityBrowser'
 import { EntityDetail } from '@renderer/components/entities/EntityDetail'
+import { NotesView } from '@renderer/components/views/NotesView'
 
 // Master/detail capture surface: quick-add on top, the entity browser on the left, and either the
 // selected entity's detail or the live session log on the right.
@@ -15,6 +20,7 @@ export function CaptureView() {
   const selectedEntityId = useAppStore((s) => s.selectedEntityId)
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [filter, setFilter] = useState<EntityFilter>('all')
+  const [capturePanel, setCapturePanel] = useState<CapturePanel>('session')
   const { entities, refresh } = useEntities(activeCampaignId)
 
   if (!activeCampaignId) {
@@ -53,7 +59,15 @@ export function CaptureView() {
             filter={filter}
             onFilterChange={setFilter}
             onSelect={setSelectedEntity}
-            onShowSessionLog={() => setSelectedEntity(null)}
+            panel={capturePanel}
+            onShowSessionLog={() => {
+              setSelectedEntity(null)
+              setCapturePanel('session')
+            }}
+            onShowNotes={() => {
+              setSelectedEntity(null)
+              setCapturePanel('notes')
+            }}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -62,13 +76,14 @@ export function CaptureView() {
               key={selectedEntityId}
               entityId={selectedEntityId}
               allEntities={entities}
-              sessionId={activeSessionId}
               onEntityChanged={refresh}
               onDeleted={() => {
                 setSelectedEntity(null)
                 refresh()
               }}
             />
+          ) : capturePanel === 'notes' ? (
+            <NotesView key={activeCampaignId} />
           ) : (
             <EventFeed sessionId={activeSessionId} />
           )}

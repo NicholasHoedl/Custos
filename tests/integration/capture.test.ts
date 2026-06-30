@@ -25,7 +25,7 @@ describe('capture integration', () => {
     const sword = createEntity(ctx, { campaignId: c.id, type: 'item', name: 'Old Sword' })
 
     createNote(ctx, {
-      entityId: aldric.id,
+      entityIds: [aldric.id],
       sessionId: s1.id,
       content: 'Said the north road is dangerous — bandits in the last month'
     })

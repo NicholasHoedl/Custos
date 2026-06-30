@@ -75,7 +75,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
       toEntityId: manor.id,
       relation: 'located_in'
     })
-    const note = createNote(ctx, { entityId: glasstaff.id, content: 'Glasstaff led the Redbrands.' })
+    const note = createNote(ctx, { entityIds: [glasstaff.id], content: 'Glasstaff led the Redbrands.' })
     store.upsertNote(note.id, unit(0), 'h')
 
     embedFn.mockResolvedValue(unit(0)) // the situation embeds toward the Glasstaff note

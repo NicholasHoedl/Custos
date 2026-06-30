@@ -1,4 +1,12 @@
-import { sqliteTable, text, integer, blob, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  sqliteTable,
+  text,
+  integer,
+  blob,
+  index,
+  uniqueIndex,
+  primaryKey
+} from 'drizzle-orm/sqlite-core'
 
 // Phase 1: a typed property graph. Entities are nodes; entity_link rows are typed, directed edges.
 // Containment hierarchy (located_in/contains, member_of/has_member) is just edges traversed with
@@ -53,19 +61,40 @@ export const entity = sqliteTable(
   ]
 )
 
+// A note's content + provenance. Its entity association lives entirely in note_entity (M2M) — a note
+// has no entity_id column (dropped in 0004); it carries an optional session_id for "when".
 export const note = sqliteTable(
   'note',
   {
     id: text('id').primaryKey(),
-    entityId: text('entity_id')
-      .notNull()
-      .references(() => entity.id, { onDelete: 'cascade' }),
     sessionId: text('session_id').references(() => session.id, { onDelete: 'set null' }),
     content: text('content').notNull(),
     tags: text('tags'), // JSON string[]
     createdAt: integer('created_at').notNull()
   },
-  (t) => [index('note_entity_idx').on(t.entityId), index('note_session_idx').on(t.sessionId)]
+  (t) => [index('note_session_idx').on(t.sessionId)]
+)
+
+// One note ↔ many entities (M2M). After migration 0004 this is the SOLE source of truth for the
+// note↔entity association (the note table no longer has an entity_id column). Both FKs cascade:
+// deleting a note clears its links; deleting an entity clears its links — and the entity service then
+// removes any note left with zero links (orphan cleanup), since a note must always have ≥1 entity.
+export const noteEntity = sqliteTable(
+  'note_entity',
+  {
+    noteId: text('note_id')
+      .notNull()
+      .references(() => note.id, { onDelete: 'cascade' }),
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entity.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at').notNull()
+  },
+  (t) => [
+    primaryKey({ columns: [t.noteId, t.entityId] }),
+    // note_id lookups ride the composite PK's leftmost prefix; only entity_id needs its own index.
+    index('note_entity_entity_idx').on(t.entityId)
+  ]
 )
 
 export const entityLink = sqliteTable(

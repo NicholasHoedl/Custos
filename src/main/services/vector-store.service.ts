@@ -172,12 +172,16 @@ export class BruteForceVectorStore implements VectorStore {
   search(query: Float32Array, campaignId: string, k: number): RetrievedChunk[] {
     const chunks: RetrievedChunk[] = []
 
+    // Notes are M2M with entities (note_entity). A note linked to N entities would otherwise produce N
+    // identical chunks; emit ONE chunk per note, attributed to a representative entity — the first by
+    // name (orderBy + first-seen wins). The single-entity RetrievedChunk shape stays unchanged so all
+    // downstream (recall/suggest gather, mapSources, scene pinning) is untouched.
     const noteRows = this.ctx.drizzle
       .select({
         noteId: schema.noteEmbedding.noteId,
         vector: schema.noteEmbedding.vector,
         content: schema.note.content,
-        entityId: schema.note.entityId,
+        entityId: schema.entity.id,
         sessionId: schema.note.sessionId,
         sessionNumber: schema.session.number,
         entityName: schema.entity.name,
@@ -185,12 +189,17 @@ export class BruteForceVectorStore implements VectorStore {
       })
       .from(schema.noteEmbedding)
       .innerJoin(schema.note, eq(schema.note.id, schema.noteEmbedding.noteId))
-      .innerJoin(schema.entity, eq(schema.entity.id, schema.note.entityId))
+      .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
+      .innerJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
       .leftJoin(schema.session, eq(schema.session.id, schema.note.sessionId))
       .where(eq(schema.entity.campaignId, campaignId))
+      .orderBy(schema.entity.name)
       .all()
 
+    const seenNote = new Set<string>()
     for (const n of noteRows) {
+      if (seenNote.has(n.noteId)) continue // keep only the representative (first-by-name) entity's row
+      seenNote.add(n.noteId)
       chunks.push({
         kind: 'note',
         entityId: n.entityId,
@@ -280,9 +289,10 @@ export class BruteForceVectorStore implements VectorStore {
           sessionId: schema.note.sessionId,
           sessionNumber: schema.session.number
         })
-        .from(schema.note)
+        .from(schema.noteEntity)
+        .innerJoin(schema.note, eq(schema.note.id, schema.noteEntity.noteId))
         .leftJoin(schema.session, eq(schema.session.id, schema.note.sessionId))
-        .where(eq(schema.note.entityId, e.id))
+        .where(eq(schema.noteEntity.entityId, e.id))
         .limit(FUZZY_NOTES_PER_ENTITY)
         .all()
       for (const n of notes) {

@@ -12,7 +12,7 @@ import { RELATIONS, isRelationAllowed, isRelationKey } from '@shared/relations'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { getEntity } from './entity.service'
-import { listNotes } from './note.service'
+import { listNotesForEntity } from './note.service'
 import { newId, now, rowToLink } from './serialize'
 
 const HIERARCHY_PAIR: Record<HierarchyKind, { fwd: string; inv: string }> = {
@@ -151,7 +151,7 @@ export function getHierarchy(ctx: DbContext, entityId: string, kind: HierarchyKi
 export function getEntityContext(ctx: DbContext, entityId: string, depth = 1): EntityContext {
   const root = getEntity(ctx, entityId)
   if (!root) throw new Error(`Entity ${entityId} not found`)
-  const notes = listNotes(ctx, entityId)
+  const notes = listNotesForEntity(ctx, entityId)
   const visited = new Set<string>([entityId])
   const neighbors: ContextNeighbor[] = []
   let frontier: string[] = [entityId]

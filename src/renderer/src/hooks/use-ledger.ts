@@ -65,6 +65,16 @@ export function useNotes(entityId: string | null): { notes: Note[]; refresh: () 
   return { notes, refresh }
 }
 
+export function useAllNotes(campaignId: string | null): { notes: Note[]; refresh: () => void } {
+  const [notes, setNotes] = useState<Note[]>([])
+  const refresh = useCallback(() => {
+    if (!campaignId) return setNotes([])
+    ledger.note.listAll(campaignId).then(setNotes)
+  }, [campaignId])
+  useEffect(() => refresh(), [refresh])
+  return { notes, refresh }
+}
+
 export function useRelationships(entityId: string | null): {
   relationships: RelationshipView[]
   refresh: () => void

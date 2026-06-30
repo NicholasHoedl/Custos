@@ -8,11 +8,19 @@ import {
   listEntities,
   updateEntity
 } from '../../../src/main/services/entity.service'
-import { createNote, listNotes } from '../../../src/main/services/note.service'
+import { createNote, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
 import { createSession } from '../../../src/main/services/session.service'
 import { createLink, listForEntity } from '../../../src/main/services/link.service'
+import { BruteForceVectorStore } from '../../../src/main/services/vector-store.service'
 import { makeTestDb } from '../../helpers/test-db'
+
+// A deterministic unit vector so the orphan test can attach embeddings without the embedding model.
+function unit(i: number): Float32Array {
+  const v = new Float32Array(384)
+  v[i] = 1
+  return v
+}
 
 describe('entity.service', () => {
   let ctx: DbContext
@@ -61,7 +69,7 @@ describe('entity.service', () => {
     const inn = createEntity(ctx, { campaignId, type: 'location', name: 'Copper Kettle' })
     const session = createSession(ctx, { campaignId })
 
-    createNote(ctx, { entityId: npc.id, content: 'owes a favor' })
+    createNote(ctx, { entityIds: [npc.id], content: 'owes a favor' })
     createLink(ctx, { campaignId, fromEntityId: npc.id, toEntityId: inn.id, relation: 'located_in' })
     const event = createEvent(ctx, {
       sessionId: session.id,
@@ -72,7 +80,7 @@ describe('entity.service', () => {
     deleteEntity(ctx, npc.id)
 
     expect(getEntity(ctx, npc.id)).toBeNull()
-    expect(listNotes(ctx, npc.id)).toHaveLength(0) // notes cascade-deleted
+    expect(listNotesForEntity(ctx, npc.id)).toHaveLength(0) // its only note was orphan-removed
     expect(listForEntity(ctx, inn.id)).toHaveLength(0) // link cascade-deleted (both ends)
 
     const events = listEvents(ctx, session.id)
@@ -81,5 +89,26 @@ describe('entity.service', () => {
     expect(events[0].entityId).toBeNull() // ...with its entity reference set to null
 
     expect(getEntity(ctx, inn.id)?.name).toBe('Copper Kettle') // the other entity is untouched
+  })
+
+  it('on delete, keeps shared notes but orphan-removes notes left with no entities (+ embedding)', () => {
+    const store = new BruteForceVectorStore(ctx)
+    const a = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
+    const b = createEntity(ctx, { campaignId, type: 'npc', name: 'Brynn' })
+    const shared = createNote(ctx, { entityIds: [a.id, b.id], content: 'they plotted together' })
+    const solo = createNote(ctx, { entityIds: [a.id], content: 'a secret only about Aldric' })
+    store.upsertNote(shared.id, unit(0), 'hs')
+    store.upsertNote(solo.id, unit(1), 'hso')
+
+    deleteEntity(ctx, a.id)
+
+    // The shared note survives (still tagged to Brynn), now listed only under Brynn; embedding intact.
+    const brynnNotes = listNotesForEntity(ctx, b.id)
+    expect(brynnNotes.map((n) => n.id)).toEqual([shared.id])
+    expect(brynnNotes[0].entityIds).toEqual([b.id])
+    expect(store.noteHash(shared.id)).toBe('hs')
+
+    // The solo note had only Aldric → orphaned → removed, and its embedding cascaded away.
+    expect(store.noteHash(solo.id)).toBeNull()
   })
 })

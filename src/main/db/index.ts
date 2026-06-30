@@ -23,9 +23,18 @@ export function getDb(): LedgerDb {
   const file = join(app.getPath('userData'), 'ledger.db')
   rawDb = new Database(file)
   rawDb.pragma('journal_mode = WAL')
-  rawDb.pragma('foreign_keys = ON')
   db = drizzle(rawDb, { schema })
-  migrate(db, { migrationsFolder: migrationsFolder() })
+  // Run migrations with FK enforcement OFF, then restore it for all runtime queries. SQLite drops a
+  // column by rebuilding the table (CREATE new / copy / DROP old / RENAME); with foreign_keys ON, the
+  // DROP's implicit row-delete cascades into child tables (note_embedding, note_entity) and silently
+  // wipes them. PRAGMA foreign_keys is a no-op inside a transaction, and the migrator wraps all
+  // migrations in one, so it must be toggled here — outside that transaction (ADR-004 seed safety).
+  rawDb.pragma('foreign_keys = OFF')
+  try {
+    migrate(db, { migrationsFolder: migrationsFolder() })
+  } finally {
+    rawDb.pragma('foreign_keys = ON') // always restore enforcement, even if a migration throws
+  }
   return db
 }
 

@@ -9,7 +9,7 @@ import {
   updateSession
 } from '../../../src/main/services/session.service'
 import { createEntity } from '../../../src/main/services/entity.service'
-import { createNote, listNotes } from '../../../src/main/services/note.service'
+import { createNote, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
 import { makeTestDb } from '../../helpers/test-db'
 
@@ -33,7 +33,7 @@ describe('session.service', () => {
   it('deletes a session, cascading its events and nulling its notes’ session link', () => {
     const session = createSession(ctx, { campaignId })
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
-    createNote(ctx, { entityId: npc.id, sessionId: session.id, content: 'a captured note' })
+    createNote(ctx, { entityIds: [npc.id], sessionId: session.id, content: 'a captured note' })
     createEvent(ctx, { sessionId: session.id, content: 'something happened' })
 
     deleteSession(ctx, session.id)
@@ -41,7 +41,7 @@ describe('session.service', () => {
     expect(getSession(ctx, session.id)).toBeNull()
     expect(listEvents(ctx, session.id)).toHaveLength(0) // events cascade away
 
-    const notes = listNotes(ctx, npc.id)
+    const notes = listNotesForEntity(ctx, npc.id)
     expect(notes).toHaveLength(1) // the note itself survives...
     expect(notes[0].sessionId).toBeNull() // ...with its session link nulled
   })
