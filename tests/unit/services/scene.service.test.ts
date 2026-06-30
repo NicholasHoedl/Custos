@@ -49,6 +49,7 @@ describe('scene.service resolveScene', () => {
       attributes: { objective: 'Find and free Gundren' }
     })
     const gundren = createEntity(ctx, { campaignId, type: 'npc', name: 'Gundren' })
+    const glasstaff = createEntity(ctx, { campaignId, type: 'npc', name: 'Glasstaff' })
     // Inn is in Phandalin; Toblen is in the Inn; the quest involves Gundren.
     createLink(ctx, { campaignId, fromEntityId: inn.id, toEntityId: town.id, relation: 'located_in' })
     createLink(ctx, {
@@ -70,8 +71,9 @@ describe('scene.service resolveScene', () => {
         locationId: inn.id,
         embarkedQuestId: quest.id,
         nearbyPcIds: [elaria.id],
-        timeOfDay: 'evening',
-        inCombat: true
+        presentEntityIds: [glasstaff.id],
+        sceneMode: 'combat',
+        timeOfDay: 'evening'
       },
       pc.id
     )
@@ -85,15 +87,17 @@ describe('scene.service resolveScene', () => {
         'Stonehill Inn',
         'Rescue Gundren',
         'Toblen Stonehill',
-        'Gundren'
+        'Gundren',
+        'Glasstaff'
       ])
     )
 
     const block = r.block ?? ''
     expect(block).toContain('Where: Stonehill Inn (in Phandalin) — Safe')
     expect(block).toContain('When: Evening')
-    expect(block).toContain('In combat: yes')
+    expect(block).toContain("What's happening: Combat")
     expect(block).toContain('Party present: Elaria')
+    expect(block).toContain('In the scene: Glasstaff')
     expect(block).toContain('Pursuing: Rescue Gundren (Find and free Gundren)')
     expect(block).toContain('Also here: Toblen Stonehill')
   })
@@ -107,14 +111,15 @@ describe('scene.service resolveScene', () => {
         locationId: 'nope',
         embarkedQuestId: null,
         nearbyPcIds: ['ghost'],
-        timeOfDay: null,
-        inCombat: true
+        presentEntityIds: ['phantom'],
+        sceneMode: 'combat',
+        timeOfDay: null
       },
       null
     )
     expect(r.pinned).toEqual([])
     expect(r.quest).toBeNull()
-    expect(r.block).toContain('In combat: yes')
+    expect(r.block).toContain("What's happening: Combat")
   })
 })
 

@@ -25,6 +25,19 @@ vi.mock('../../src/main/services/claude.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/main/services/claude.service')>()
   return { ...actual, isAvailable: () => true, recall: claudeRecall }
 })
+// Simulate a PC with no brief yet: getPersona returns null, so in-character recall must GENERATE one
+// (stubbed here to avoid a real Claude call) rather than silently falling back to factual.
+vi.mock('../../src/main/services/persona.service', () => ({
+  getPersona: () => null,
+  generatePersona: async () => ({
+    entityId: 'pc',
+    brief: 'CHARACTER BRIEF — a steady cleric of Tymora',
+    edited: false,
+    stale: false,
+    model: null,
+    updatedAt: 0
+  })
+}))
 
 import { RECALL_CHUNK_CHANNEL, RECALL_DONE_CHANNEL } from '@shared/ipc-types'
 import { makeTestDb } from '../helpers/test-db'
@@ -183,8 +196,9 @@ describe('recall RAG pipeline (mocked AI)', () => {
           locationId: inn.id,
           embarkedQuestId: quest.id,
           nearbyPcIds: [],
-          timeOfDay: 'evening',
-          inCombat: false
+          presentEntityIds: [],
+          sceneMode: null,
+          timeOfDay: 'evening'
         }
       },
       new AbortController().signal
@@ -196,5 +210,37 @@ describe('recall RAG pipeline (mocked AI)', () => {
     expect(call.scene).toContain('When: Evening')
     // The pinned location's status surfaces into the state grounding even though it wasn't retrieved.
     expect(call.state).toContain('Stonehill Inn (location): Safe')
+  })
+
+  it('in-character: tells Claude who the active PC is even with no brief yet (generates one)', async () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
+    createSession(ctx, { campaignId })
+    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Brother Cassius' })
+    embedFn.mockResolvedValue(unit(0))
+    claudeRecall.mockResolvedValue([])
+
+    await ask(
+      ctx,
+      store,
+      () => {},
+      {
+        requestId: 'ric',
+        query: 'What do I think of Kaelen?',
+        campaignId,
+        pcId: pc.id,
+        mode: 'in_character'
+      },
+      new AbortController().signal
+    )
+
+    const call = claudeRecall.mock.calls.at(-1)![0] as {
+      mode: string
+      context: { pcName: string | null; persona: string | null }
+    }
+    expect(call.mode).toBe('in_character') // NOT silently downgraded to factual
+    expect(call.context.pcName).toBe('Brother Cassius') // the model is told whose head it's in
+    expect(call.context.persona).toContain('cleric of Tymora') // the brief reached the prompt
   })
 })

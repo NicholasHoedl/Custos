@@ -7,6 +7,7 @@ import type { HierarchyView } from '@shared/graph-types'
 import { ledger } from '@renderer/lib/ipc'
 import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
+import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
 import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
@@ -75,6 +76,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
   async function handleDelete() {
     try {
       await ledger.entity.delete(entity!.id)
+      useUiStore.getState().bumpEntities() // drop the deleted entity from every list immediately
       toast.success('Deleted', { description: entity!.name })
       onDeleted()
     } catch (err) {

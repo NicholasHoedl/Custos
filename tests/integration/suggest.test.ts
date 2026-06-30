@@ -198,8 +198,9 @@ describe('suggest RAG pipeline (mocked AI)', () => {
           locationId: inn.id,
           embarkedQuestId: null,
           nearbyPcIds: [],
-          timeOfDay: 'night',
-          inCombat: true
+          presentEntityIds: [],
+          sceneMode: 'combat',
+          timeOfDay: 'night'
         }
       },
       new AbortController().signal
@@ -208,7 +209,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     expect(res.ok).toBe(true)
     const call = claudeSuggest.mock.calls.at(-1)![0] as { scene: string | null; state: string | null }
     expect(call.scene).toContain('Stonehill Inn')
-    expect(call.scene).toContain('In combat: yes')
+    expect(call.scene).toContain("What's happening: Combat")
     expect(call.state).toContain('Stonehill Inn (location): Safe')
   })
 })

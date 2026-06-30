@@ -52,6 +52,7 @@ export function QuickAddBar({ campaignId, sessionId, onCreated }: QuickAddBarPro
           content: note.trim()
         })
       }
+      useUiStore.getState().bumpEntities() // make the new entity appear in every list immediately
       toast.success(`Added ${ENTITY_TYPE_LABELS[type]}`, { description: trimmed })
       setName('')
       setNote('')

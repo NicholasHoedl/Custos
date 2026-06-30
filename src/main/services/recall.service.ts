@@ -12,7 +12,7 @@ import type { DbContext } from './db-context'
 import type { RetrievedChunk, VectorStore } from './vector-store.service'
 import { embed, isModelReady } from './embedding.service'
 import { getEntity } from './entity.service'
-import { getPersona } from './persona.service'
+import { generatePersona, getPersona } from './persona.service'
 import { getSettings } from './settings.service'
 import { listForEntity } from './link.service'
 import { listSessions } from './session.service'
@@ -99,19 +99,13 @@ export async function ask(
     )
     const chunks = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
 
-    // Resolve effective mode + persona (fall back to factual when there's no active PC / no persona).
-    let effectiveMode: RecallMode = 'factual'
-    let persona: string | null = null
-    let pcName: string | null = null
-    if (mode === 'in_character' && pcId) {
-      const p = getPersona(ctx, pcId)
-      const pc = getEntity(ctx, pcId)
-      if (p && pc) {
-        effectiveMode = 'in_character'
-        persona = p.brief
-        pcName = pc.name
-      }
-    }
+    // In-character mode engages whenever there's a valid active PC — NOT only when a brief already
+    // exists. The brief (which gives the character its voice and, crucially, tells the model WHO it is)
+    // is resolved after the key/online gate below, since generating one needs Claude. Previously a PC
+    // with no brief yet silently fell back to a faceless factual answer ("who are you playing?").
+    const pc = mode === 'in_character' && pcId ? getEntity(ctx, pcId) : null
+    const inCharacter = Boolean(pc && pc.type === 'pc')
+    const effectiveMode: RecallMode = inCharacter ? 'in_character' : 'factual'
 
     if (!isAvailable()) {
       send(RECALL_DONE_CHANNEL, {
@@ -132,6 +126,15 @@ export async function ask(
       return
     }
 
+    // Resolve the in-character brief now that we know we'll call Claude: reuse the stored persona, or
+    // generate one from the PC's own fields (refreshing a stale brief) — exactly as Suggest does.
+    let persona: string | null = null
+    if (inCharacter && pc) {
+      let p = getPersona(ctx, pc.id)
+      if (!p || p.stale) p = await generatePersona(ctx, pc.id)
+      persona = p.brief
+    }
+
     const campaign = ctx.drizzle
       .select({ name: schema.campaign.name, description: schema.campaign.description })
       .from(schema.campaign)
@@ -140,7 +143,7 @@ export async function ask(
     const context: RecallContext = {
       campaignName: campaign?.name ?? 'the campaign',
       campaignDescription: campaign?.description ?? null,
-      pcName,
+      pcName: pc?.name ?? null,
       persona
     }
 

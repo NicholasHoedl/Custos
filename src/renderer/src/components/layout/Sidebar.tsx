@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   BookOpen,
   Check,
+  ChevronDown,
   ChevronsUpDown,
   MoreHorizontal,
   Pencil,
@@ -10,13 +11,19 @@ import {
   Search,
   Settings,
   Sparkles,
-  Swords,
   Trash2,
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Campaign, Session } from '@shared/entity-types'
-import { TIMES_OF_DAY, TIME_OF_DAY_LABELS, type TimeOfDay } from '@shared/scene-types'
+import { ENTITY_TYPE_LABELS, type Campaign, type Session } from '@shared/entity-types'
+import {
+  SCENE_MODES,
+  SCENE_MODE_LABELS,
+  TIMES_OF_DAY,
+  TIME_OF_DAY_LABELS,
+  type SceneMode,
+  type TimeOfDay
+} from '@shared/scene-types'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { useCampaigns, useEntities, useSessions } from '@renderer/hooks/use-ledger'
@@ -769,22 +776,53 @@ function isOpenQuestStatus(status: string | null): boolean {
   return !status || !['completed', 'failed'].includes(status.toLowerCase())
 }
 
-// The "current scene" cluster: where the party is, the time, who's present, the quest in progress, and a
-// combat toggle. These feed the optional `scene` payload into Recall and Suggest (see use-recall /
-// use-suggest). Each entity-backed selector hides when its list is empty.
+// The "current scene" cluster: the scene mode, where the party is, the time, who's present, who they're
+// facing, and the quest in progress. These feed the optional `scene` payload into Recall and Suggest
+// (see use-recall / use-suggest). Collapsible to save room; each entity-backed selector hides when its
+// list is empty. Collapsing only hides the controls — the selected scene (in app-store) stays active.
 function SceneControls({ campaignId }: { campaignId: string }) {
+  const [open, setOpen] = useState(true)
+  const scene = useAppStore((s) => s.scene)
+  const sceneActive =
+    Boolean(scene.locationId) ||
+    Boolean(scene.embarkedQuestId) ||
+    scene.nearbyPcIds.length > 0 ||
+    scene.presentEntityIds.length > 0 ||
+    Boolean(scene.sceneMode) ||
+    Boolean(scene.timeOfDay)
   return (
     <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          Scene
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2"
+      >
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            Scene
+          </span>
+          {!open && sceneActive && (
+            <span className="size-1.5 rounded-full bg-primary" aria-label="a scene is set" />
+          )}
         </span>
-        <CombatToggle />
-      </div>
-      <LocationSelector campaignId={campaignId} />
-      <EmbarkedQuestSelector campaignId={campaignId} />
-      <NearbyPcsSelector campaignId={campaignId} />
-      <TimeOfDaySelector />
+        <ChevronDown
+          className={cn(
+            'size-3.5 text-muted-foreground transition-transform',
+            !open && '-rotate-90'
+          )}
+        />
+      </button>
+      {open && (
+        <div className="space-y-1.5">
+          <SceneModeSelector />
+          <LocationSelector campaignId={campaignId} />
+          <EmbarkedQuestSelector campaignId={campaignId} />
+          <NearbyPcsSelector campaignId={campaignId} />
+          <PresentEntitiesSelector campaignId={campaignId} />
+          <TimeOfDaySelector />
+        </div>
+      )}
     </div>
   )
 }
@@ -950,18 +988,110 @@ function NearbyPcsSelector({ campaignId }: { campaignId: string }) {
   )
 }
 
-function CombatToggle() {
-  const inCombat = useAppStore((s) => s.scene.inCombat)
-  const setInCombat = useAppStore((s) => s.setInCombat)
+function SceneModeSelector() {
+  const sceneMode = useAppStore((s) => s.scene.sceneMode)
+  const setSceneMode = useAppStore((s) => s.setSceneMode)
   return (
-    <Button
-      variant={inCombat ? 'destructive' : 'outline'}
-      size="sm"
-      className="h-7 gap-1.5 px-2 text-xs"
-      onClick={() => setInCombat(!inCombat)}
+    <Select
+      value={sceneMode ?? SCENE_NONE}
+      onValueChange={(v) => setSceneMode(v === SCENE_NONE ? null : (v as SceneMode))}
     >
-      <Swords className="size-3.5" />
-      {inCombat ? 'In combat' : 'Out of combat'}
-    </Button>
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Scene mode" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SCENE_NONE}>Any mode</SelectItem>
+        {SCENE_MODES.map((m) => (
+          <SelectItem key={m} value={m}>
+            {SCENE_MODE_LABELS[m]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+// Multi-select of the NPCs/factions the party is facing or dealing with — pinned into grounding and
+// named in the scene block so advice targets the actual actors. (Adapts NearbyPcsSelector, grouped.)
+function PresentEntitiesSelector({ campaignId }: { campaignId: string }) {
+  const { entities } = useEntities(campaignId)
+  const presentEntityIds = useAppStore((s) => s.scene.presentEntityIds)
+  const setPresentEntities = useAppStore((s) => s.setPresentEntities)
+  const [open, setOpen] = useState(false)
+
+  const options = entities.filter((e) => e.type === 'npc' || e.type === 'faction')
+  if (options.length === 0) return null
+
+  const selected = new Set(presentEntityIds)
+  function toggle(id: string) {
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setPresentEntities(options.filter((e) => next.has(e.id)).map((e) => e.id))
+  }
+  const chosen = options.filter((e) => selected.has(e.id))
+  const label =
+    chosen.length === 0
+      ? 'In the scene'
+      : chosen.length === 1
+        ? chosen[0].name
+        : `${chosen.length} present`
+  const groups = (['npc', 'faction'] as const)
+    .map((type) => ({ type, items: options.filter((e) => e.type === type) }))
+    .filter((g) => g.items.length > 0)
+
+  return (
+    <div className="space-y-1.5">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+          >
+            <span className={cn(chosen.length === 0 && 'text-muted-foreground')}>{label}</span>
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search NPCs & factions…" />
+            <CommandList>
+              <CommandEmpty>No NPCs or factions.</CommandEmpty>
+              {groups.map((g) => (
+                <CommandGroup key={g.type} heading={ENTITY_TYPE_LABELS[g.type]}>
+                  {g.items.map((e) => (
+                    <CommandItem key={e.id} value={`${e.name} ${e.id}`} onSelect={() => toggle(e.id)}>
+                      <Check
+                        className={cn('size-4', selected.has(e.id) ? 'opacity-100' : 'opacity-0')}
+                      />
+                      {e.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {chosen.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {chosen.map((e) => (
+            <Badge key={e.id} variant="secondary" className="gap-1 pr-1">
+              {e.name}
+              <button
+                type="button"
+                onClick={() => toggle(e.id)}
+                aria-label={`Remove ${e.name}`}
+                className="rounded-sm text-muted-foreground transition-colors hover:text-destructive"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

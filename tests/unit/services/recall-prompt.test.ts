@@ -141,20 +141,22 @@ describe('current-state grounding', () => {
 })
 
 describe('scene grounding', () => {
-  it('formatScene renders where/when/combat/party/quest/here, and null when empty', () => {
+  it('formatScene renders where/when/mode/party/facing/quest/here, and null when empty', () => {
     const block = formatScene({
       location: { name: 'Stonehill Inn', status: 'Safe', containerName: 'Phandalin' },
       quest: { name: 'Rescue Gundren', objective: 'Find and free Gundren' },
       nearbyPcNames: ['Elaria'],
+      facingNames: ['Glasstaff'],
       hereNames: ['Toblen'],
       timeOfDay: 'Evening',
-      inCombat: true,
+      mode: 'Combat',
       sceneSet: true
     })
     expect(block).toContain('Where: Stonehill Inn (in Phandalin) — Safe')
     expect(block).toContain('When: Evening')
-    expect(block).toContain('In combat: yes')
+    expect(block).toContain("What's happening: Combat")
     expect(block).toContain('Party present: Elaria')
+    expect(block).toContain('In the scene: Glasstaff')
     expect(block).toContain('Pursuing: Rescue Gundren (Find and free Gundren)')
     expect(block).toContain('Also here: Toblen')
 
@@ -163,9 +165,10 @@ describe('scene grounding', () => {
         location: null,
         quest: null,
         nearbyPcNames: [],
+        facingNames: [],
         hereNames: [],
         timeOfDay: null,
-        inCombat: false,
+        mode: null,
         sceneSet: false
       })
     ).toBeNull()

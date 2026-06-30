@@ -9,6 +9,7 @@ import type {
 } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
 import { ledger } from '@renderer/lib/ipc'
+import { useUiStore } from '@renderer/store/ui-store'
 
 // Thin data hooks over the typed `ledger.*` bridge. Each keys on its id(s) and exposes a `refresh()`
 // to re-pull after a mutation. No external query library — useEffect + manual refresh is enough here.
@@ -37,11 +38,15 @@ export function useEntities(
   type?: EntityType
 ): { entities: Entity[]; refresh: () => void } {
   const [entities, setEntities] = useState<Entity[]>([])
+  // Refetch whenever ANY entity is created/updated/deleted (bumped via useUiStore.bumpEntities). Each
+  // useEntities instance is independent, so without this a create in one component (e.g. quick-add)
+  // leaves every other list — like the sidebar scene selectors — showing a stale set.
+  const entitiesVersion = useUiStore((s) => s.entitiesVersion)
   const refresh = useCallback(() => {
     if (!campaignId) return setEntities([])
     ledger.entity.list(campaignId, type).then(setEntities)
   }, [campaignId, type])
-  useEffect(() => refresh(), [refresh])
+  useEffect(() => refresh(), [refresh, entitiesVersion])
   return { entities, refresh }
 }
 

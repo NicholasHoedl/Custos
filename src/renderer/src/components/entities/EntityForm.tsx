@@ -9,6 +9,7 @@ import {
 } from '@shared/entity-types'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import { ledger } from '@renderer/lib/ipc'
+import { useUiStore } from '@renderer/store/ui-store'
 import {
   Dialog,
   DialogContent,
@@ -164,6 +165,7 @@ export function EntityForm({
             attributes: attrs,
             status: status.trim() || undefined
           })
+      useUiStore.getState().bumpEntities() // refresh every entity list (e.g. scene selectors) now
       toast.success(editing ? 'Saved' : `Added ${ENTITY_TYPE_LABELS[type]}`, { description: trimmed })
       onSaved(saved)
       onOpenChange(false)

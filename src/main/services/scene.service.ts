@@ -1,4 +1,4 @@
-import { TIME_OF_DAY_LABELS, type SceneContext } from '@shared/scene-types'
+import { SCENE_MODE_LABELS, TIME_OF_DAY_LABELS, type SceneContext } from '@shared/scene-types'
 import type { Entity } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
 import type { DbContext } from './db-context'
@@ -59,6 +59,10 @@ export function resolveScene(
   const nearbyPcs = scene.nearbyPcIds
     .map((id) => getEntity(ctx, id))
     .filter((e): e is Entity => e !== null && e.type === 'pc')
+  // Non-party actors the party is facing / dealing with (NPCs, factions) — the focus of the advice.
+  const facing = scene.presentEntityIds
+    .map((id) => getEntity(ctx, id))
+    .filter((e): e is Entity => e !== null && e.type !== 'pc')
 
   // Nothing meaningful set → no scene grounding at all (keeps behavior unchanged when the feature is
   // unused; the renderer always sends a scene object, so this is the common "untouched" case).
@@ -66,8 +70,9 @@ export function resolveScene(
     Boolean(location) ||
     Boolean(quest) ||
     nearbyPcs.length > 0 ||
+    facing.length > 0 ||
     Boolean(scene.timeOfDay) ||
-    scene.inCombat
+    Boolean(scene.sceneMode)
   if (!sceneSet) return { block: null, pinned: [], quest: null, nearbyPcs: [] }
 
   const activePc = activePcId ? getEntity(ctx, activePcId) : null
@@ -76,9 +81,11 @@ export function resolveScene(
   const hierarchy = location ? getHierarchy(ctx, location.id, 'location') : null
   const lastAncestor = hierarchy?.ancestors[hierarchy.ancestors.length - 1]
   const containerName = lastAncestor ? lastAncestor.name : null
-  // Keep "Also here" distinct from the active/nearby PCs, which are listed separately.
+  // Keep "Also here" distinct from the active/nearby PCs and the facing actors, listed separately.
   const exclude = new Set<string>(
-    [activePcId, ...scene.nearbyPcIds].filter((id): id is string => Boolean(id))
+    [activePcId, ...scene.nearbyPcIds, ...facing.map((e) => e.id)].filter((id): id is string =>
+      Boolean(id)
+    )
   )
   const hereEntities = hierarchy
     ? hierarchy.descendants
@@ -94,7 +101,15 @@ export function resolveScene(
 
   // Pin everything we want grounded regardless of vector similarity, deduped by id.
   const pinnedMap = new Map<string, Entity>()
-  for (const e of [activePc, location, quest, ...nearbyPcs, ...hereEntities, ...questInvolved]) {
+  for (const e of [
+    activePc,
+    location,
+    quest,
+    ...nearbyPcs,
+    ...facing,
+    ...hereEntities,
+    ...questInvolved
+  ]) {
     if (e) pinnedMap.set(e.id, e)
   }
 
@@ -102,9 +117,10 @@ export function resolveScene(
     location: location ? { name: location.name, status: location.status, containerName } : null,
     quest: quest ? { name: quest.name, objective: questObjective(quest) } : null,
     nearbyPcNames: nearbyPcs.map((p) => p.name),
+    facingNames: facing.map((e) => e.name),
     hereNames: hereEntities.map((e) => e.name),
     timeOfDay: scene.timeOfDay ? TIME_OF_DAY_LABELS[scene.timeOfDay] : null,
-    inCombat: scene.inCombat,
+    mode: scene.sceneMode ? SCENE_MODE_LABELS[scene.sceneMode] : null,
     sceneSet: true
   })
 

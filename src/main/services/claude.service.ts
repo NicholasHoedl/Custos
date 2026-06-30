@@ -77,7 +77,7 @@ RIGHT-SIZE IT. Match the length to the question and to how much this character t
 
 FORM. Write as flowing inner monologue — continuous prose, the way a mind actually moves. NEVER use bullet points, numbered lists, headings, or any markdown. NEVER organize the answer into labelled items or a catalogue ("Item:", "First… Second…", "The smaller errands…", "Four threads:"). Even when the question spans many things, let them flow as one connected reflection, weighted toward what this character actually cares about — linger on what matters to them, pass quickly over what doesn't, and never give everything the same dutiful equal-weight tour. Output only the monologue — no headings, no inline source citations (the app shows sources separately).
 
-PRESENT SCENE. A "present scene" block may tell you where you are, the time of day, who's here with you, what you're pursuing, and whether you're in a fight — treat it as your immediate now. Let it pull your attention: mid-fight your thoughts run fast, urgent, physical; at rest they drift to the people around you and the threads still open.`
+PRESENT SCENE. A "present scene" block may tell you where you are, the time, who's with you and who you're facing, what you're pursuing, and the MODE of the moment — treat it as your immediate now. Let it set your mental tempo: in Combat your thoughts run fast, urgent, physical; in a Social moment you read the room and weigh your words; in Stealth you're tense and watchful; in Downtime or Travel they drift to the people around you and the threads still open.`
 
 const FEW_SHOT = `Example — the DEPTH and FORM to reach (a different character and campaign; borrow none of its facts, and do NOT copy its melancholy register — a blunt, cheerful, or ice-cold character reaches the same depth in their OWN words).
 
@@ -86,7 +86,7 @@ Cyrus Mordrane, a proud draconic sorcerer, asked "Who is Marduk?":
 
 Why it works: it FLOWS as one unbroken thought — no lists, no labels, no inventory. It reaches for the sensory and specific (the candlelight, the rings, the corrected hands) and lets the feeling stay complicated (what he wishes were true vs. what is; "harder to say aloud"). The WORLD-fact is grounded — Marduk holds the gate, can't be trusted — while the private history and its ache are Cyrus's own to render. Reach that depth and that flow, in your character's voice — and only at the length the subject earns (Cyrus has years with Marduk; a near-stranger would get a few honest lines, not a tour). And remember: wanting is not having — Cyrus could covet Marduk's staff, but never claim it's his unless the notes or relationships say so.`
 
-const FACTUAL_INSTRUCTIONS = `You are a campaign-notes assistant for a tabletop RPG. Answer the question using ONLY the retrieved notes, the current-state block, and the relationships provided. Be direct, concise, and neutral. Do not speculate or invent anything they do not support. Treat the current-state block as the present: completed or failed quests and dead, defeated, or disbanded entities are RESOLVED — describe them as done, not ongoing. If the notes do not contain the answer, say so plainly. Write in plain prose — no bullet points, numbered lists, headings, or markdown. Do not add inline citations — the application displays sources separately. A "present scene" block may state where the party is, the time of day, who's present, the active quest, and whether they're in combat — treat it as the present moment.`
+const FACTUAL_INSTRUCTIONS = `You are a campaign-notes assistant for a tabletop RPG. Answer the question using ONLY the retrieved notes, the current-state block, and the relationships provided. Be direct, concise, and neutral. Do not speculate or invent anything they do not support. Treat the current-state block as the present: completed or failed quests and dead, defeated, or disbanded entities are RESOLVED — describe them as done, not ongoing. If the notes do not contain the answer, say so plainly. Write in plain prose — no bullet points, numbered lists, headings, or markdown. Do not add inline citations — the application displays sources separately. A "present scene" block may state where the party is, the time, who's present and who they're facing, the active quest, and the scene mode — treat it as the present moment.`
 
 export interface RecallContext {
   campaignName: string
@@ -171,9 +171,10 @@ export interface SceneFacts {
   location: { name: string; status: string | null; containerName: string | null } | null
   quest: { name: string; objective: string | null } | null
   nearbyPcNames: string[]
+  facingNames: string[] // non-party actors present — the NPCs/factions being faced/dealt with
   hereNames: string[]
   timeOfDay: string | null
-  inCombat: boolean
+  mode: string | null // the scene's kind (Combat / Social / …), or null when unset
   sceneSet: boolean
 }
 
@@ -193,8 +194,9 @@ export function formatScene(facts: SceneFacts): string | null {
     lines.push(`- Where: ${where}${status}`)
   }
   if (facts.timeOfDay) lines.push(`- When: ${facts.timeOfDay}`)
-  lines.push(`- In combat: ${facts.inCombat ? 'yes' : 'no'}`)
+  if (facts.mode) lines.push(`- What's happening: ${facts.mode}`)
   if (facts.nearbyPcNames.length) lines.push(`- Party present: ${facts.nearbyPcNames.join(', ')}`)
+  if (facts.facingNames.length) lines.push(`- In the scene: ${facts.facingNames.join(', ')}`)
   if (facts.quest) {
     const objective = facts.quest.objective ? ` (${facts.quest.objective})` : ''
     lines.push(`- Pursuing: ${facts.quest.name}${objective}`)
@@ -353,7 +355,7 @@ GROUND IT. Everything you treat as a world-fact — who's who, who holds or cont
 
 RATIONALE. One short line per option: why THIS attitude fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
 
-PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them, the quest in progress, and whether they're in a fight — weight the four options to that moment: in combat, lean to immediate, physical, tactical choices; at rest, to social or exploratory ones.`
+PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them (party) and who they're facing (NPCs/factions), the quest in progress, and the scene's MODE. Let the mode steer the kind of action — Combat: immediate, physical, tactical; Social: persuasion, leverage, reading people; Stealth: avoid notice, scout, misdirect; Exploration: investigate, search, press deeper; Downtime: rest, personal threads, prepare; Travel: on the road, plan ahead — and aim the options at whoever the character is facing.`
 
 /**
  * The structured-output schema for Suggest. JSON Schema cannot enforce array length or attitude
@@ -560,7 +562,7 @@ FIT THE CHARACTER. These are the moves THIS PC would actually be drawn to — we
 
 AIM for about six to eight suggestions spanning a few different categories — enough to give real choices without burying them. Quality over quantity; skip a category rather than pad it.
 
-PRESENT SCENE. If a "present scene" block is given, prefer moves that fit where the party is, the time of day, who's present, and the quest in progress; if they're in a fight, lean toward immediate, in-the-moment moves rather than errands or travel.`
+PRESENT SCENE. If a "present scene" block is given, prefer next-moves that fit where the party is, the time, who's present and who they're facing, the quest in progress, and the scene's MODE — Combat: immediate, in-the-moment moves over errands or travel; Social: who to talk to, persuade, or confront; Stealth: scouting and quiet approaches; Exploration: places to investigate; Downtime/Travel: personal threads, preparation, and where to head next.`
 
 /** Structured-output schema for directions. Length isn't enforceable here — suggest.service validates. */
 const DIRECTIONS_SCHEMA = {

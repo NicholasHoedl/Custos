@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SceneContext, TimeOfDay } from '@shared/scene-types'
+import type { SceneContext, SceneMode, TimeOfDay } from '@shared/scene-types'
 
 const CAMPAIGN_KEY = 'ledger.activeCampaignId'
 const PC_KEY = 'ledger.activePcId'
@@ -18,8 +18,9 @@ const EMPTY_SCENE: SceneContext = {
   locationId: null,
   embarkedQuestId: null,
   nearbyPcIds: [],
-  timeOfDay: null,
-  inCombat: false
+  presentEntityIds: [],
+  sceneMode: null,
+  timeOfDay: null
 }
 
 function persistedScene(): SceneContext {
@@ -53,8 +54,9 @@ interface AppState {
   setSceneLocation: (id: string | null) => void
   setEmbarkedQuest: (id: string | null) => void
   setNearbyPcs: (ids: string[]) => void
+  setPresentEntities: (ids: string[]) => void
+  setSceneMode: (mode: SceneMode | null) => void
   setTimeOfDay: (t: TimeOfDay | null) => void
-  setInCombat: (inCombat: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -110,9 +112,15 @@ export const useAppStore = create<AppState>((set) => ({
       persistScene(scene)
       return { scene }
     }),
-  setInCombat: (inCombat) =>
+  setPresentEntities: (ids) =>
     set((s) => {
-      const scene = { ...s.scene, inCombat }
+      const scene = { ...s.scene, presentEntityIds: ids }
+      persistScene(scene)
+      return { scene }
+    }),
+  setSceneMode: (mode) =>
+    set((s) => {
+      const scene = { ...s.scene, sceneMode: mode }
       persistScene(scene)
       return { scene }
     })
