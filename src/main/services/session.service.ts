@@ -20,6 +20,44 @@ export function getSession(ctx: DbContext, id: string): Session | null {
   return r ? rowToSession(r) : null
 }
 
+/** The session NUMBER for a given session id, or null if it doesn't exist. */
+export function sessionNumberById(ctx: DbContext, id: string): number | null {
+  const r = ctx.drizzle
+    .select({ number: schema.session.number })
+    .from(schema.session)
+    .where(eq(schema.session.id, id))
+    .get()
+  return r?.number ?? null
+}
+
+/** The campaign's latest (highest) session number, or null if it has no sessions yet. */
+export function latestSessionNumber(ctx: DbContext, campaignId: string): number | null {
+  const r = ctx.drizzle
+    .select({ number: schema.session.number })
+    .from(schema.session)
+    .where(eq(schema.session.campaignId, campaignId))
+    .orderBy(desc(schema.session.number))
+    .get()
+  return r?.number ?? null
+}
+
+/**
+ * Chronology (ADR-017): the session NUMBER to stamp a capture with — the given active session if it
+ * resolves, else the campaign's latest, else null (pre-tracking; no sessions exist yet). Resolved in
+ * the MAIN process, never trusting a renderer-supplied number.
+ */
+export function resolveCaptureSessionNumber(
+  ctx: DbContext,
+  sessionId: string | undefined,
+  campaignId: string
+): number | null {
+  if (sessionId) {
+    const byId = sessionNumberById(ctx, sessionId)
+    if (byId !== null) return byId
+  }
+  return latestSessionNumber(ctx, campaignId)
+}
+
 export function createSession(ctx: DbContext, input: CreateSessionInput): Session {
   const agg = ctx.drizzle
     .select({ m: max(schema.session.number) })

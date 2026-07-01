@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { RecallMode, RecallRequest, RecallSource } from '@shared/recall-types'
 import type { RelationshipView } from '@shared/graph-types'
+import type { Lifecycle } from '@shared/entity-types'
 import {
   RECALL_CHUNK_CHANNEL,
   RECALL_DONE_CHANNEL,
@@ -9,6 +10,7 @@ import {
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import type { RetrievedChunk, VectorStore } from './vector-store.service'
+import { resolveEntityState } from './chronology.service'
 import { embed, isModelReady } from './embedding.service'
 import { getEntity } from './entity.service'
 import { generatePersona, getPersona } from './persona.service'
@@ -70,8 +72,10 @@ export async function ask(
       return
     }
 
+    // Chronology (ADR-017): when asOfSession is set, clamp retrieval + reconstructed state to ≤ N.
+    const asOf = req.asOfSession
     const queryVec = await embed(query)
-    const denseChunks = store.search(queryVec, campaignId, TOP_K)
+    const denseChunks = store.search(queryVec, campaignId, TOP_K, asOf)
     // Hybrid retrieval: dense embeddings miss a misspelled proper noun ("glastav" → "Glasstaff").
     // Fuzzy-match the query against entity NAMES and fold those entities in (description + a few notes)
     // so the thing the player named always surfaces, even when the spelling is off.
@@ -79,7 +83,8 @@ export async function ask(
       campaignId,
       query,
       new Set(denseChunks.map((c) => c.entityId)),
-      2
+      2,
+      asOf
     )
     const chunks = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
 
@@ -135,28 +140,40 @@ export async function ask(
     // entity_link and never reach Claude via embeddings, and (b) its current status. Plus the latest
     // session as the "present" anchor. Without these the model invents facts ("the staff is mine") and
     // treats resolved threads (a defeated NPC, a completed quest) as if they were still open.
-    const scene = resolveScene(ctx, req.scene, pcId)
+    const scene = resolveScene(ctx, req.scene, pcId, asOf)
     const seen = new Set<string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
-    const stateItems: { name: string; type: string; status: string | null }[] = []
+    const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
+      []
     // Pin the current-scene entities into grounding first so they're always present, even off-vector.
-    gatherPinned(ctx, scene.pinned, seen, relItems, stateItems)
+    gatherPinned(ctx, scene.pinned, seen, relItems, stateItems, asOf)
     for (const c of chunks) {
       if (seen.has(c.entityId)) continue
       seen.add(c.entityId)
-      relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId) })
-      stateItems.push({
-        name: c.entityName,
-        type: c.entityType,
-        status: getEntity(ctx, c.entityId)?.status ?? null
-      })
+      relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId, asOf) })
+      const ent = getEntity(ctx, c.entityId)
+      if (ent) {
+        const st = resolveEntityState(ctx, ent, asOf)
+        stateItems.push({
+          name: c.entityName,
+          type: c.entityType,
+          status: st.status,
+          lifecycle: st.lifecycle
+        })
+      }
     }
     const relationships = formatRelationships(relItems)
-    const latest = listSessions(ctx, campaignId)[0]
-    const latestLabel = latest
-      ? `Session ${latest.number}${latest.title ? ` — ${latest.title}` : ''}`
-      : null
-    const state = formatState(latestLabel, stateItems)
+    // The "present" anchor is the as-of session when set, else the campaign's latest session.
+    const anchorLabel =
+      asOf !== undefined
+        ? `Session ${asOf}`
+        : (() => {
+            const latest = listSessions(ctx, campaignId)[0]
+            return latest
+              ? `Session ${latest.number}${latest.title ? ` — ${latest.title}` : ''}`
+              : null
+          })()
+    const state = formatState(anchorLabel, stateItems, asOf !== undefined)
 
     const sources = await claudeRecall({
       query,

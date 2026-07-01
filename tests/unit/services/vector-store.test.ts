@@ -4,6 +4,7 @@ import type { DbContext } from '../../../src/main/services/db-context'
 import { createCampaign } from '../../../src/main/services/campaign.service'
 import { createEntity } from '../../../src/main/services/entity.service'
 import { createNote } from '../../../src/main/services/note.service'
+import { createSession } from '../../../src/main/services/session.service'
 import { BruteForceVectorStore, nameMatchScore } from '../../../src/main/services/vector-store.service'
 import { makeTestDb } from '../../helpers/test-db'
 
@@ -102,5 +103,56 @@ describe('fuzzy entity matching (typo-tolerant retrieval)', () => {
 
     // excluding the matched entity (already a dense hit) yields nothing
     expect(store.fuzzyEntityChunks(campaignId, 'who is glastav?', new Set([glass.id]), 2)).toHaveLength(0)
+  })
+})
+
+describe('as-of clamp (chronology — no future-knowledge leak)', () => {
+  it('search excludes notes from sessions AFTER N; keeps ≤ N and undated notes', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
+    const s1 = createSession(ctx, { campaignId }) // session 1
+    createSession(ctx, { campaignId }) // session 2
+    const s3 = createSession(ctx, { campaignId }) // session 3
+    const past = createNote(ctx, { entityIds: [npc.id], sessionId: s1.id, content: 'past note' })
+    const future = createNote(ctx, { entityIds: [npc.id], sessionId: s3.id, content: 'future note' })
+    const undated = createNote(ctx, { entityIds: [npc.id], content: 'timeless note' })
+    for (const id of [past.id, future.id, undated.id]) store.upsertNote(id, vec(0), 'h')
+
+    // As of session 2: the session-3 note vanishes; session-1 + undated remain.
+    const asOf2 = store
+      .search(vec(0), campaignId, 10, 2)
+      .filter((c) => c.kind === 'note')
+      .map((c) => c.noteId)
+    expect(asOf2).toContain(past.id)
+    expect(asOf2).toContain(undated.id)
+    expect(asOf2).not.toContain(future.id)
+
+    // "Now" (no asOf): every note is retrievable again.
+    const now = store
+      .search(vec(0), campaignId, 10)
+      .filter((c) => c.kind === 'note')
+      .map((c) => c.noteId)
+    expect(now).toEqual(expect.arrayContaining([past.id, future.id, undated.id]))
+  })
+
+  it('fuzzyEntityChunks applies the same ≤ N clamp to an entity’s notes', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const glass = createEntity(ctx, { campaignId, type: 'npc', name: 'Iarno "Glasstaff" Albrek' })
+    const s1 = createSession(ctx, { campaignId }) // 1
+    createSession(ctx, { campaignId }) // 2
+    const s3 = createSession(ctx, { campaignId }) // 3
+    createNote(ctx, { entityIds: [glass.id], sessionId: s1.id, content: 'took his staff early' })
+    createNote(ctx, { entityIds: [glass.id], sessionId: s3.id, content: 'a later betrayal' })
+
+    const contents = store
+      .fuzzyEntityChunks(campaignId, 'who is glastav?', new Set(), 5, 2)
+      .filter((c) => c.kind === 'note')
+      .map((c) => c.content)
+    expect(contents.some((c) => c.includes('early'))).toBe(true) // session 1 ≤ 2
+    expect(contents.some((c) => c.includes('betrayal'))).toBe(false) // session 3 > 2 → clamped out
   })
 })

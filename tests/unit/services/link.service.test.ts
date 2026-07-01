@@ -1,9 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { eq } from 'drizzle-orm'
 import type { Entity } from '@shared/entity-types'
 import type { DbContext } from '../../../src/main/services/db-context'
+import * as schema from '../../../src/main/db/schema'
 import { createCampaign } from '../../../src/main/services/campaign.service'
 import { createEntity } from '../../../src/main/services/entity.service'
-import { createLink, deleteLink, listForEntity } from '../../../src/main/services/link.service'
+import { createSession } from '../../../src/main/services/session.service'
+import {
+  createLink,
+  deleteLink,
+  listForEntity,
+  severLink
+} from '../../../src/main/services/link.service'
 import { makeTestDb } from '../../helpers/test-db'
 
 describe('link.service', () => {
@@ -120,5 +128,44 @@ describe('link.service', () => {
     expect(b.id).toBe(a.id)
     expect(listForEntity(ctx, aldric.id)).toHaveLength(1)
     expect(listForEntity(ctx, inn.id)).toHaveLength(1)
+  })
+
+  // ---- Chronology: sever + re-form (M3) ----
+
+  it('severs a relationship without deleting it, and re-forms a fresh interval', () => {
+    const rowsFor = (): (typeof schema.entityLink.$inferSelect)[] =>
+      ctx.drizzle.select().from(schema.entityLink).where(eq(schema.entityLink.fromEntityId, aldric.id)).all()
+
+    const s1 = createSession(ctx, { campaignId }) // session 1
+    const l1 = createLink(ctx, {
+      campaignId,
+      fromEntityId: aldric.id,
+      toEntityId: inn.id,
+      relation: 'located_in',
+      sessionId: s1.id
+    })
+    expect(l1.startSessionNumber).toBe(1)
+    expect(l1.endSessionNumber).toBeNull()
+
+    const s2 = createSession(ctx, { campaignId }) // session 2
+    severLink(ctx, l1.id, s2.id)
+
+    const afterSever = rowsFor()
+    expect(afterSever).toHaveLength(1) // not deleted — the row survives
+    expect(afterSever[0].endSessionNumber).toBe(2) // closed at session 2
+
+    // Re-forming the same edge creates a NEW open interval (idempotency ignores closed rows).
+    const s3 = createSession(ctx, { campaignId }) // session 3
+    const l2 = createLink(ctx, {
+      campaignId,
+      fromEntityId: aldric.id,
+      toEntityId: inn.id,
+      relation: 'located_in',
+      sessionId: s3.id
+    })
+    expect(l2.id).not.toBe(l1.id)
+    const afterReform = rowsFor()
+    expect(afterReform).toHaveLength(2) // both intervals preserved
+    expect(afterReform.filter((r) => r.endSessionNumber === null)).toHaveLength(1) // exactly one open
   })
 })

@@ -30,9 +30,11 @@ import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useSuggest } from '@renderer/hooks/use-suggest'
+import { useSessions } from '@renderer/hooks/use-ledger'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
+import { AsOfSelect } from '@renderer/components/AsOfSelect'
 
 const CATEGORY_ICONS: Record<SuggestCategory, LucideIcon> = {
   quest: ScrollText,
@@ -53,6 +55,8 @@ export function SuggestView() {
   const suggest = useSuggest()
   const [situation, setSituation] = useState('')
   const [mode, setMode] = useState<SuggestMode>('attitudes')
+  const { sessions } = useSessions(activeCampaignId)
+  const [asOf, setAsOf] = useState<number | null>(null)
 
   // Switching mode clears any stale result so the output always matches the selected mode.
   function changeMode(m: SuggestMode) {
@@ -86,7 +90,7 @@ export function SuggestView() {
 
   function submit() {
     if (!canSubmit) return
-    suggest.ask(situation, mode)
+    suggest.ask(situation, mode, asOf ?? undefined)
   }
 
   return (
@@ -168,8 +172,11 @@ export function SuggestView() {
             }
           }}
         />
-        <div className="flex items-center justify-between gap-3">
-          <ModeToggle mode={mode} setMode={changeMode} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ModeToggle mode={mode} setMode={changeMode} />
+            <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+          </div>
           <Button size="sm" onClick={submit} disabled={!canSubmit}>
             {thinking ? 'Thinking…' : 'Suggest'}
           </Button>

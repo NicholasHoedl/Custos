@@ -7,7 +7,7 @@ import {
   type StorySuggestion
 } from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
-import { ENTITY_TYPES } from '@shared/entity-types'
+import { ENTITY_TYPES, type Lifecycle } from '@shared/entity-types'
 import type { RawExtraction } from '@shared/import-types'
 import type { RetrievedChunk } from './vector-store.service'
 import { getKey, keyExists } from './key.service'
@@ -151,20 +151,29 @@ export function formatRelationships(
  * open. The session anchor (if known) comes first; then one line per entity that carries a status.
  */
 export function formatState(
-  latestSession: string | null,
-  items: { name: string; type: string; status: string | null }[]
+  anchor: string | null,
+  items: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[],
+  asOf = false
 ): string | null {
   const lines: string[] = []
-  if (latestSession) {
-    lines.push(`- The party's most recent session is ${latestSession} — that is the present.`)
+  if (anchor) {
+    lines.push(
+      asOf
+        ? `- Reconstructing the world AS OF ${anchor} — reason only about what was true then; ignore anything from later sessions.`
+        : `- The party's most recent session is ${anchor} — that is the present.`
+    )
   }
   const seen = new Set<string>()
   for (const it of items) {
-    if (!it.status) continue
+    // Surface an entity that carries a status OR is no longer active (an ended NPC/quest the model must
+    // not treat as live). A live entity with no status is unremarkable — skip it to keep the block tight.
+    if (!it.status && it.lifecycle !== 'ended') continue
     const key = `${it.name}:${it.type}`
     if (seen.has(key)) continue
     seen.add(key)
-    lines.push(`- ${it.name} (${it.type}): ${it.status}`)
+    const mark = it.lifecycle === 'ended' ? ' [ended]' : ''
+    const status = it.status ? `: ${it.status}` : ''
+    lines.push(`- ${it.name} (${it.type})${mark}${status}`)
   }
   return lines.length ? lines.join('\n') : null
 }

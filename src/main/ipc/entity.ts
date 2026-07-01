@@ -5,6 +5,7 @@ import type { DbContext } from '../services/db-context'
 import type { VectorStore } from '../services/vector-store.service'
 import { indexEntity } from '../services/embedding-index.service'
 import { markStaleIfChanged } from '../services/persona.service'
+import { getEntityHistory } from '../services/chronology.service'
 import * as svc from '../services/entity.service'
 
 export function registerEntityHandlers(ctx: DbContext, store: VectorStore): void {
@@ -24,4 +25,5 @@ export function registerEntityHandlers(ctx: DbContext, store: VectorStore): void
     return entity
   })
   ipcMain.handle(IPC.entityDelete, (_e, id: string) => svc.deleteEntity(ctx, id))
+  ipcMain.handle(IPC.entityHistory, (_e, id: string) => getEntityHistory(ctx, id))
 }

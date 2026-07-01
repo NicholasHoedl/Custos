@@ -8,6 +8,7 @@ import {
   listEntities,
   updateEntity
 } from '../../../src/main/services/entity.service'
+import { getEntityHistory } from '../../../src/main/services/chronology.service'
 import { createNote, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
 import { createSession } from '../../../src/main/services/session.service'
@@ -110,5 +111,61 @@ describe('entity.service', () => {
 
     // The solo note had only Aldric → orphaned → removed, and its embedding cascaded away.
     expect(store.noteHash(solo.id)).toBeNull()
+  })
+
+  // ---- Chronology capture (M3) ----
+
+  it('seeds a baseline history row on create, with lifecycle derived from status', () => {
+    const s = createSession(ctx, { campaignId }) // session 1
+    const e = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Fallen Foe',
+      status: 'Dead',
+      sessionId: s.id
+    })
+    expect(e.lifecycle).toBe('ended') // heuristic on 'Dead'
+    const h = getEntityHistory(ctx, e.id)
+    expect(h).toHaveLength(1)
+    expect(h[0]).toMatchObject({ lifecycle: 'ended', status: 'Dead', sinceSessionNumber: 1 })
+  })
+
+  it('records a pre-tracking baseline (null session) when no session is active', () => {
+    const e = createEntity(ctx, { campaignId, type: 'npc', name: 'Nobody' })
+    const h = getEntityHistory(ctx, e.id)
+    expect(h).toHaveLength(1)
+    expect(h[0].sinceSessionNumber).toBeNull() // no sessions exist -> pre-tracking
+    expect(h[0].lifecycle).toBe('unknown')
+  })
+
+  it('appends a stamped history row when status or lifecycle changes', () => {
+    const s1 = createSession(ctx, { campaignId }) // 1
+    const e = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Duke',
+      status: 'Alive',
+      sessionId: s1.id
+    })
+    createSession(ctx, { campaignId }) // 2
+    const s3 = createSession(ctx, { campaignId }) // 3
+    const u = updateEntity(ctx, e.id, { status: 'Slain', lifecycle: 'ended', sessionId: s3.id })
+    expect(u.lifecycle).toBe('ended')
+    const h = getEntityHistory(ctx, e.id)
+    expect(h).toHaveLength(2) // baseline + the change
+    expect(h[1]).toMatchObject({ lifecycle: 'ended', status: 'Slain', sinceSessionNumber: 3 })
+  })
+
+  it('does not append a history row when neither status nor lifecycle changes', () => {
+    const s = createSession(ctx, { campaignId })
+    const e = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Steady',
+      status: 'Fine',
+      sessionId: s.id
+    })
+    updateEntity(ctx, e.id, { name: 'Steady Renamed', sessionId: s.id }) // rename only
+    expect(getEntityHistory(ctx, e.id)).toHaveLength(1) // still just the baseline
   })
 })

@@ -10,11 +10,12 @@ import {
   type SuggestResult,
   type SuggestTag
 } from '@shared/suggest-types'
-import type { Entity } from '@shared/entity-types'
+import type { Entity, Lifecycle } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import type { RetrievedChunk, VectorStore } from './vector-store.service'
+import { resolveEntityState, stateAsOf } from './chronology.service'
 import { embed, isModelReady } from './embedding.service'
 import { getEntity, listEntities } from './entity.service'
 import { generatePersona, getPersona } from './persona.service'
@@ -123,6 +124,8 @@ export async function suggest(
 ): Promise<SuggestResult> {
   const { campaignId, pcId, situation } = req
   const mode = req.mode ?? 'attitudes'
+  // Chronology (ADR-017): clamp retrieval + reconstructed state to ≤ N when as-of is set.
+  const asOf = req.asOfSession
   try {
     if (!isModelReady()) return fail('no_model')
     if (!pcId) return fail('no_pc')
@@ -138,13 +141,14 @@ export async function suggest(
     // Directions mode allows an empty situation; fall back to the PC's name so retrieval still runs.
     const queryText = situation.trim() || pc.name
     const situationVec = await embed(queryText)
-    const denseChunks = store.search(situationVec, campaignId, TOP_K)
+    const denseChunks = store.search(situationVec, campaignId, TOP_K, asOf)
     // Hybrid retrieval (same as Recall): fold in entities whose NAME the query fuzzily matches.
     const fuzzy = store.fuzzyEntityChunks(
       campaignId,
       queryText,
       new Set(denseChunks.map((c) => c.entityId)),
-      2
+      2,
+      asOf
     )
     const chunks: RetrievedChunk[] = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
 
@@ -170,36 +174,49 @@ export async function suggest(
 
     // Per retrieved entity: its relationships (ownership/alliances from entity_link, invisible to
     // embeddings) and current status, plus the latest session as the present-moment anchor.
-    const scene = resolveScene(ctx, req.scene, pcId)
+    const scene = resolveScene(ctx, req.scene, pcId, asOf)
     const seen = new Set<string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
-    const stateItems: { name: string; type: string; status: string | null }[] = []
+    const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
+      []
     // Pin the current-scene entities into grounding first so they're always present, even off-vector.
-    gatherPinned(ctx, scene.pinned, seen, relItems, stateItems)
+    gatherPinned(ctx, scene.pinned, seen, relItems, stateItems, asOf)
     for (const c of chunks) {
       if (seen.has(c.entityId)) continue
       seen.add(c.entityId)
-      relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId) })
-      stateItems.push({
-        name: c.entityName,
-        type: c.entityType,
-        status: getEntity(ctx, c.entityId)?.status ?? null
-      })
+      relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId, asOf) })
+      const ent = getEntity(ctx, c.entityId)
+      if (ent) {
+        const st = resolveEntityState(ctx, ent, asOf)
+        stateItems.push({
+          name: c.entityName,
+          type: c.entityType,
+          status: st.status,
+          lifecycle: st.lifecycle
+        })
+      }
     }
     const relationships = formatRelationships(relItems)
-    const latest = listSessions(ctx, campaignId)[0]
-    const latestLabel = latest
-      ? `Session ${latest.number}${latest.title ? ` — ${latest.title}` : ''}`
-      : null
-    const state = formatState(latestLabel, stateItems)
+    const anchorLabel =
+      asOf !== undefined
+        ? `Session ${asOf}`
+        : (() => {
+            const latest = listSessions(ctx, campaignId)[0]
+            return latest
+              ? `Session ${latest.number}${latest.title ? ` — ${latest.title}` : ''}`
+              : null
+          })()
+    const state = formatState(anchorLabel, stateItems, asOf !== undefined)
 
     const { suggestModel, suggestEffort } = getSettings()
 
     if (mode === 'directions') {
       // Open-ended: ground in the campaign's unfinished business + the rest of the party.
-      const openQuestEntities = listEntities(ctx, campaignId, 'quest').filter((q) =>
-        isOpenQuest(q.status)
-      )
+      const openQuestEntities = listEntities(ctx, campaignId, 'quest').filter((q) => {
+        if (asOf === undefined) return isOpenQuest(q.status)
+        const st = stateAsOf(ctx, q.id, asOf)
+        return st !== null && isOpenQuest(st.status) // null => the quest didn't exist yet at N
+      })
       // Pin the embarked quest even if it has been completed/failed, so directions can build on it.
       const sceneQuest = scene.quest
       if (sceneQuest && !openQuestEntities.some((q) => q.id === sceneQuest.id)) {
@@ -207,7 +224,7 @@ export async function suggest(
       }
       const openQuests = openQuestEntities.map((q) => ({
         name: q.name,
-        status: q.status,
+        status: resolveEntityState(ctx, q, asOf).status,
         objective: questObjective(q)
       }))
       const otherPcs = listEntities(ctx, campaignId, 'pc')

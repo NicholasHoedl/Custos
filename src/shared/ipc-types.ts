@@ -5,8 +5,10 @@ import type {
   EntityLink,
   EntityType,
   EventLogEntry,
+  Lifecycle,
   Note,
-  Session
+  Session,
+  StatusHistoryEntry
 } from './entity-types'
 import type { RelationKey } from './relations'
 import type { EntityContext, HierarchyView, RelationshipView } from './graph-types'
@@ -50,10 +52,19 @@ export interface CreateEntityInput {
   goals?: string[]
   attributes?: Record<string, unknown>
   status?: string
+  lifecycle?: Lifecycle // chronology: defaults to the status heuristic when omitted
+  sessionId?: string // capture context: active session id, stamps the baseline history row
 }
-export type UpdateEntityInput = Partial<
-  Pick<Entity, 'name' | 'description' | 'traits' | 'goals' | 'attributes' | 'status'>
->
+export interface UpdateEntityInput {
+  name?: string
+  description?: string | null
+  traits?: string[]
+  goals?: string[]
+  attributes?: Record<string, unknown>
+  status?: string | null
+  lifecycle?: Lifecycle
+  sessionId?: string // capture context: active session id, stamps a status/lifecycle change
+}
 export interface CreateNoteInput {
   entityIds: string[] // the note is associated with one or more entities (M2M); must be non-empty
   sessionId?: string
@@ -76,6 +87,7 @@ export interface CreateLinkInput {
   toEntityId: string
   relation: RelationKey
   description?: string
+  sessionId?: string // capture context: active session id, stamps the interval start
 }
 
 export interface EntitySearchResult {
@@ -109,6 +121,8 @@ export interface LedgerApi {
     create(input: CreateEntityInput): Promise<Entity>
     update(id: string, patch: UpdateEntityInput): Promise<Entity>
     delete(id: string): Promise<void>
+    /** Chronology: the entity's full status/lifecycle history, oldest first. */
+    history(entityId: string): Promise<StatusHistoryEntry[]>
   }
   note: {
     list(entityId: string): Promise<Note[]>
@@ -123,6 +137,8 @@ export interface LedgerApi {
   }
   link: {
     create(input: CreateLinkInput): Promise<EntityLink>
+    /** Sever a relationship without erasing it (chronology): closes its open interval at the session. */
+    sever(id: string, sessionId?: string): Promise<void>
     delete(id: string): Promise<void>
     listForEntity(entityId: string): Promise<RelationshipView[]>
   }
@@ -198,6 +214,7 @@ export const IPC = {
   entityCreate: 'entity:create',
   entityUpdate: 'entity:update',
   entityDelete: 'entity:delete',
+  entityHistory: 'entity:history',
   noteList: 'note:list',
   noteListAll: 'note:listAll',
   noteCreate: 'note:create',
@@ -206,6 +223,7 @@ export const IPC = {
   eventList: 'event:list',
   eventCreate: 'event:create',
   linkCreate: 'link:create',
+  linkSever: 'link:sever',
   linkDelete: 'link:delete',
   linkListForEntity: 'link:listForEntity',
   graphContext: 'graph:context',

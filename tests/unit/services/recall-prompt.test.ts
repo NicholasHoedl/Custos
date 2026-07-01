@@ -114,21 +114,38 @@ describe('relationship context (grounding)', () => {
 })
 
 describe('current-state grounding', () => {
-  it('formats the session anchor + entity statuses and skips null statuses', () => {
+  it('formats the anchor + states, marks ended, and skips active entities with no status', () => {
     const out = formatState('Session 3 — The Redbrands', [
-      { name: 'Iarno', type: 'npc', status: 'Defeated' },
-      { name: 'Mira', type: 'npc', status: null },
-      { name: 'End the Redbrands', type: 'quest', status: 'Completed' }
+      { name: 'Iarno', type: 'npc', status: 'Defeated', lifecycle: 'ended' },
+      { name: 'Mira', type: 'npc', status: null, lifecycle: 'active' },
+      { name: 'End the Redbrands', type: 'quest', status: 'Completed', lifecycle: 'ended' }
     ])
     expect(out).toContain('most recent session is Session 3')
-    expect(out).toContain('- Iarno (npc): Defeated')
-    expect(out).toContain('- End the Redbrands (quest): Completed')
-    expect(out).not.toContain('Mira')
+    expect(out).toContain('- Iarno (npc) [ended]: Defeated')
+    expect(out).toContain('- End the Redbrands (quest) [ended]: Completed')
+    expect(out).not.toContain('Mira') // active + no status → skipped
   })
 
-  it('returns null with no session and no statuses, but keeps a lone session anchor', () => {
-    expect(formatState(null, [{ name: 'X', type: 'npc', status: null }])).toBeNull()
-    expect(formatState('Session 1', [{ name: 'X', type: 'npc', status: null }])).toContain('Session 1')
+  it('surfaces an ended entity even with no free-text status', () => {
+    const out = formatState(null, [{ name: 'Gone', type: 'npc', status: null, lifecycle: 'ended' }])
+    expect(out).toContain('- Gone (npc) [ended]')
+  })
+
+  it('uses an AS OF anchor (not "the present") when asOf is set', () => {
+    const out = formatState(
+      'Session 2',
+      [{ name: 'X', type: 'npc', status: 'Alive', lifecycle: 'active' }],
+      true
+    )
+    expect(out).toContain('AS OF Session 2')
+    expect(out).not.toContain('the present')
+  })
+
+  it('returns null with no anchor and nothing to surface, but keeps a lone anchor', () => {
+    expect(formatState(null, [{ name: 'X', type: 'npc', status: null, lifecycle: 'active' }])).toBeNull()
+    expect(
+      formatState('Session 1', [{ name: 'X', type: 'npc', status: null, lifecycle: 'active' }])
+    ).toContain('Session 1')
   })
 
   it('buildUserContent inserts the state block (as present/FACT) before the query', () => {

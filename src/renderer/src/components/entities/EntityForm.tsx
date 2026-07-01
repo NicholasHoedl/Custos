@@ -4,8 +4,11 @@ import { toast } from 'sonner'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
+  LIFECYCLES,
+  LIFECYCLE_LABELS,
   type Entity,
-  type EntityType
+  type EntityType,
+  type Lifecycle
 } from '@shared/entity-types'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import { ledger } from '@renderer/lib/ipc'
@@ -70,6 +73,7 @@ export function EntityForm({
   const [traits, setTraits] = useState<string[]>([])
   const [goals, setGoals] = useState<string[]>([])
   const [status, setStatus] = useState('')
+  const [lifecycle, setLifecycle] = useState<Lifecycle>('active')
   const [attributes, setAttributes] = useState<Record<string, unknown>>({})
   const [extraRows, setExtraRows] = useState<AttrRow[]>([])
   const [moreOpen, setMoreOpen] = useState(false)
@@ -85,6 +89,7 @@ export function EntityForm({
     setTraits(e?.traits ?? [])
     setGoals(e?.goals ?? [])
     setStatus(e?.status ?? '')
+    setLifecycle(e?.lifecycle ?? 'active')
     const attrs = e?.attributes ?? {}
     setAttributes(attrs)
     const extras = toRows(attrs, profileKeys(t))
@@ -153,7 +158,8 @@ export function EntityForm({
             traits: payloadTraits,
             goals: payloadGoals,
             attributes: attrs,
-            status: status.trim() || null
+            status: status.trim() || null,
+            lifecycle
           })
         : await ledger.entity.create({
             campaignId,
@@ -163,7 +169,8 @@ export function EntityForm({
             traits: payloadTraits,
             goals: payloadGoals,
             attributes: attrs,
-            status: status.trim() || undefined
+            status: status.trim() || undefined,
+            lifecycle
           })
       useUiStore.getState().bumpEntities() // refresh every entity list (e.g. scene selectors) now
       toast.success(editing ? 'Saved' : `Added ${ENTITY_TYPE_LABELS[type]}`, { description: trimmed })
@@ -356,6 +363,25 @@ export function EntityForm({
               <StatusCombobox id="ef-status" value={status} onChange={setStatus} options={prof.status} />
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ef-lifecycle">Lifecycle</Label>
+            <Select value={lifecycle} onValueChange={(v) => setLifecycle(v as Lifecycle)}>
+              <SelectTrigger id="ef-lifecycle">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LIFECYCLES.map((lc) => (
+                  <SelectItem key={lc} value={lc}>
+                    {LIFECYCLE_LABELS[lc]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Whether this still exists / is in play — the AI trusts it for “now vs. then.”
+            </p>
+          </div>
 
           {prof.fields.map(renderField)}
 

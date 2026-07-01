@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Info, Link2, X } from 'lucide-react'
+import { Info, Link2, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
 import { relationsForTypes, type RelationKey } from '@shared/relations'
@@ -46,12 +46,21 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  async function remove(id: string) {
+  async function sever(id: string) {
     try {
-      await ledger.link.delete(id)
+      await ledger.link.sever(id) // soft close — kept in the timeline as ended (chronology)
       refresh()
     } catch (err) {
-      toast.error('Could not remove link', { description: String(err) })
+      toast.error('Could not unlink', { description: String(err) })
+    }
+  }
+
+  async function hardDelete(id: string) {
+    try {
+      await ledger.link.delete(id) // escape hatch for a mis-entry — removed with no history
+      refresh()
+    } catch (err) {
+      toast.error('Could not delete', { description: String(err) })
     }
   }
 
@@ -83,13 +92,32 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
                   <TooltipContent>{rel.link.description}</TooltipContent>
                 </Tooltip>
               )}
-              <button
-                onClick={() => remove(rel.link.id)}
-                className="ml-auto shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
-                aria-label="Remove link"
-              >
-                <X className="size-3.5" />
-              </button>
+              <div className="ml-auto flex shrink-0 items-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => sever(rel.link.id)}
+                      className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Unlink (keeps history)"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Unlink — kept in the timeline as ended</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => hardDelete(rel.link.id)}
+                      className="rounded p-1 text-muted-foreground/40 transition-colors hover:text-destructive"
+                      aria-label="Delete permanently"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete permanently — for a mistake (no history)</TooltipContent>
+                </Tooltip>
+              </div>
             </li>
           ))}
         </ul>

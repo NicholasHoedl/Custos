@@ -152,6 +152,8 @@ export interface SuggestRequest {
   mode?: SuggestMode
   /** The current scene (location/time/party/quest/combat), folded into grounding. */
   scene?: SceneContext
+  /** Chronology (ADR-017): reconstruct "as of" this session NUMBER (retrieval + state clamped ≤ N). */
+  asOfSession?: number
 }
 
 export type SuggestFailureReason =

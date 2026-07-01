@@ -1,7 +1,8 @@
 import { SCENE_MODE_LABELS, TIME_OF_DAY_LABELS, type SceneContext } from '@shared/scene-types'
-import type { Entity } from '@shared/entity-types'
+import type { Entity, Lifecycle } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
 import type { DbContext } from './db-context'
+import { resolveEntityState } from './chronology.service'
 import { getEntity } from './entity.service'
 import { getHierarchy, listForEntity } from './link.service'
 import { formatScene } from './claude.service'
@@ -18,7 +19,7 @@ export interface ResolvedScene {
 }
 
 export type RelItem = { name: string; views: RelationshipView[] }
-export type StateItem = { name: string; type: string; status: string | null }
+export type StateItem = { name: string; type: string; status: string | null; lifecycle: Lifecycle }
 
 /** Fold a set of pinned entities' relationships + status into the gather accumulators (deduped). */
 export function gatherPinned(
@@ -26,13 +27,15 @@ export function gatherPinned(
   pinned: Entity[],
   seen: Set<string>,
   relItems: RelItem[],
-  stateItems: StateItem[]
+  stateItems: StateItem[],
+  asOf?: number
 ): void {
   for (const e of pinned) {
     if (seen.has(e.id)) continue
     seen.add(e.id)
-    relItems.push({ name: e.name, views: listForEntity(ctx, e.id) })
-    stateItems.push({ name: e.name, type: e.type, status: e.status })
+    relItems.push({ name: e.name, views: listForEntity(ctx, e.id, asOf) })
+    const st = resolveEntityState(ctx, e, asOf)
+    stateItems.push({ name: e.name, type: e.type, status: st.status, lifecycle: st.lifecycle })
   }
 }
 
@@ -50,7 +53,8 @@ function questObjective(q: Entity): string | null {
 export function resolveScene(
   ctx: DbContext,
   scene: SceneContext | undefined,
-  activePcId: string | null
+  activePcId: string | null,
+  asOf?: number
 ): ResolvedScene {
   if (!scene) return { block: null, pinned: [], quest: null, nearbyPcs: [] }
 
@@ -114,7 +118,9 @@ export function resolveScene(
   }
 
   const block = formatScene({
-    location: location ? { name: location.name, status: location.status, containerName } : null,
+    location: location
+      ? { name: location.name, status: resolveEntityState(ctx, location, asOf).status, containerName }
+      : null,
     quest: quest ? { name: quest.name, objective: questObjective(quest) } : null,
     nearbyPcNames: nearbyPcs.map((p) => p.name),
     facingNames: facing.map((e) => e.name),

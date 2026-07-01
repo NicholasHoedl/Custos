@@ -11,6 +11,7 @@ import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
 import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
+import { EntityHistory } from './EntityHistory'
 import { PersonaEditor } from './PersonaEditor'
 import { Button } from '@renderer/components/ui/button'
 import { Separator } from '@renderer/components/ui/separator'
@@ -97,6 +98,11 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
                 {entity.status}
               </span>
             )}
+            {entity.lifecycle === 'ended' && (
+              <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                Ended
+              </span>
+            )}
           </div>
           <h2 className="font-display text-2xl font-semibold text-foreground">{entity.name}</h2>
           {hierarchy && hierarchy.ancestors.length > 0 && (
@@ -155,6 +161,10 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
         <Separator />
 
         <RelationshipEditor entity={entity} allEntities={allEntities} />
+
+        <Separator />
+
+        <EntityHistory entityId={entity.id} />
 
         <Separator />
 

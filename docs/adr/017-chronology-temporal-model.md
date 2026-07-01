@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (design) — **implementation not yet started.**
+Accepted — **implemented** across milestones M1–M5 (schema + migration, reconstruction, capture,
+as-of clamp, UI). Verified: typecheck + the full unit/integration suite green.
 
 **Date:** 2026-07-01
 **Deciders:** Solo developer
@@ -86,6 +87,29 @@ parsing free text.
   extends ADR-012).
 - The **`entity_link` unique index must relax** to allow a severed-then-reformed relationship.
 - Null-`sessionId` notes need an explicit as-of rule.
+
+## Implementation notes (as built, M1–M5)
+
+Two refinements emerged during implementation (surfaced by an adversarial plan review):
+
+- **Denormalize `session.number`** into the interval/history columns (`since_session_number`,
+  `start_session_number`, `end_session_number`) rather than storing session ids and joining — so
+  `stateAsOf` and the interval filter are pure integer comparisons, no join on the hot clamp path.
+  *Invariant:* session numbers are assigned once (`max+1`) and never renumbered, so a deleted session
+  leaves a harmless dangling number.
+- **Relationship removal = sever by default** (close the interval); the hard `deleteLink` is kept as an
+  escape hatch for mis-entries. Uniqueness is a **partial** unique index
+  (`… WHERE end_session_number IS NULL`, "at most one open interval"); `schema.ts` keeps a plain index
+  so `drizzle-kit generate` won't regenerate a full unique one.
+
+Accepted v1 limitations / deferred (documented, not defects):
+
+- **Capture stamps to the campaign's latest session** via a main-process fallback; explicit
+  active-session threading and an "as-of edit override" UI are deferred.
+- **Session Recap** grounds on *live* state (now carrying `lifecycle`), not as-of the recapped session
+  — a small follow-up (`stateAsOf(session.number)`).
+- Under as-of, an entity's **unversioned description** and the scene's **expanded contents**
+  (`getHierarchy`) read as timeless; only status + relationships are reconstructed.
 
 ## Related Decisions
 

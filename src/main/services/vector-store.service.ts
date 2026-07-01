@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull, lte, or } from 'drizzle-orm'
 import type { EntityType } from '@shared/entity-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
@@ -24,13 +24,14 @@ export interface VectorStore {
   removeEntity(entityId: string): void
   noteHash(noteId: string): string | null
   entityHash(entityId: string): string | null
-  search(query: Float32Array, campaignId: string, k: number): RetrievedChunk[]
+  search(query: Float32Array, campaignId: string, k: number, asOf?: number): RetrievedChunk[]
   /** Entities whose NAME the query fuzzily matches (typo-tolerant), as chunks — merged with `search`. */
   fuzzyEntityChunks(
     campaignId: string,
     query: string,
     exclude: Set<string>,
-    limit: number
+    limit: number,
+    asOf?: number
   ): RetrievedChunk[]
 }
 
@@ -169,7 +170,7 @@ export class BruteForceVectorStore implements VectorStore {
     return r?.h ?? null
   }
 
-  search(query: Float32Array, campaignId: string, k: number): RetrievedChunk[] {
+  search(query: Float32Array, campaignId: string, k: number, asOf?: number): RetrievedChunk[] {
     const chunks: RetrievedChunk[] = []
 
     // Notes are M2M with entities (note_entity). A note linked to N entities would otherwise produce N
@@ -192,7 +193,15 @@ export class BruteForceVectorStore implements VectorStore {
       .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
       .innerJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
       .leftJoin(schema.session, eq(schema.session.id, schema.note.sessionId))
-      .where(eq(schema.entity.campaignId, campaignId))
+      .where(
+        asOf === undefined
+          ? eq(schema.entity.campaignId, campaignId)
+          : and(
+              eq(schema.entity.campaignId, campaignId),
+              // No future leak: only notes from sessions <= N; undated (null-session) notes pass through.
+              or(isNull(schema.note.sessionId), lte(schema.session.number, asOf))
+            )
+      )
       .orderBy(schema.entity.name)
       .all()
 
@@ -248,7 +257,8 @@ export class BruteForceVectorStore implements VectorStore {
     campaignId: string,
     query: string,
     exclude: Set<string>,
-    limit: number
+    limit: number,
+    asOf?: number
   ): RetrievedChunk[] {
     const entities = this.ctx.drizzle
       .select({
@@ -292,7 +302,14 @@ export class BruteForceVectorStore implements VectorStore {
         .from(schema.noteEntity)
         .innerJoin(schema.note, eq(schema.note.id, schema.noteEntity.noteId))
         .leftJoin(schema.session, eq(schema.session.id, schema.note.sessionId))
-        .where(eq(schema.noteEntity.entityId, e.id))
+        .where(
+          asOf === undefined
+            ? eq(schema.noteEntity.entityId, e.id)
+            : and(
+                eq(schema.noteEntity.entityId, e.id),
+                or(isNull(schema.note.sessionId), lte(schema.session.number, asOf))
+              )
+        )
         .limit(FUZZY_NOTES_PER_ENTITY)
         .all()
       for (const n of notes) {

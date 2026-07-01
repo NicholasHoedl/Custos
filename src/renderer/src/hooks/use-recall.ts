@@ -16,7 +16,7 @@ interface RecallState {
 const IDLE: RecallState = { status: 'idle', answer: '', sources: [], reason: null, error: null }
 
 export function useRecall(): RecallState & {
-  ask: (query: string, mode: RecallMode) => void
+  ask: (query: string, mode: RecallMode, asOfSession?: number) => void
   cancel: () => void
   reset: () => void
 } {
@@ -69,7 +69,7 @@ export function useRecall(): RecallState & {
   }, [flush, schedule])
 
   const ask = useCallback(
-    (query: string, mode: RecallMode) => {
+    (query: string, mode: RecallMode, asOfSession?: number) => {
       if (!activeCampaignId || !query.trim()) return
       const requestId = crypto.randomUUID()
       reqId.current = requestId
@@ -82,7 +82,8 @@ export function useRecall(): RecallState & {
           campaignId: activeCampaignId,
           pcId: activePcId,
           mode,
-          scene
+          scene,
+          asOfSession
         })
         .catch((err) =>
           setState((s) => ({ ...s, status: 'error', error: { message: String(err), kind: 'unknown' } }))

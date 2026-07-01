@@ -1,5 +1,6 @@
 import type { RecapRequest } from '@shared/recap-types'
 import type { RelationshipView } from '@shared/graph-types'
+import type { Lifecycle } from '@shared/entity-types'
 import { RECAP_CHUNK_CHANNEL, RECAP_DONE_CHANNEL, RECAP_ERROR_CHANNEL } from '@shared/ipc-types'
 import type { DbContext } from './db-context'
 import { getEntity } from './entity.service'
@@ -63,13 +64,14 @@ export async function generateRecap(
     for (const e of events) if (e.entityId) involvedIds.add(e.entityId)
     const nameById = new Map<string, string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
-    const stateItems: { name: string; type: string; status: string | null }[] = []
+    const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
+      []
     for (const id of involvedIds) {
       const ent = getEntity(ctx, id)
       if (!ent) continue
       nameById.set(id, ent.name)
       relItems.push({ name: ent.name, views: listForEntity(ctx, id) })
-      stateItems.push({ name: ent.name, type: ent.type, status: ent.status })
+      stateItems.push({ name: ent.name, type: ent.type, status: ent.status, lifecycle: ent.lifecycle })
     }
     const relationships = formatRelationships(relItems)
     const state = formatState(null, stateItems) // null anchor: recap a specific session, not "the present"

@@ -1,9 +1,11 @@
 import { and, eq } from 'drizzle-orm'
-import type { Entity, EntityType } from '@shared/entity-types'
+import type { Entity, EntityType, Lifecycle } from '@shared/entity-types'
 import type { CreateEntityInput, UpdateEntityInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
+import { lifecycleHeuristic } from './chronology.service'
 import { deleteOrphanNotes } from './note.service'
+import { resolveCaptureSessionNumber } from './session.service'
 import { newId, now, rowToEntity, serializeArray, serializeObject } from './serialize'
 
 export function listEntities(ctx: DbContext, campaignId: string, type?: EntityType): Entity[] {
@@ -26,6 +28,9 @@ export function getEntity(ctx: DbContext, id: string): Entity | null {
 
 export function createEntity(ctx: DbContext, input: CreateEntityInput): Entity {
   const ts = now()
+  const status = input.status ?? null
+  // Chronology (ADR-017): lifecycle defaults to the status heuristic; the caller may override it.
+  const lifecycle: Lifecycle = input.lifecycle ?? lifecycleHeuristic(status)
   const row = {
     id: newId(),
     campaignId: input.campaignId,
@@ -35,23 +40,58 @@ export function createEntity(ctx: DbContext, input: CreateEntityInput): Entity {
     traits: serializeArray(input.traits),
     goals: serializeArray(input.goals),
     attributes: serializeObject(input.attributes),
-    status: input.status ?? null,
+    status,
+    lifecycle,
     createdAt: ts,
     updatedAt: ts
   }
-  ctx.drizzle.insert(schema.entity).values(row).run()
+  const sinceSessionNumber = resolveCaptureSessionNumber(ctx, input.sessionId, input.campaignId)
+  ctx.drizzle.transaction((tx) => {
+    tx.insert(schema.entity).values(row).run()
+    // Seed a baseline history row so stateAsOf has a value from this entity's creation onward.
+    tx.insert(schema.statusHistory)
+      .values({ id: newId(), entityId: row.id, lifecycle, status, sinceSessionNumber, recordedAt: ts })
+      .run()
+  })
   return rowToEntity(row)
 }
 
 export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInput): Entity {
-  const set: Partial<typeof schema.entity.$inferInsert> = { updatedAt: now() }
+  const before = getEntity(ctx, id)
+  if (!before) throw new Error(`Entity ${id} not found`)
+  const ts = now()
+  const set: Partial<typeof schema.entity.$inferInsert> = { updatedAt: ts }
   if (patch.name !== undefined) set.name = patch.name.trim()
   if (patch.description !== undefined) set.description = patch.description
   if (patch.status !== undefined) set.status = patch.status
+  if (patch.lifecycle !== undefined) set.lifecycle = patch.lifecycle
   if (patch.traits !== undefined) set.traits = serializeArray(patch.traits)
   if (patch.goals !== undefined) set.goals = serializeArray(patch.goals)
   if (patch.attributes !== undefined) set.attributes = serializeObject(patch.attributes)
-  ctx.drizzle.update(schema.entity).set(set).where(eq(schema.entity.id, id)).run()
+
+  // Chronology: append a stamped history row iff status OR lifecycle actually changed.
+  const newStatus = patch.status !== undefined ? patch.status : before.status
+  const newLifecycle: Lifecycle = patch.lifecycle !== undefined ? patch.lifecycle : before.lifecycle
+  const changed = newStatus !== before.status || newLifecycle !== before.lifecycle
+  const sinceSessionNumber = changed
+    ? resolveCaptureSessionNumber(ctx, patch.sessionId, before.campaignId)
+    : null
+
+  ctx.drizzle.transaction((tx) => {
+    tx.update(schema.entity).set(set).where(eq(schema.entity.id, id)).run()
+    if (changed) {
+      tx.insert(schema.statusHistory)
+        .values({
+          id: newId(),
+          entityId: id,
+          lifecycle: newLifecycle,
+          status: newStatus,
+          sinceSessionNumber,
+          recordedAt: ts
+        })
+        .run()
+    }
+  })
   const e = getEntity(ctx, id)
   if (!e) throw new Error(`Entity ${id} not found`)
   return e

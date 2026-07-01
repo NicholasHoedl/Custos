@@ -133,7 +133,7 @@ describe('scene.service gatherPinned', () => {
     const stateItems: StateItem[] = []
     gatherPinned(ctx, [a, a], seen, relItems, stateItems) // duplicate ignored
     expect(stateItems).toHaveLength(1)
-    expect(stateItems[0]).toEqual({ name: 'Aldric', type: 'npc', status: 'Alive' })
+    expect(stateItems[0]).toEqual({ name: 'Aldric', type: 'npc', status: 'Alive', lifecycle: 'active' })
     expect(relItems).toHaveLength(1)
   })
 })

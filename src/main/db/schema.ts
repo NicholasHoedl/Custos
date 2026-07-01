@@ -52,6 +52,9 @@ export const entity = sqliteTable(
     goals: text('goals'), // JSON string[] — promoted
     attributes: text('attributes'), // JSON object — open bag of type-specific fields (no migration needed)
     status: text('status'),
+    // Chronology (ADR-017): coarse lifecycle the AI trusts for past-vs-present; free-text `status`
+    // stays for nuance. This is what history versions. Backfilled from status by heuristic in 0005.
+    lifecycle: text('lifecycle').notNull().default('unknown'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull()
   },
@@ -59,6 +62,25 @@ export const entity = sqliteTable(
     index('entity_campaign_type_idx').on(t.campaignId, t.type),
     index('entity_campaign_name_idx').on(t.campaignId, t.name)
   ]
+)
+
+// Chronology (ADR-017): append-only trail of an entity's status + lifecycle over time. A baseline row
+// per entity (since_session_number NULL = pre-tracking) plus one row per status/lifecycle change,
+// stamped with the session NUMBER it happened in (denormalized — no FK; the timeline is
+// session.number, assigned once and never renumbered). `stateAsOf` reads the latest row <= N.
+export const statusHistory = sqliteTable(
+  'status_history',
+  {
+    id: text('id').primaryKey(),
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entity.id, { onDelete: 'cascade' }),
+    lifecycle: text('lifecycle').notNull(),
+    status: text('status'),
+    sinceSessionNumber: integer('since_session_number'), // NULL = pre-tracking baseline
+    recordedAt: integer('recorded_at').notNull()
+  },
+  (t) => [index('status_history_entity_idx').on(t.entityId)]
 )
 
 // A note's content + provenance. Its entity association lives entirely in note_entity (M2M) — a note
@@ -112,13 +134,23 @@ export const entityLink = sqliteTable(
     campaignId: text('campaign_id')
       .notNull()
       .references(() => campaign.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at') // nullable so ADD COLUMN is clean; the service always sets it
+    createdAt: integer('created_at'), // nullable so ADD COLUMN is clean; the service always sets it
+    // Chronology (ADR-017): relationship validity interval, by session NUMBER (denormalized — the
+    // timeline is session.number). start_session_number NULL = pre-tracking; end_session_number NULL =
+    // still live (an OPEN interval). Severing sets end_session_number; the row is never deleted.
+    startSessionNumber: integer('start_session_number'),
+    endSessionNumber: integer('end_session_number')
   },
   (t) => [
     index('link_from_idx').on(t.fromEntityId),
     index('link_to_idx').on(t.toEntityId),
     index('link_relation_idx').on(t.relation),
-    uniqueIndex('link_unique_idx').on(t.fromEntityId, t.toEntityId, t.relation)
+    // Plain index (was `link_unique_idx`). Uniqueness of an OPEN (from,to,relation) interval is
+    // enforced by a PARTIAL unique index — `link_open_unique_idx ... WHERE end_session_number IS NULL`
+    // — that lives ONLY in migration 0005, because Drizzle's index builder can't express a partial
+    // predicate. Keep this PLAIN so `drizzle-kit generate` won't regenerate a full unique index and
+    // reintroduce the pre-interval constraint (which would block sever -> reform). See ADR-017.
+    index('link_from_to_relation_idx').on(t.fromEntityId, t.toEntityId, t.relation)
   ]
 )
 

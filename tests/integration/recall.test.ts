@@ -43,7 +43,7 @@ import { RECALL_CHUNK_CHANNEL, RECALL_DONE_CHANNEL } from '@shared/ipc-types'
 import { makeTestDb } from '../helpers/test-db'
 import { createCampaign } from '../../src/main/services/campaign.service'
 import { createSession } from '../../src/main/services/session.service'
-import { createEntity } from '../../src/main/services/entity.service'
+import { createEntity, updateEntity } from '../../src/main/services/entity.service'
 import { createNote } from '../../src/main/services/note.service'
 import { createLink } from '../../src/main/services/link.service'
 import { BruteForceVectorStore } from '../../src/main/services/vector-store.service'
@@ -242,5 +242,74 @@ describe('recall RAG pipeline (mocked AI)', () => {
     expect(call.mode).toBe('in_character') // NOT silently downgraded to factual
     expect(call.context.pcName).toBe('Brother Cassius') // the model is told whose head it's in
     expect(call.context.persona).toContain('cleric of Tymora') // the brief reached the prompt
+  })
+
+  it('as-of clamps retrieval AND reconstructs past state (no future-knowledge leak)', async () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
+    const s1 = createSession(ctx, { campaignId }) // 1
+    createSession(ctx, { campaignId }) // 2
+    const s3 = createSession(ctx, { campaignId }) // 3
+
+    // An NPC alive in session 1, killed in session 3.
+    const duke = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Duke Halric',
+      status: 'Alive',
+      sessionId: s1.id
+    })
+    updateEntity(ctx, duke.id, { status: 'Slain', lifecycle: 'ended', sessionId: s3.id })
+
+    const pastNote = createNote(ctx, {
+      entityIds: [duke.id],
+      sessionId: s1.id,
+      content: 'The Duke pledged aid on the north road.'
+    })
+    const futureNote = createNote(ctx, {
+      entityIds: [duke.id],
+      sessionId: s3.id,
+      content: 'The Duke was slain at the feast.'
+    })
+    store.upsertNote(pastNote.id, unit(0), 'hp')
+    store.upsertNote(futureNote.id, unit(0), 'hf')
+    embedFn.mockResolvedValue(unit(0))
+    claudeRecall.mockResolvedValue([])
+
+    // AS OF session 2 — before the death and before the session-3 note.
+    await ask(
+      ctx,
+      store,
+      () => {},
+      { requestId: 'asof', query: 'the Duke', campaignId, pcId: null, mode: 'factual', asOfSession: 2 },
+      new AbortController().signal
+    )
+    const asOfCall = claudeRecall.mock.calls.at(-1)![0] as {
+      chunks: Array<{ content: string }>
+      state: string | null
+    }
+    const asOfContents = asOfCall.chunks.map((c) => c.content).join('\n')
+    expect(asOfContents).toContain('pledged aid') // session-1 note is in
+    expect(asOfContents).not.toContain('slain at the feast') // session-3 note clamped OUT
+    expect(asOfCall.state).toMatch(/AS OF Session 2/) // as-of anchor, not "the present"
+    expect(asOfCall.state).toContain('Alive') // reconstructed status at session 2
+    expect(asOfCall.state).not.toContain('[ended]') // the Duke was alive then
+
+    // NOW — the Duke is ended and the later note is retrievable again.
+    await ask(
+      ctx,
+      store,
+      () => {},
+      { requestId: 'now', query: 'the Duke', campaignId, pcId: null, mode: 'factual' },
+      new AbortController().signal
+    )
+    const nowCall = claudeRecall.mock.calls.at(-1)![0] as {
+      chunks: Array<{ content: string }>
+      state: string | null
+    }
+    const nowContents = nowCall.chunks.map((c) => c.content).join('\n')
+    expect(nowContents).toContain('slain at the feast') // future note now visible
+    expect(nowCall.state).toContain('Duke Halric (npc) [ended]') // now dead
   })
 })

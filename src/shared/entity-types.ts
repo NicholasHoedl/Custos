@@ -24,6 +24,17 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
   event: 'Event'
 }
 
+/** Chronology (ADR-017): the coarse lifecycle the AI trusts for past-vs-present reasoning. */
+export type Lifecycle = 'active' | 'ended' | 'unknown'
+
+export const LIFECYCLES: readonly Lifecycle[] = ['active', 'ended', 'unknown']
+
+export const LIFECYCLE_LABELS: Record<Lifecycle, string> = {
+  active: 'Active',
+  ended: 'Ended',
+  unknown: 'Unknown'
+}
+
 export interface Campaign {
   id: string
   name: string
@@ -52,6 +63,7 @@ export interface Entity {
   goals: string[] // promoted
   attributes: Record<string, unknown> // open bag of type-specific fields
   status: string | null
+  lifecycle: Lifecycle // chronology: coarse state the AI trusts; free-text `status` stays for nuance
   createdAt: number
   updatedAt: number
 }
@@ -73,6 +85,18 @@ export interface EntityLink {
   description: string | null // the "why/when" of the edge — the RAG-context lever
   campaignId: string
   createdAt: number | null
+  startSessionNumber: number | null // chronology: interval start; null = pre-tracking
+  endSessionNumber: number | null // chronology: interval end; null = still live (open)
+}
+
+/** One row of an entity's status/lifecycle history over time (chronology, ADR-017). */
+export interface StatusHistoryEntry {
+  id: string
+  entityId: string
+  lifecycle: Lifecycle
+  status: string | null
+  sinceSessionNumber: number | null // null = pre-tracking baseline
+  recordedAt: number
 }
 
 export interface EventLogEntry {

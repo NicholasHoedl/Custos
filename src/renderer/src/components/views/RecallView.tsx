@@ -5,9 +5,11 @@ import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useRecall } from '@renderer/hooks/use-recall'
+import { useSessions } from '@renderer/hooks/use-ledger'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
+import { AsOfSelect } from '@renderer/components/AsOfSelect'
 
 export function RecallView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
@@ -17,6 +19,8 @@ export function RecallView() {
   const recall = useRecall()
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<RecallMode>('in_character')
+  const { sessions } = useSessions(activeCampaignId)
+  const [asOf, setAsOf] = useState<number | null>(null)
 
   if (!activeCampaignId) {
     return (
@@ -36,7 +40,7 @@ export function RecallView() {
 
   function submit() {
     if (!query.trim() || streaming || !onb.modelReady) return
-    recall.ask(query, effectiveMode)
+    recall.ask(query, effectiveMode, asOf ?? undefined)
   }
 
   return (
@@ -106,8 +110,11 @@ export function RecallView() {
             }
           }}
         />
-        <div className="flex items-center justify-between gap-3">
-          <ModeToggle mode={effectiveMode} setMode={setMode} canInCharacter={canInCharacter} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ModeToggle mode={effectiveMode} setMode={setMode} canInCharacter={canInCharacter} />
+            <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+          </div>
           {streaming ? (
             <Button variant="outline" size="sm" onClick={recall.cancel}>
               Stop

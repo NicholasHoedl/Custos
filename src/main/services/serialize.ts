@@ -5,8 +5,10 @@ import type {
   EntityLink,
   EntityType,
   EventLogEntry,
+  Lifecycle,
   Note,
-  Session
+  Session,
+  StatusHistoryEntry
 } from '@shared/entity-types'
 import * as schema from '../db/schema'
 
@@ -61,6 +63,7 @@ export function rowToEntity(r: typeof schema.entity.$inferSelect): Entity {
     goals: parseArray(r.goals),
     attributes: parseObject(r.attributes),
     status: r.status,
+    lifecycle: r.lifecycle as Lifecycle,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt
   }
@@ -85,7 +88,22 @@ export function rowToLink(r: typeof schema.entityLink.$inferSelect): EntityLink 
     relation: r.relation,
     description: r.description,
     campaignId: r.campaignId,
-    createdAt: r.createdAt
+    createdAt: r.createdAt,
+    startSessionNumber: r.startSessionNumber,
+    endSessionNumber: r.endSessionNumber
+  }
+}
+
+export function rowToStatusHistory(
+  r: typeof schema.statusHistory.$inferSelect
+): StatusHistoryEntry {
+  return {
+    id: r.id,
+    entityId: r.entityId,
+    lifecycle: r.lifecycle as Lifecycle,
+    status: r.status,
+    sinceSessionNumber: r.sinceSessionNumber,
+    recordedAt: r.recordedAt
   }
 }
 

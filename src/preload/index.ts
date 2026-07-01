@@ -41,7 +41,8 @@ const api: LedgerApi = {
     get: (id) => ipcRenderer.invoke(IPC.entityGet, id),
     create: (input) => ipcRenderer.invoke(IPC.entityCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.entityUpdate, id, patch),
-    delete: (id) => ipcRenderer.invoke(IPC.entityDelete, id)
+    delete: (id) => ipcRenderer.invoke(IPC.entityDelete, id),
+    history: (entityId) => ipcRenderer.invoke(IPC.entityHistory, entityId)
   },
   note: {
     list: (entityId) => ipcRenderer.invoke(IPC.noteList, entityId),
@@ -56,6 +57,7 @@ const api: LedgerApi = {
   },
   link: {
     create: (input) => ipcRenderer.invoke(IPC.linkCreate, input),
+    sever: (id, sessionId) => ipcRenderer.invoke(IPC.linkSever, id, sessionId),
     delete: (id) => ipcRenderer.invoke(IPC.linkDelete, id),
     listForEntity: (entityId) => ipcRenderer.invoke(IPC.linkListForEntity, entityId)
   },

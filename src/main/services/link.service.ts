@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import type { Entity, EntityLink } from '@shared/entity-types'
 import type { CreateLinkInput, HierarchyKind } from '@shared/ipc-types'
 import type {
@@ -11,8 +11,10 @@ import type {
 import { RELATIONS, isRelationAllowed, isRelationKey } from '@shared/relations'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
+import { isIntervalLiveAt } from './chronology.service'
 import { getEntity } from './entity.service'
 import { listNotesForEntity } from './note.service'
+import { resolveCaptureSessionNumber } from './session.service'
 import { newId, now, rowToLink } from './serialize'
 
 const HIERARCHY_PAIR: Record<HierarchyKind, { fwd: string; inv: string }> = {
@@ -41,16 +43,20 @@ export function createLink(ctx: DbContext, input: CreateLinkInput): EntityLink {
     .select()
     .from(schema.entityLink)
     .where(
-      or(
-        and(
-          eq(schema.entityLink.fromEntityId, input.fromEntityId),
-          eq(schema.entityLink.toEntityId, input.toEntityId),
-          eq(schema.entityLink.relation, input.relation)
-        ),
-        and(
-          eq(schema.entityLink.fromEntityId, input.toEntityId),
-          eq(schema.entityLink.toEntityId, input.fromEntityId),
-          eq(schema.entityLink.relation, inverseKey)
+      and(
+        // Only an OPEN interval collapses; a severed edge can be re-formed as a fresh interval.
+        isNull(schema.entityLink.endSessionNumber),
+        or(
+          and(
+            eq(schema.entityLink.fromEntityId, input.fromEntityId),
+            eq(schema.entityLink.toEntityId, input.toEntityId),
+            eq(schema.entityLink.relation, input.relation)
+          ),
+          and(
+            eq(schema.entityLink.fromEntityId, input.toEntityId),
+            eq(schema.entityLink.toEntityId, input.fromEntityId),
+            eq(schema.entityLink.relation, inverseKey)
+          )
         )
       )
     )
@@ -64,18 +70,50 @@ export function createLink(ctx: DbContext, input: CreateLinkInput): EntityLink {
     relation: input.relation,
     description: input.description ?? null,
     campaignId: input.campaignId,
-    createdAt: now()
+    createdAt: now(),
+    // Chronology (ADR-017): a new relationship opens an interval at the active session.
+    startSessionNumber: resolveCaptureSessionNumber(ctx, input.sessionId, input.campaignId),
+    endSessionNumber: null
   }
   ctx.drizzle.insert(schema.entityLink).values(row).run()
   return rowToLink(row)
+}
+
+/**
+ * Chronology (ADR-017): "unlink" without erasing history — close the OPEN interval by stamping
+ * end_session_number with the active session. A no-op if the link is missing or already severed. When
+ * no session exists to anchor a "when", there is no timeline to preserve, so fall back to hard removal.
+ * The explicit `deleteLink` remains an escape hatch for genuine mis-entries.
+ */
+export function severLink(ctx: DbContext, id: string, sessionId?: string): void {
+  const link = ctx.drizzle
+    .select()
+    .from(schema.entityLink)
+    .where(eq(schema.entityLink.id, id))
+    .get()
+  if (!link || link.endSessionNumber !== null) return
+  const n = resolveCaptureSessionNumber(ctx, sessionId, link.campaignId)
+  if (n === null) {
+    ctx.drizzle.delete(schema.entityLink).where(eq(schema.entityLink.id, id)).run()
+    return
+  }
+  ctx.drizzle
+    .update(schema.entityLink)
+    .set({ endSessionNumber: n })
+    .where(eq(schema.entityLink.id, id))
+    .run()
 }
 
 export function deleteLink(ctx: DbContext, id: string): void {
   ctx.drizzle.delete(schema.entityLink).where(eq(schema.entityLink.id, id)).run()
 }
 
-/** All relationships touching an entity, in both directions, with the correctly-oriented label. */
-export function listForEntity(ctx: DbContext, entityId: string): RelationshipView[] {
+/**
+ * All relationships touching an entity, correctly oriented. Chronology (ADR-017): by default returns
+ * only LIVE (open-interval) relationships; pass `asOf` to return those live at that session number.
+ * Severed relationships surface only in an as-of view or the history disclosure.
+ */
+export function listForEntity(ctx: DbContext, entityId: string, asOf?: number): RelationshipView[] {
   const links = ctx.drizzle
     .select()
     .from(schema.entityLink)
@@ -83,6 +121,11 @@ export function listForEntity(ctx: DbContext, entityId: string): RelationshipVie
     .all()
   const views: RelationshipView[] = []
   for (const l of links) {
+    const live =
+      asOf === undefined
+        ? l.endSessionNumber === null
+        : isIntervalLiveAt(l.startSessionNumber, l.endSessionNumber, asOf)
+    if (!live) continue
     const isOut = l.fromEntityId === entityId
     const other = getEntity(ctx, isOut ? l.toEntityId : l.fromEntityId)
     if (!other) continue

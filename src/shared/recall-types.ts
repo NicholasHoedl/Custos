@@ -13,6 +13,11 @@ export interface RecallRequest {
   mode: RecallMode
   /** The current scene (location/time/party/quest/combat), folded into grounding. */
   scene?: SceneContext
+  /**
+   * Chronology (ADR-017): reconstruct the world "as of" this session NUMBER. Omitted = now (latest).
+   * When set, retrieval AND state are clamped to ≤ N (no future-knowledge leak).
+   */
+  asOfSession?: number
 }
 
 export interface RecallChunk {

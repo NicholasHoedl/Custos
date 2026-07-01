@@ -1,6 +1,6 @@
 # Chronology — Design
 
-**Status:** Accepted (design) — implementation not yet started
+**Status:** Accepted — implemented (M1–M5); see ADR-017 "Implementation notes" for as-built deltas
 **Date:** 2026-07-01
 **Owner:** Solo developer
 **ADR:** [ADR-017](../adr/017-chronology-temporal-model.md)
