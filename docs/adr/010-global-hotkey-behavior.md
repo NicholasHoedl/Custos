@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — Phase 0 ships the interim **focus-main** scaffolding (single-instance lock + `globalShortcut`); the popup-vs-focus behavior is decided in Phase 1 (P1-07).
+Accepted — **Option A (focus/show the main window with the quick-add bar focused)** shipped: a single-instance lock + a configurable `globalShortcut` in `src/main/index.ts` that focuses the window and sends the quick-add-focus channel to the renderer. The dedicated popup (Option B) was not built. *(Finalized 2026-07-01 to match the implementation.)*
 
 **Date:** 2026-06-25
 **Deciders:** Solo developer
@@ -36,16 +36,17 @@ The open sub-decision is **what the hotkey does when pressed**.
 
 ## Decision
 
-(Proposed) Lean toward **Option B (dedicated quick-capture popup)** for least disruption, with
-**Option A as the low-effort fallback** if the popup proves fiddly. Confirm during Phase 0, when
-the window architecture and the quick-add UI are built.
+**Accepted: Option A** — the global hotkey shows/focuses the main window with the `QuickAddBar`
+focused (`src/main/index.ts`; the hotkey is configurable). Option B (a dedicated frameless
+quick-capture popup) was considered lower-priority and deferred; Option A shipped as the pragmatic,
+low-effort choice and has proven sufficient in practice.
 
 ## Rationale
 
 The point of a global hotkey is to capture **without leaving the moment of play**; a small popup
-serves that far better than raising the full app. But the popup is more work, so the choice is
-held as **Proposed** until Phase 0, with a clear fallback that still satisfies "the global
-hotkey works."
+serves that far better than raising the full app. But the popup is more work — so for v1 the
+low-effort **Option A** shipped and has proven sufficient; the popup (Option B) remains a possible
+future enhancement.
 
 ## Consequences
 

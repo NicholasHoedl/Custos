@@ -1,8 +1,14 @@
 # Ledger — Architecture Document
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25
-**Status:** Draft — awaiting developer approval
+**Date:** 2026-06-25 · **Last currency review:** 2026-07-01
+**Status:** Implemented — this is the original MVP architecture plan. Several subsystems have since
+evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
+store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest uses a **multi-tag, 8-option**
+model, not 4-of-7 fixed attitudes (ADR-016); **notes are many-to-many** via `note_entity` (SPEC §10);
+retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); and post-MVP features (current
+scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10. A
+**chronology** model is designed in ADR-017. The flagged sections below are being reconciled to match.
 
 ---
 
@@ -21,7 +27,7 @@ The stack is chosen to minimize packaging complexity, leverage the developer's e
 | Main process language | TypeScript (compiled via electron-vite) | Same language as renderer; no context switching; strong types for IPC contracts. |
 | Local database | SQLite via `better-sqlite3` | Battle-tested, zero-install, excellent Node.js bindings, synchronous API simplifies main-process code, single file on disk. |
 | ORM / query builder | Drizzle ORM | Lightweight, TypeScript-first, excellent SQLite support, generates typed queries, schema-as-code. Avoids the weight of Prisma or Sequelize. |
-| Vector store | `sqlite-vec` extension for SQLite | Keeps the vector index in the same SQLite file as the relational data. No separate process, no additional service, trivially packaged. |
+| Vector store | Brute-force JS cosine over BLOBs in SQLite (ADR-012; `sqlite-vec` deferred) | Same SQLite file, but **no native extension to package** — the single biggest packaging risk avoided. `sqlite-vec` can replace it behind the same `VectorStore` interface later. |
 | Embeddings runtime | Transformers.js (`@xenova/transformers`) | Runs ONNX models in Node.js (main process) — no Python sidecar, no separate process, WASM/ONNX backend works on Windows CPU without CUDA. See ADR-002. |
 | Embedding model | `Xenova/all-MiniLM-L6-v2` | 22M params, 384-dim vectors, excellent quality/speed ratio at this scale, runs entirely on CPU, ships as a cacheable ONNX file. See ADR-002. |
 | Claude SDK | `@anthropic-ai/sdk` (Node/TypeScript) | Official SDK, streaming support, citation document blocks, prompt caching headers. Called exclusively from main process. |
@@ -188,10 +194,14 @@ Entity
 
 Note
   id           UUID PK
-  entityId     UUID FK → Entity.id
-  sessionId    UUID FK → Session.id (session in which the note was created)
+  sessionId    UUID FK → Session.id (nullable — "when"; the session the note belongs to)
   content      TEXT NOT NULL
   tags         TEXT (JSON array of strings)
+  createdAt    INTEGER (unix ms)
+
+NoteEntity   (note ↔ entity, MANY-TO-MANY — a note may tag one OR several entities; SPEC §10)
+  noteId       UUID FK → Note.id     ┐ composite PK
+  entityId     UUID FK → Entity.id   ┘
   createdAt    INTEGER (unix ms)
 
 EntityLink
@@ -210,33 +220,37 @@ EventLog
   timestamp    INTEGER (unix ms)
 ```
 
-### Vector Index (sqlite-vec)
+### Vector Index (brute-force cosine — ADR-012)
 
-Co-located in the same SQLite file via the `sqlite-vec` extension:
+Embeddings live as BLOBs in the same SQLite file. v1 searches them with **brute-force JS cosine**
+(`sqlite-vec` was deferred — ADR-012). One row per note and per **entity** (name + description):
 
 ```
 NoteEmbedding
   noteId       UUID FK → Note.id (PK)
   embedding    BLOB (float32 array, 384 dims for all-MiniLM-L6-v2)
 
-EventEmbedding
-  eventId      UUID FK → EventLog.id (PK)
+EntityEmbedding
+  entityId     UUID FK → Entity.id (PK)
   embedding    BLOB (float32 array, 384 dims)
 ```
 
-The virtual table for ANN search is created by `sqlite-vec` on top of these columns. For the MVP data volume (hundreds to low thousands of notes), brute-force cosine over a `vec0` virtual table is fast enough. HNSW indexing can be added later if needed.
+At MVP data volume (hundreds to low thousands of vectors) a full cosine scan is sub-millisecond, so no
+ANN index is needed; a `SqliteVecStore` can drop in behind the same `VectorStore` interface later
+without a schema change (ADR-012). (The live schema also carries `model` / `dim` / `contentHash` /
+`updatedAt` per embedding row; omitted here for brevity.)
 
 ### Key Relationships
 
 ```
 Campaign ──< Session
 Campaign ──< Entity
-Entity   ──< Note
+Note     >──< Entity   (many-to-many, via NoteEntity)
 Entity   ──< EntityLink (from/to)
 Session  ──< Note
 Session  ──< EventLog
 Note     ──1 NoteEmbedding
-EventLog ──1 EventEmbedding
+Entity   ──1 EntityEmbedding
 ```
 
 ---
@@ -257,7 +271,7 @@ EmbeddingService.embed(text: string) → Promise<Float32Array>
   └─ Returns 384-dim normalized embedding
         │
         ▼
-VectorStore.upsert(noteId, embedding) → writes to NoteEmbedding table via sqlite-vec
+VectorStore.upsert(noteId, embedding) → writes the embedding BLOB to the NoteEmbedding table
 ```
 
 Embedding happens synchronously in the main process on note save. At MVP data volume this is fast enough to not require a queue. If it becomes noticeable, background it with a simple async queue.
@@ -276,7 +290,7 @@ Main process: RecallService.query(params)
         ├─ EmbeddingService.embed(query) → queryEmbedding (local, no network)
         │
         ├─ VectorStore.search(queryEmbedding, campaignId, topK)
-        │    └─ sqlite-vec cosine similarity search filtered by campaignId
+        │    └─ brute-force cosine similarity, filtered by campaignId (ADR-012); hybrid dense + fuzzy name match
         │    └─ Returns: [{ noteId, score, content, entityName, sessionNumber }]
         │
         ├─ [offline check] if no network → return retrieved chunks only
@@ -322,7 +336,7 @@ Anthropic's `ephemeral` cache defaults to a **5-minute** TTL; pass `cache_contro
 | Feature | Default Model | Notes |
 |---|---|---|
 | Recall synthesis | `claude-sonnet-4-6` | Lower latency/cost; configurable to Opus |
-| Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (4 attitude-based recommendations) |
+| Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 8-option "in the moment" + open-ended "directions" — ADR-016) |
 | Auto-tagging (future) | `claude-haiku-4-5` | Background task, latency-insensitive |
 
 ### ClaudeService Interface (main process only)
@@ -374,6 +388,12 @@ interface SuggestResult {
 **Recall** uses the streaming API (`client.messages.stream()`), piping tokens to the renderer via a dedicated IPC streaming channel (`event.sender.send` from the main process). **Suggest is different** — it is a single, non-streamed structured-output call (`client.messages.parse()` / `output_config.format`) returning the full `SuggestResult` at once (see below).
 
 ### Suggest Output Model (multi-attitude)
+
+> **⚠️ Superseded by ADR-016 (`docs/adr/016-suggest-multitag-overhaul.md`).** The 4-of-7 fixed-attitude
+> model in this section — and the `Attitude` / `AttitudeRecommendation` / `count: 4` types above — was
+> the MVP design. Current Suggest returns **8 options** from a **62-tag** vocabulary (1 primary + ≤2
+> secondary tags, distinct primaries), plus an open-ended **"directions"** mode. The structured-output
+> + code-side-validation *mechanism* described below still holds; the output *shape* does not.
 
 Suggest does **not** return one recommendation. Given the situation, the active PC's traits/goals, and retrieved campaign history, Opus 4.8 (with adaptive thinking) must:
 

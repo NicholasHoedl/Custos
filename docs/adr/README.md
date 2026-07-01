@@ -21,13 +21,14 @@ ADR that supersedes the old one (don't edit the old one).
 | [007](007-renderer-state-management.md) | Renderer state management: Zustand | Accepted | 2026-06-25 |
 | [008](008-streaming-ipc-protocol.md) | Streaming IPC protocol: custom typed channels | Accepted | 2026-06-25 |
 | [009](009-suggest-output-model.md) | Suggest output model: multi-attitude structured output | Superseded by [016](016-suggest-multitag-overhaul.md) | 2026-06-25 |
-| [010](010-global-hotkey-behavior.md) | Global quick-add hotkey behavior | Proposed | 2026-06-25 |
+| [010](010-global-hotkey-behavior.md) | Global quick-add hotkey behavior | Accepted | 2026-06-25 |
 | [011](011-graph-query-raw-sql.md) | Raw SQL (recursive CTEs) for graph traversal; Drizzle for CRUD | Accepted | 2026-06-25 |
 | [012](012-vector-store-bruteforce.md) | Brute-force JS cosine vector store for v1 (refines ADR-003) | Accepted | 2026-06-25 |
 | [013](013-session-recap.md) | Session recap: neutral streamed summary saved to the session | Accepted | 2026-06-30 |
 | [014](014-import-extraction-apply.md) | Import: LLM extraction with human-in-the-loop transactional apply | Accepted | 2026-06-30 |
 | [015](015-current-scene.md) | Current scene: a renderer-selected present moment pinned into grounding | Accepted | 2026-06-30 |
 | [016](016-suggest-multitag-overhaul.md) | Suggest output model v2: multi-tag moments + directions mode (supersedes ADR-009) | Accepted | 2026-06-30 |
+| [017](017-chronology-temporal-model.md) | Chronology: session-led temporal model (validity intervals + as-of reconstruction) | Accepted (design) | 2026-07-01 |
 
 ## Status legend
 
