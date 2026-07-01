@@ -14,7 +14,9 @@ import { registerSearchHandlers } from './search'
 import { registerSettingsHandlers } from './settings'
 import { registerOnboardingHandlers } from './onboarding'
 import { registerRecallHandlers } from './recall'
+import { registerRecapHandlers } from './recap'
 import { registerSuggestHandlers } from './suggest'
+import { registerImportHandlers } from './import'
 import { registerPersonaHandlers } from './persona'
 
 /** Send a one-way event to the renderer (streaming: recall chunks, model-download progress). */
@@ -45,7 +47,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerSettingsHandlers()
   registerOnboardingHandlers(send, reindex)
   registerRecallHandlers(ctx, store, send)
+  registerRecapHandlers(ctx, send)
   registerSuggestHandlers(ctx, store)
+  registerImportHandlers(ctx, store)
   registerPersonaHandlers(ctx)
 
   void reindex() // embed anything unindexed (no-ops until the model is downloaded)

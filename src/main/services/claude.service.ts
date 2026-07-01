@@ -7,6 +7,8 @@ import {
   type StorySuggestion
 } from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
+import { ENTITY_TYPES } from '@shared/entity-types'
+import type { RawExtraction } from '@shared/import-types'
 import type { RetrievedChunk } from './vector-store.service'
 import { getKey, keyExists } from './key.service'
 
@@ -332,6 +334,99 @@ export async function complete(system: string, user: string, model: string): Pro
     .trim()
 }
 
+// ---- Recap prompt (session "previously on") ----
+
+const RECAP_INSTRUCTIONS = `You write a "Previously on…" recap of ONE session of a tabletop RPG campaign, to be read aloud to the table at the start of the next session.
+
+GROUND IT STRICTLY. Every event, name, place, outcome, and possession you mention MUST come from the logged beats, the session's notes, the status block, or the relationships provided. Invent nothing — no embellishment, no added stakes, no drama the material doesn't contain. If the material is thin, write a SHORT recap; never pad to fill space.
+
+FORM. Flowing past-tense prose, one to three short paragraphs. No lists, headings, bullet points, or markdown. Don't address the player ("you"), and don't mention notes, sessions, or this app — just tell what happened. Right-size the length to how much actually happened.
+
+CONTINUITY. A prior recap may be provided for context; you may open with a brief bridge from it, but the recap must cover THIS session's beats, not retell the previous one.`
+
+/** System prompt for Recap: just the (cacheable) instructions — no persona or campaign context needed. */
+export function buildRecapSystem(): Anthropic.TextBlockParam[] {
+  return [{ type: 'text', text: RECAP_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
+}
+
+export interface RecapInput {
+  sessionLabel: string
+  priorSummary: string | null
+  beats: string[] // event-log entries for the session, in chronological order
+  notes: { names: string; content: string }[] // session notes + the entities they're tagged to
+  state: string | null // involved entities' current status (via formatState(null, …))
+  relationships: string | null // involved entities' relationships (via formatRelationships)
+}
+
+/**
+ * The user turn for Recap: plain-text blocks only (no citeable documents — a recap needs no source UI).
+ * Order: header → prior summary → logged beats → session notes → status → relationships → the ask.
+ */
+export function buildRecapUserContent(input: RecapInput): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = [
+    { type: 'text', text: `Recapping ${input.sessionLabel}.` }
+  ]
+  if (input.priorSummary) {
+    content.push({
+      type: 'text',
+      text: `For continuity, the recap of the previous session:\n${input.priorSummary}`
+    })
+  }
+  if (input.beats.length) {
+    content.push({
+      type: 'text',
+      text: `Logged beats from this session, in order — treat as FACT:\n${input.beats
+        .map((b) => `- ${b}`)
+        .join('\n')}`
+    })
+  }
+  if (input.notes.length) {
+    const notes = input.notes.map((n) => `## ${n.names}\n${n.content}`).join('\n\n')
+    content.push({ type: 'text', text: `Notes from this session — treat as FACT:\n\n${notes}` })
+  }
+  if (input.state) {
+    content.push({
+      type: 'text',
+      text: `Status of who and what was involved — treat as FACT:\n${input.state}`
+    })
+  }
+  if (input.relationships) {
+    content.push({
+      type: 'text',
+      text: `Known relationships among them — treat as FACT:\n${input.relationships}`
+    })
+  }
+  content.push({
+    type: 'text',
+    text: `Write the "previously on" recap of ${input.sessionLabel} now.`
+  })
+  return content
+}
+
+export interface RecapParams {
+  input: RecapInput
+  model: string
+  onText: (text: string) => void
+  signal?: AbortSignal
+}
+
+/** Streams the recap text (via onText). Throws on no key / API error; resolves when the stream ends. */
+export async function recap(params: RecapParams): Promise<void> {
+  const c = getClient()
+  if (!c) throw new Error('no_key')
+  const stream = c.messages.stream(
+    {
+      model: params.model,
+      max_tokens: 1500,
+      system: buildRecapSystem(),
+      messages: [{ role: 'user', content: buildRecapUserContent(params.input) }]
+    },
+    { signal: params.signal }
+  )
+  stream.on('text', (text) => params.onText(text))
+  await stream.finalMessage()
+}
+
 // ---- Suggest prompt (Phase 3) ----
 
 const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks and what they value, the character's race and class, a set of retrieved campaign notes, a snapshot of the current state, the known relationships among the people and things involved, and the situation facing the party right now.
@@ -490,20 +585,21 @@ export interface SuggestParams {
   signal?: AbortSignal
 }
 
-/**
- * Shared single-shot structured call (ADR-008/009): Opus-class model + adaptive thinking + a
- * json_schema output format. Returns the array found at `arrayKey` (UNVALIDATED — callers enforce
- * count/shape rules). Throws on no key, refusal, truncation, or unparseable output.
- */
-async function structuredArrayCall<T>(opts: {
+interface StructuredCallOpts {
   model: string
   effort: 'medium' | 'high'
   schema: Record<string, unknown>
   system: Anthropic.TextBlockParam[]
   content: Anthropic.ContentBlockParam[]
-  arrayKey: string
   signal?: AbortSignal
-}): Promise<T[]> {
+}
+
+/**
+ * Shared single-shot structured call (ADR-008/009): Opus-class model + adaptive thinking + a
+ * json_schema output format. Returns the parsed JSON object (UNVALIDATED). Throws on no key, refusal,
+ * truncation, or unparseable output.
+ */
+async function structuredCall(opts: StructuredCallOpts): Promise<Record<string, unknown>> {
   const c = getClient()
   if (!c) throw new Error('no_key')
   const message = await c.messages.create(
@@ -524,15 +620,141 @@ async function structuredArrayCall<T>(opts: {
     .map((b) => b.text)
     .join('')
     .trim()
-  let parsed: unknown
   try {
-    parsed = JSON.parse(text)
+    return JSON.parse(text) as Record<string, unknown>
   } catch {
     throw new Error('unparseable')
   }
-  const arr = (parsed as Record<string, unknown>)[opts.arrayKey]
+}
+
+/** Returns the array at `arrayKey` (UNVALIDATED — callers enforce count/shape rules). */
+async function structuredArrayCall<T>(opts: StructuredCallOpts & { arrayKey: string }): Promise<T[]> {
+  const parsed = await structuredCall(opts)
+  const arr = parsed[opts.arrayKey]
   if (!Array.isArray(arr)) throw new Error('unparseable')
   return arr as T[]
+}
+
+/** Returns the whole parsed object (UNVALIDATED). For multi-array structured outputs (import). */
+async function structuredObjectCall<T>(opts: StructuredCallOpts): Promise<T> {
+  return (await structuredCall(opts)) as T
+}
+
+// ---- Import extraction (paste-and-extract) ----
+
+const EXTRACTION_INSTRUCTIONS = `You extract structured campaign data from pasted raw text (session notes, a chat log, a backstory doc) for a tabletop RPG tracker. Return ENTITIES and NOTES.
+
+ONLY WHAT THE TEXT SUPPORTS. Extract only entities and facts the text states or strongly implies — invent nothing. Prefer fewer, high-confidence items. If the text contains none of a kind, return an empty array.
+
+ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance. Never invent an attribute value the text doesn't give.
+
+NOTES. Capture the narrative beats and facts as short notes, each tagged to the entities it concerns. A relationship the text states (who owns or leads or is allied with whom, where something is located) belongs in a note's prose — describe it there.
+
+REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its position in your entities array — "#0", "#1", and so on. Reference an EXISTING entity by the id shown in the existing-entities list. Every note must reference at least one entity. Prefer linking to an existing entity (by id) over proposing a duplicate of it.`
+
+/** System prompt for import extraction — the (cacheable) instructions. */
+export function buildExtractionSystem(): Anthropic.TextBlockParam[] {
+  return [{ type: 'text', text: EXTRACTION_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
+}
+
+/**
+ * Extraction schema. Attributes are an array of {key,value} string pairs (not an open map) so the
+ * structured-output format stays a closed schema; import.service folds them into a Record. JSON Schema
+ * can't bound counts — import.service validates/cleans. Every object needs additionalProperties:false.
+ */
+const EXTRACTION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    entities: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          type: { type: 'string', enum: [...ENTITY_TYPES] },
+          name: { type: 'string' },
+          description: { type: 'string' },
+          status: { type: 'string' },
+          attributes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: { key: { type: 'string' }, value: { type: 'string' } },
+              required: ['key', 'value']
+            }
+          }
+        },
+        required: ['type', 'name']
+      }
+    },
+    notes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          content: { type: 'string' },
+          entityRefs: { type: 'array', items: { type: 'string' } },
+          tags: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['content', 'entityRefs']
+      }
+    }
+  },
+  required: ['entities', 'notes']
+}
+
+/** The user turn for extraction: the existing-entity list (to enable linking) + the raw pasted text. */
+export function buildExtractionUserContent(
+  text: string,
+  existing: { id: string; name: string; type: string }[]
+): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = []
+  if (existing.length) {
+    // Surface entities whose name appears in the text first, then cap — keeps the list bounded + relevant.
+    const lower = text.toLowerCase()
+    const ranked = [...existing].sort(
+      (a, b) =>
+        (lower.includes(a.name.toLowerCase()) ? 0 : 1) -
+        (lower.includes(b.name.toLowerCase()) ? 0 : 1)
+    )
+    const list = ranked
+      .slice(0, 100)
+      .map((e) => `- ${e.id} · ${e.name} (${e.type})`)
+      .join('\n')
+    content.push({
+      type: 'text',
+      text: `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
+    })
+  }
+  content.push({ type: 'text', text: `Raw text to extract from:\n\n${text}` })
+  content.push({
+    type: 'text',
+    text: 'Extract the entities and notes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
+  })
+  return content
+}
+
+export interface ExtractChangesetParams {
+  text: string
+  existing: { id: string; name: string; type: string }[]
+  model: string
+  effort: 'medium' | 'high'
+  signal?: AbortSignal
+}
+
+/** Single-shot structured extraction. Returns the raw (UNVALIDATED) changeset; import.service cleans it. */
+export async function extractChangeset(params: ExtractChangesetParams): Promise<RawExtraction> {
+  return structuredObjectCall<RawExtraction>({
+    model: params.model,
+    effort: params.effort,
+    schema: EXTRACTION_SCHEMA,
+    system: buildExtractionSystem(),
+    content: buildExtractionUserContent(params.text, params.existing),
+    signal: params.signal
+  })
 }
 
 /** "In the moment" call. Returns raw suggestions (caller enforces the 8-distinct-primary rule). */

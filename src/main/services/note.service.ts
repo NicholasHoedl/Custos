@@ -1,4 +1,4 @@
-import { desc, eq, inArray, isNull } from 'drizzle-orm'
+import { asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import type { Note } from '@shared/entity-types'
 import type { CreateNoteInput, UpdateNoteInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
@@ -50,6 +50,23 @@ export function listAllNotes(ctx: DbContext, campaignId: string): Note[] {
     .innerJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
     .where(eq(schema.entity.campaignId, campaignId))
     .orderBy(desc(schema.note.createdAt))
+    .all()
+    .map((r) => r.note)
+  const byNote = entityIdsFor(
+    ctx,
+    rows.map((n) => n.id)
+  )
+  return rows.map((n) => rowToNote(n, byNote.get(n.id) ?? []))
+}
+
+/** Notes captured during one session (chronological order), each carrying its full set of entity ids. */
+export function listNotesForSession(ctx: DbContext, sessionId: string): Note[] {
+  const rows = ctx.drizzle
+    .selectDistinct({ note: schema.note })
+    .from(schema.note)
+    .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
+    .where(eq(schema.note.sessionId, sessionId))
+    .orderBy(asc(schema.note.createdAt))
     .all()
     .map((r) => r.note)
   const byNote = entityIdsFor(

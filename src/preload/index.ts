@@ -6,6 +6,9 @@ import {
   RECALL_CHUNK_CHANNEL,
   RECALL_DONE_CHANNEL,
   RECALL_ERROR_CHANNEL,
+  RECAP_CHUNK_CHANNEL,
+  RECAP_DONE_CHANNEL,
+  RECAP_ERROR_CHANNEL,
   type LedgerApi
 } from '@shared/ipc-types'
 
@@ -77,8 +80,16 @@ const api: LedgerApi = {
     query: (input) => ipcRenderer.invoke(IPC.recallQuery, input),
     cancel: (requestId) => ipcRenderer.invoke(IPC.recallCancel, requestId)
   },
+  recap: {
+    generate: (input) => ipcRenderer.invoke(IPC.recapGenerate, input),
+    cancel: (requestId) => ipcRenderer.invoke(IPC.recapCancel, requestId)
+  },
   suggest: {
     query: (input) => ipcRenderer.invoke(IPC.suggestQuery, input)
+  },
+  import: {
+    extract: (input) => ipcRenderer.invoke(IPC.importExtract, input),
+    apply: (payload) => ipcRenderer.invoke(IPC.importApply, payload)
   },
   persona: {
     get: (entityId) => ipcRenderer.invoke(IPC.personaGet, entityId),
@@ -98,6 +109,9 @@ const api: LedgerApi = {
   onRecallChunk: (callback) => subscribe(RECALL_CHUNK_CHANNEL, callback),
   onRecallDone: (callback) => subscribe(RECALL_DONE_CHANNEL, callback),
   onRecallError: (callback) => subscribe(RECALL_ERROR_CHANNEL, callback),
+  onRecapChunk: (callback) => subscribe(RECAP_CHUNK_CHANNEL, callback),
+  onRecapDone: (callback) => subscribe(RECAP_DONE_CHANNEL, callback),
+  onRecapError: (callback) => subscribe(RECAP_ERROR_CHANNEL, callback),
   onModelDownloadProgress: (callback) => subscribe(MODEL_DOWNLOAD_PROGRESS_CHANNEL, callback)
 }
 

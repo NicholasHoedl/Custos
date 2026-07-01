@@ -11,6 +11,8 @@ import {
 } from '@renderer/components/entities/EntityBrowser'
 import { EntityDetail } from '@renderer/components/entities/EntityDetail'
 import { NotesView } from '@renderer/components/views/NotesView'
+import { RecapView } from '@renderer/components/views/RecapView'
+import { ImportView } from '@renderer/components/views/ImportView'
 
 // Master/detail capture surface: quick-add on top, the entity browser on the left, and either the
 // selected entity's detail or the live session log on the right.
@@ -68,6 +70,14 @@ export function CaptureView() {
               setSelectedEntity(null)
               setCapturePanel('notes')
             }}
+            onShowRecap={() => {
+              setSelectedEntity(null)
+              setCapturePanel('recap')
+            }}
+            onShowImport={() => {
+              setSelectedEntity(null)
+              setCapturePanel('import')
+            }}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -84,6 +94,10 @@ export function CaptureView() {
             />
           ) : capturePanel === 'notes' ? (
             <NotesView key={activeCampaignId} />
+          ) : capturePanel === 'recap' ? (
+            <RecapView key={activeCampaignId} />
+          ) : capturePanel === 'import' ? (
+            <ImportView key={activeCampaignId} />
           ) : (
             <EventFeed sessionId={activeSessionId} />
           )}

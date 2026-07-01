@@ -106,7 +106,7 @@ export function nameMatchScore(query: string, name: string): number {
   return best
 }
 
-const FUZZY_THRESHOLD = 0.5
+export const FUZZY_THRESHOLD = 0.5
 const FUZZY_NOTES_PER_ENTITY = 2
 
 // Brute-force cosine vector store (ADR-012). Vectors are normalized at embed time, so cosine == dot.

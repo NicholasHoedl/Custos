@@ -1,6 +1,5 @@
-import { lookup } from 'node:dns/promises'
 import { eq } from 'drizzle-orm'
-import type { RecallErrorKind, RecallMode, RecallRequest, RecallSource } from '@shared/recall-types'
+import type { RecallMode, RecallRequest, RecallSource } from '@shared/recall-types'
 import type { RelationshipView } from '@shared/graph-types'
 import {
   RECALL_CHUNK_CHANNEL,
@@ -24,6 +23,7 @@ import {
   type RecallContext
 } from './claude.service'
 import { gatherPinned, resolveScene } from './scene.service'
+import { classifyError, isOnline } from './ai-util'
 
 type Send = (channel: string, payload: unknown) => void
 
@@ -46,22 +46,6 @@ function chunksToSources(chunks: RetrievedChunk[]): RecallSource[] {
     })
   }
   return out
-}
-
-async function isOnline(): Promise<boolean> {
-  try {
-    await lookup('api.anthropic.com')
-    return true
-  } catch {
-    return false
-  }
-}
-
-function classifyError(err: unknown): RecallErrorKind {
-  const msg = err instanceof Error ? err.message : String(err)
-  if (msg === 'no_key') return 'no_key'
-  if (/network|fetch|ENOTFOUND|ECONN|timeout|getaddrinfo/i.test(msg)) return 'offline'
-  return 'api'
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollText, Search, StickyNote } from 'lucide-react'
+import { BookText, FileInput, ScrollText, Search, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -11,7 +11,7 @@ import { Input } from '@renderer/components/ui/input'
 
 export type EntityFilter = EntityType | 'all'
 /** Which non-entity pane the capture detail area shows when no entity is selected. */
-export type CapturePanel = 'session' | 'notes'
+export type CapturePanel = 'session' | 'notes' | 'recap' | 'import'
 
 const FILTERS: EntityFilter[] = ['all', ...ENTITY_TYPES]
 
@@ -27,6 +27,10 @@ interface EntityBrowserProps {
   onShowSessionLog: () => void
   /** Clear the selection and show the notes pane in the detail pane. */
   onShowNotes: () => void
+  /** Clear the selection and show the recap pane in the detail pane. */
+  onShowRecap: () => void
+  /** Clear the selection and show the import pane in the detail pane. */
+  onShowImport: () => void
 }
 
 // Master list of all entities in the campaign, filtered client-side by type (chips, with live counts)
@@ -40,7 +44,9 @@ export function EntityBrowser({
   onSelect,
   panel,
   onShowSessionLog,
-  onShowNotes
+  onShowNotes,
+  onShowRecap,
+  onShowImport
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
 
@@ -79,6 +85,30 @@ export function EntityBrowser({
         >
           <StickyNote className="size-4" />
           Notes
+        </button>
+        <button
+          onClick={onShowRecap}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+            !selectedId && panel === 'recap'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+          )}
+        >
+          <BookText className="size-4" />
+          Recap
+        </button>
+        <button
+          onClick={onShowImport}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+            !selectedId && panel === 'import'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+          )}
+        >
+          <FileInput className="size-4" />
+          Import
         </button>
       </div>
       <div className="border-b border-border">

@@ -1,4 +1,3 @@
-import { lookup } from 'node:dns/promises'
 import { eq } from 'drizzle-orm'
 import {
   SUGGEST_TAGS,
@@ -32,25 +31,10 @@ import {
   type SuggestContext
 } from './claude.service'
 import { gatherPinned, resolveScene } from './scene.service'
+import { classifyError, isOnline } from './ai-util'
 
 const TOP_K = 8
 const TAG_SET = new Set<string>(SUGGEST_TAGS)
-
-async function isOnline(): Promise<boolean> {
-  try {
-    await lookup('api.anthropic.com')
-    return true
-  } catch {
-    return false
-  }
-}
-
-function classifyError(err: unknown): SuggestFailureReason {
-  const msg = err instanceof Error ? err.message : String(err)
-  if (msg === 'no_key') return 'no_key'
-  if (/network|fetch|ENOTFOUND|ECONN|timeout|getaddrinfo/i.test(msg)) return 'offline'
-  return 'api'
-}
 
 function fail(reason: SuggestFailureReason): SuggestResult {
   return { ok: false, reason }

@@ -7,8 +7,10 @@ import {
   deleteNote,
   listAllNotes,
   listNotesForEntity,
+  listNotesForSession,
   updateNote
 } from '../../../src/main/services/note.service'
+import { createSession } from '../../../src/main/services/session.service'
 import { makeTestDb } from '../../helpers/test-db'
 
 describe('note.service (note ↔ many entities)', () => {
@@ -79,5 +81,19 @@ describe('note.service (note ↔ many entities)', () => {
     deleteNote(ctx, shared.id)
     expect(listNotesForEntity(ctx, a)).toHaveLength(0)
     expect(listNotesForEntity(ctx, b)).toHaveLength(0)
+  })
+
+  it('listNotesForSession returns only that session’s notes, populated with their entityIds', () => {
+    const s1 = createSession(ctx, { campaignId }).id
+    const s2 = createSession(ctx, { campaignId }).id
+    const first = createNote(ctx, { entityIds: [a, b], content: 'first', sessionId: s1 })
+    createNote(ctx, { entityIds: [a], content: 'second', sessionId: s1 })
+    createNote(ctx, { entityIds: [b], content: 'other session', sessionId: s2 })
+    createNote(ctx, { entityIds: [a], content: 'no session' }) // sessionId null → excluded
+
+    const notes = listNotesForSession(ctx, s1)
+    expect(notes.map((n) => n.content).sort()).toEqual(['first', 'second'])
+    const got = notes.find((n) => n.id === first.id)!
+    expect([...got.entityIds].sort()).toEqual([a, b].sort())
   })
 })

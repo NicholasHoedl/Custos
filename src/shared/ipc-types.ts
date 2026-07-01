@@ -20,6 +20,8 @@ import type {
   RecallRequest
 } from './recall-types'
 import type { SuggestRequest, SuggestResult } from './suggest-types'
+import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
+import type { ApplyResult, ConfirmedChangeset, ExtractRequest, ExtractResult } from './import-types'
 
 // ---- Input payloads ----
 export interface CreateCampaignInput {
@@ -148,6 +150,14 @@ export interface LedgerApi {
   suggest: {
     query(input: SuggestRequest): Promise<SuggestResult>
   }
+  recap: {
+    generate(input: RecapRequest): Promise<{ requestId: string }>
+    cancel(requestId: string): Promise<void>
+  }
+  import: {
+    extract(input: ExtractRequest): Promise<ExtractResult>
+    apply(payload: ConfirmedChangeset): Promise<ApplyResult>
+  }
   persona: {
     get(entityId: string): Promise<PersonaBrief | null>
     generate(entityId: string): Promise<PersonaBrief>
@@ -164,6 +174,10 @@ export interface LedgerApi {
   onRecallChunk(callback: (chunk: RecallChunk) => void): () => void
   onRecallDone(callback: (done: RecallDone) => void): () => void
   onRecallError(callback: (err: RecallError) => void): () => void
+  /** Streaming Recap events (filter by requestId). Each returns an unsubscribe fn. */
+  onRecapChunk(callback: (chunk: RecapChunk) => void): () => void
+  onRecapDone(callback: (done: RecapDone) => void): () => void
+  onRecapError(callback: (err: RecapError) => void): () => void
   onModelDownloadProgress(callback: (progress: ModelDownloadProgress) => void): () => void
 }
 
@@ -205,7 +219,11 @@ export const IPC = {
   apikeyClear: 'apikey:clear',
   recallQuery: 'recall:query',
   recallCancel: 'recall:cancel',
+  recapGenerate: 'recap:generate',
+  recapCancel: 'recap:cancel',
   suggestQuery: 'suggest:query',
+  importExtract: 'import:extract',
+  importApply: 'import:apply',
   personaGet: 'persona:get',
   personaGenerate: 'persona:generate',
   personaUpdate: 'persona:update',
@@ -221,5 +239,9 @@ export const QUICK_ADD_FOCUS_CHANNEL = 'ui:quick-add-focus'
 export const RECALL_CHUNK_CHANNEL = 'stream:chunk'
 export const RECALL_DONE_CHANNEL = 'stream:done'
 export const RECALL_ERROR_CHANNEL = 'stream:error'
+// ---- One-way streaming channels: main -> renderer (Recap). Payloads are requestId-tagged. ----
+export const RECAP_CHUNK_CHANNEL = 'recap:chunk'
+export const RECAP_DONE_CHANNEL = 'recap:done'
+export const RECAP_ERROR_CHANNEL = 'recap:error'
 /** One-way: main -> renderer, embedding-model download progress (onboarding). */
 export const MODEL_DOWNLOAD_PROGRESS_CHANNEL = 'onboarding:model-progress'
