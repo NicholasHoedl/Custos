@@ -153,7 +153,8 @@ The MVP delivers all three pillars at their simplest viable form. It is a single
 
 ### Out of scope for MVP
 
-These are explicitly deferred. Do not design the MVP around them.
+These are explicitly deferred. Do not design the MVP around them. *(Some items below have since
+shipped as post-MVP additions — see §10.)*
 
 - Multi-user or sync (no cloud backend, no accounts, no auth)
 - Mobile companion app
@@ -253,3 +254,38 @@ The MVP is successful when the developer can:
 **Still open:**
 1. **Chunking strategy for notes:** one chunk per note (assumed for MVP) vs. sentence-boundary or fixed-size chunks. Revisit if notes get long.
 2. **Embedding performance:** confirm CPU-only `all-MiniLM-L6-v2` inference is acceptable on the developer's machine before committing.
+
+---
+
+## 10. Delivered beyond the MVP
+
+The three MVP pillars shipped, and development continued past v0.1. This section records what now
+exists beyond the original scope so the spec reflects reality; design rationale for each new
+subsystem lives in the linked ADR (older additions are captured in git history).
+
+**Suggest evolved** past the original 4-attitude model (ADR-016):
+- **"What's next" (directions) mode** — open-ended, in-character story-progression ideas grounded
+  in the campaign's open quests + the party, alongside the original in-the-moment mode.
+- **In-the-moment overhaul** — the 7 fixed attitudes were replaced by a ~62-tag vocabulary
+  (disposition tags + the PC's own race/class); each option carries 1 primary + up to 2 secondary
+  tags, and the mode now returns **8** options with distinct primary tags.
+
+**Current scene** (ADR-015) — a sidebar-selected "present moment" (location, time of day, party present, the
+NPCs/factions being faced, the embarked quest, and a scene *mode*: combat / social / exploration /
+stealth / downtime / travel). It is pinned into grounding and steers both Recall and Suggest.
+
+**Notes are many-to-many** — a note can be tagged to one OR many entities (via a `note_entity`
+join table), authored and managed from a Notes pane inside Capture.
+
+**Session Recap** (ADR-013) — a Capture pane that streams a neutral "Previously on…" of a chosen
+session, grounded in that session's beats + notes, and saves it to the session summary. This
+supersedes the "automated session summarization" non-goal listed in §4.
+
+**Paste-and-Extract Import** (ADR-014) — a Capture pane that turns pasted raw text into reviewed,
+deduped entities + notes, applied in one transaction. (Distinct from the still-deferred campaign
+*file* export/import in §4 — this is text ingestion, not save-file portability.)
+
+Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
+character-sheet stats, audio transcription, image/map attachments, and campaign file
+export/import. The nearest queued follow-ups are **relationship extraction in Import** and an
+**in-character recap voice**.

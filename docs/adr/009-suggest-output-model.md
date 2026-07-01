@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-016](016-suggest-multitag-overhaul.md) (2026-06-30) — the 4-of-7 fixed-attitude
+output model was replaced by a multi-tag, two-mode model. Its mechanism (structured output + code-side
+validation on Opus 4.8 with adaptive thinking) carries forward. Originally **Accepted** 2026-06-25.
 
 **Date:** 2026-06-25
 **Deciders:** Solo developer
