@@ -1,5 +1,6 @@
 import { and, eq, isNull, or } from 'drizzle-orm'
 import type { Entity, EntityLink } from '@shared/entity-types'
+import type { RelationKey } from '@shared/relations'
 import type { CreateLinkInput, HierarchyKind } from '@shared/ipc-types'
 import type {
   ContextNeighbor,
@@ -33,35 +34,11 @@ export function createLink(ctx: DbContext, input: CreateLinkInput): EntityLink {
   if (!isRelationAllowed(input.relation, from.type, to.type)) {
     throw new Error(`Relation "${input.relation}" is not allowed from ${from.type} to ${to.type}`)
   }
-  // Idempotent: an equivalent edge returns the existing one instead of duplicating. "Equivalent" is
-  // the exact (from, to, relation) tuple OR the same relationship authored from the other side —
-  // (to, from, inverseKey). For symmetric relations inverseKey === relation, so a reciprocal
-  // ally_of/knows collapses; for directed pairs it collapses e.g. `contains` against `located_in`
-  // (the reverse view is already derived at read time, so a second physical edge is pure duplication).
-  const inverseKey = RELATIONS[input.relation].inverseKey
-  const existing = ctx.drizzle
-    .select()
-    .from(schema.entityLink)
-    .where(
-      and(
-        // Only an OPEN interval collapses; a severed edge can be re-formed as a fresh interval.
-        isNull(schema.entityLink.endSessionNumber),
-        or(
-          and(
-            eq(schema.entityLink.fromEntityId, input.fromEntityId),
-            eq(schema.entityLink.toEntityId, input.toEntityId),
-            eq(schema.entityLink.relation, input.relation)
-          ),
-          and(
-            eq(schema.entityLink.fromEntityId, input.toEntityId),
-            eq(schema.entityLink.toEntityId, input.fromEntityId),
-            eq(schema.entityLink.relation, inverseKey)
-          )
-        )
-      )
-    )
-    .get()
-  if (existing) return rowToLink(existing)
+  // Idempotent: an equivalent OPEN edge returns the existing one instead of duplicating (a severed
+  // edge can be re-formed as a fresh interval). "Equivalent" includes the inverse authoring direction
+  // — see findOpenLink.
+  const existing = findOpenLink(ctx, input.fromEntityId, input.toEntityId, input.relation)
+  if (existing) return existing
 
   const row = {
     id: newId(),
@@ -77,6 +54,43 @@ export function createLink(ctx: DbContext, input: CreateLinkInput): EntityLink {
   }
   ctx.drizzle.insert(schema.entityLink).values(row).run()
   return rowToLink(row)
+}
+
+/**
+ * The OPEN (live) edge for (from, to, relation), if any — matching the exact tuple OR the same
+ * relationship authored from the other side ((to, from, inverseKey); for symmetric relations
+ * inverseKey === relation, so a reciprocal ally_of collapses; for directed pairs `contains` collapses
+ * against `located_in`). Backs createLink's idempotency and the backfill's sever-by-endpoints.
+ */
+export function findOpenLink(
+  ctx: DbContext,
+  fromEntityId: string,
+  toEntityId: string,
+  relation: RelationKey
+): EntityLink | null {
+  const inverseKey = RELATIONS[relation].inverseKey
+  const row = ctx.drizzle
+    .select()
+    .from(schema.entityLink)
+    .where(
+      and(
+        isNull(schema.entityLink.endSessionNumber),
+        or(
+          and(
+            eq(schema.entityLink.fromEntityId, fromEntityId),
+            eq(schema.entityLink.toEntityId, toEntityId),
+            eq(schema.entityLink.relation, relation)
+          ),
+          and(
+            eq(schema.entityLink.fromEntityId, toEntityId),
+            eq(schema.entityLink.toEntityId, fromEntityId),
+            eq(schema.entityLink.relation, inverseKey)
+          )
+        )
+      )
+    )
+    .get()
+  return row ? rowToLink(row) : null
 }
 
 /**

@@ -285,7 +285,17 @@ supersedes the "automated session summarization" non-goal listed in §4.
 deduped entities + notes, applied in one transaction. (Distinct from the still-deferred campaign
 *file* export/import in §4 — this is text ingestion, not save-file portability.)
 
+**Chronology** (ADR-017) — the AI reasons with time. Entity status + relationships are versioned as
+an append-only, session-stamped history (lifecycle flag, status trail, relationship validity
+intervals); Recall & Suggest can reconstruct the world **"as of session N"** with a hard
+no-future-leak clamp, and an inline "Changed over time" disclosure shows each entity's trail.
+
+**Backfill interview** (ADR-018) — a Capture pane for adopting Ledger mid-campaign: a
+roster-then-beats guided flow that turns freeform answers + partial notes into entities, third-person
+notes, and **dated status/relationship changes** stamped at their sessions — so the backfilled past
+feeds Chronology's as-of reconstruction. This also delivered Import's deferred relationship
+extraction (as `relationshipChanges`).
+
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file
-export/import. The nearest queued follow-ups are **relationship extraction in Import** and an
-**in-character recap voice**.
+export/import. The nearest queued follow-up is an **in-character recap voice**.

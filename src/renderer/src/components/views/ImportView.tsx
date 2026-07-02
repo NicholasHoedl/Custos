@@ -1,10 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { AlertTriangle, Check, FileText, KeyRound, Sparkles, WifiOff } from 'lucide-react'
-import {
-  ENTITY_TYPES,
-  ENTITY_TYPE_LABELS,
-  type EntityType
-} from '@shared/entity-types'
+import { AlertTriangle, FileText, KeyRound, Sparkles, WifiOff } from 'lucide-react'
 import type {
   ConfirmedEntity,
   ConfirmedNote,
@@ -19,15 +14,8 @@ import { useEntities } from '@renderer/hooks/use-ledger'
 import { useImport } from '@renderer/hooks/use-import'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
-import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@renderer/components/ui/select'
+import { EntityRow, NoteRow } from '@renderer/components/capture/import-rows'
 
 // Paste raw text → Claude proposes entities + notes → review/edit/confirm each → apply in one txn.
 // Lives as a Capture pane (like Notes/Recap).
@@ -156,7 +144,7 @@ export function ImportView() {
             </Button>
             <Button
               size="sm"
-              onClick={imp.apply}
+              onClick={() => imp.apply()}
               disabled={applying || (creating === 0 && linking === 0 && noting === 0)}
             >
               {applying ? 'Applying…' : 'Apply'}
@@ -194,210 +182,6 @@ export function ImportView() {
       )}
       {imp.reason && <ReasonBanner reason={imp.reason} />}
     </Wrap>
-  )
-}
-
-function EntityRow({
-  entity,
-  matches,
-  existingName,
-  onPatch
-}: {
-  entity: ConfirmedEntity
-  matches: MatchCandidate[]
-  existingName: (id: string) => string
-  onPatch: (patch: Partial<ConfirmedEntity>) => void
-}) {
-  const included = entity.action !== 'skip'
-  const top = matches[0]
-  return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        included ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <Toggle
-          on={included}
-          onClick={() =>
-            onPatch({ action: included ? 'skip' : entity.linkToEntityId ? 'link' : 'create' })
-          }
-        />
-        <Input
-          value={entity.name}
-          onChange={(e) => onPatch({ name: e.target.value })}
-          disabled={!included}
-          className="h-8 flex-1"
-        />
-        <Select
-          value={entity.type}
-          onValueChange={(v) => onPatch({ type: v as EntityType })}
-          disabled={!included}
-        >
-          <SelectTrigger className="h-8 w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ENTITY_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {ENTITY_TYPE_LABELS[t]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {included && matches.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs">
-          <span className="text-muted-foreground">
-            Similar existing: <span className="text-foreground">{top.name}</span> ({top.type},{' '}
-            {Math.round(top.score * 100)}%)
-          </span>
-          <div className="ml-auto inline-flex overflow-hidden rounded border border-border">
-            <button
-              onClick={() =>
-                onPatch({ action: 'link', linkToEntityId: entity.linkToEntityId ?? top.entityId })
-              }
-              className={cn(
-                'px-2 py-0.5',
-                entity.action === 'link'
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              Link
-            </button>
-            <button
-              onClick={() => onPatch({ action: 'create' })}
-              className={cn(
-                'px-2 py-0.5',
-                entity.action === 'create'
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              Create new
-            </button>
-          </div>
-        </div>
-      )}
-
-      {included && entity.action === 'link' && matches.length > 1 && (
-        <div className="mt-2">
-          <Select
-            value={entity.linkToEntityId ?? top.entityId}
-            onValueChange={(v) => onPatch({ linkToEntityId: v })}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {matches.map((m) => (
-                <SelectItem key={m.entityId} value={m.entityId}>
-                  {m.name} ({m.type}, {Math.round(m.score * 100)}%)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {included && entity.action === 'create' && (
-        <>
-          <Textarea
-            value={entity.description ?? ''}
-            onChange={(e) => onPatch({ description: e.target.value })}
-            rows={2}
-            placeholder="Description (optional)"
-            className="mt-2 text-sm"
-          />
-          {entity.attributes && Object.keys(entity.attributes).length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {Object.entries(entity.attributes).map(([k, v]) => (
-                <span
-                  key={k}
-                  className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                >
-                  {k}: {String(v)}
-                </span>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {included && entity.action === 'link' && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Notes from this import attach to{' '}
-          <span className="text-foreground">{existingName(entity.linkToEntityId ?? '')}</span> instead
-          of creating a new entity.
-        </p>
-      )}
-    </div>
-  )
-}
-
-function NoteRow({
-  note,
-  refName,
-  onPatch
-}: {
-  note: ConfirmedNote
-  refName: (r: EntityRef) => string
-  onPatch: (patch: Partial<ConfirmedNote>) => void
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        note.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
-      <div className="flex items-start gap-2">
-        <Toggle on={note.include} onClick={() => onPatch({ include: !note.include })} />
-        <div className="min-w-0 flex-1">
-          <Textarea
-            value={note.content}
-            onChange={(e) => onPatch({ content: e.target.value })}
-            rows={2}
-            disabled={!note.include}
-            className="text-sm"
-          />
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {note.entityRefs.map((r, i) => (
-              <span key={i} className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
-                {refName(r)}
-              </span>
-            ))}
-            {note.tags.map((t) => (
-              <span
-                key={t}
-                className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground"
-              >
-                #{t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={on ? 'Exclude' : 'Include'}
-      className={cn(
-        'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition-colors',
-        on ? 'border-primary bg-primary/15 text-primary' : 'border-border text-transparent'
-      )}
-    >
-      <Check className="size-3.5" />
-    </button>
   )
 }
 

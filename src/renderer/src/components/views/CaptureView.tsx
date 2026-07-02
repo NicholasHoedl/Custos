@@ -13,6 +13,7 @@ import { EntityDetail } from '@renderer/components/entities/EntityDetail'
 import { NotesView } from '@renderer/components/views/NotesView'
 import { RecapView } from '@renderer/components/views/RecapView'
 import { ImportView } from '@renderer/components/views/ImportView'
+import { BackfillView } from '@renderer/components/views/BackfillView'
 
 // Master/detail capture surface: quick-add on top, the entity browser on the left, and either the
 // selected entity's detail or the live session log on the right.
@@ -78,6 +79,10 @@ export function CaptureView() {
               setSelectedEntity(null)
               setCapturePanel('import')
             }}
+            onShowBackfill={() => {
+              setSelectedEntity(null)
+              setCapturePanel('backfill')
+            }}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -98,6 +103,8 @@ export function CaptureView() {
             <RecapView key={activeCampaignId} />
           ) : capturePanel === 'import' ? (
             <ImportView key={activeCampaignId} />
+          ) : capturePanel === 'backfill' ? (
+            <BackfillView key={activeCampaignId} />
           ) : (
             <EventFeed sessionId={activeSessionId} />
           )}

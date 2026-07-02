@@ -7,7 +7,8 @@ import {
   type StorySuggestion
 } from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
-import { ENTITY_TYPES, type Lifecycle } from '@shared/entity-types'
+import { ENTITY_TYPES, LIFECYCLES, type Lifecycle } from '@shared/entity-types'
+import { RELATIONS } from '@shared/relations'
 import type { RawExtraction } from '@shared/import-types'
 import type { RetrievedChunk } from './vector-store.service'
 import { getKey, keyExists } from './key.service'
@@ -657,68 +658,119 @@ ONLY WHAT THE TEXT SUPPORTS. Extract only entities and facts the text states or 
 
 ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance. Never invent an attribute value the text doesn't give.
 
-NOTES. Capture the narrative beats and facts as short notes, each tagged to the entities it concerns. A relationship the text states (who owns or leads or is allied with whom, where something is located) belongs in a note's prose — describe it there.
+NOTES. Capture the narrative beats and facts as short notes, each tagged to the entities it concerns. Write every note in neutral THIRD PERSON ("the party", entity names — never "I"/"we"/"my") so it reads correctly for any character. A relationship the text states (who owns or leads or is allied with whom, where something is located) belongs in a note's prose — describe it there.
 
 REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its position in your entities array — "#0", "#1", and so on. Reference an EXISTING entity by the id shown in the existing-entities list. Every note must reference at least one entity. Prefer linking to an existing entity (by id) over proposing a duplicate of it.`
 
+// Changeset v2 (ADR-018, backfill interview): additionally extract the CHANGES the text narrates, so
+// they can be stamped at the session under review and feed the as-of timeline.
+const CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. Only emit CHANGES the text narrates — never a state merely described as ongoing.
+
+RELATIONSHIP CHANGES. When the text narrates a relationship forming or ending — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — add a relationshipChanges item {fromRef, toRef, relation, action} with action "form" or "sever", using only the allowed relation keys. Keep the narrative note describing it as well.
+
+Both use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text narrates none, return empty arrays.`
+
 /** System prompt for import extraction — the (cacheable) instructions. */
-export function buildExtractionSystem(): Anthropic.TextBlockParam[] {
-  return [{ type: 'text', text: EXTRACTION_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
+export function buildExtractionSystem(withChanges = false): Anthropic.TextBlockParam[] {
+  const text = withChanges
+    ? `${EXTRACTION_INSTRUCTIONS}\n\n${CHANGES_INSTRUCTIONS}`
+    : EXTRACTION_INSTRUCTIONS
+  return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }]
 }
 
 /**
  * Extraction schema. Attributes are an array of {key,value} string pairs (not an open map) so the
  * structured-output format stays a closed schema; import.service folds them into a Record. JSON Schema
  * can't bound counts — import.service validates/cleans. Every object needs additionalProperties:false.
+ * With `withChanges` (backfill, ADR-018) the schema also requires the two change arrays.
  */
-const EXTRACTION_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    entities: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          type: { type: 'string', enum: [...ENTITY_TYPES] },
-          name: { type: 'string' },
-          description: { type: 'string' },
-          status: { type: 'string' },
-          attributes: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: { key: { type: 'string' }, value: { type: 'string' } },
-              required: ['key', 'value']
+function extractionSchema(withChanges: boolean): Record<string, unknown> {
+  const schema: {
+    type: string
+    additionalProperties: boolean
+    properties: Record<string, unknown>
+    required: string[]
+  } = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      entities: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            type: { type: 'string', enum: [...ENTITY_TYPES] },
+            name: { type: 'string' },
+            description: { type: 'string' },
+            status: { type: 'string' },
+            attributes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: { key: { type: 'string' }, value: { type: 'string' } },
+                required: ['key', 'value']
+              }
             }
-          }
-        },
-        required: ['type', 'name']
+          },
+          required: ['type', 'name']
+        }
+      },
+      notes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            content: { type: 'string' },
+            entityRefs: { type: 'array', items: { type: 'string' } },
+            tags: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['content', 'entityRefs']
+        }
       }
     },
-    notes: {
+    required: ['entities', 'notes']
+  }
+  if (withChanges) {
+    schema.properties.statusChanges = {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          content: { type: 'string' },
-          entityRefs: { type: 'array', items: { type: 'string' } },
-          tags: { type: 'array', items: { type: 'string' } }
+          entityRef: { type: 'string' },
+          lifecycle: { type: 'string', enum: [...LIFECYCLES] },
+          status: { type: 'string' }
         },
-        required: ['content', 'entityRefs']
+        required: ['entityRef', 'lifecycle']
       }
     }
-  },
-  required: ['entities', 'notes']
+    schema.properties.relationshipChanges = {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          fromRef: { type: 'string' },
+          toRef: { type: 'string' },
+          relation: { type: 'string', enum: Object.keys(RELATIONS) },
+          action: { type: 'string', enum: ['form', 'sever'] }
+        },
+        required: ['fromRef', 'toRef', 'relation', 'action']
+      }
+    }
+    schema.required = ['entities', 'notes', 'statusChanges', 'relationshipChanges']
+  }
+  return schema
 }
 
 /** The user turn for extraction: the existing-entity list (to enable linking) + the raw pasted text. */
 export function buildExtractionUserContent(
   text: string,
-  existing: { id: string; name: string; type: string }[]
+  existing: { id: string; name: string; type: string }[],
+  withChanges = false
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (existing.length) {
@@ -741,7 +793,9 @@ export function buildExtractionUserContent(
   content.push({ type: 'text', text: `Raw text to extract from:\n\n${text}` })
   content.push({
     type: 'text',
-    text: 'Extract the entities and notes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
+    text: withChanges
+      ? 'Extract the entities, notes, status changes, and relationship changes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
+      : 'Extract the entities and notes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
   })
   return content
 }
@@ -751,17 +805,19 @@ export interface ExtractChangesetParams {
   existing: { id: string; name: string; type: string }[]
   model: string
   effort: 'medium' | 'high'
+  withChanges?: boolean // changeset v2 (backfill): also extract status/relationship changes
   signal?: AbortSignal
 }
 
 /** Single-shot structured extraction. Returns the raw (UNVALIDATED) changeset; import.service cleans it. */
 export async function extractChangeset(params: ExtractChangesetParams): Promise<RawExtraction> {
+  const withChanges = params.withChanges ?? false
   return structuredObjectCall<RawExtraction>({
     model: params.model,
     effort: params.effort,
-    schema: EXTRACTION_SCHEMA,
-    system: buildExtractionSystem(),
-    content: buildExtractionUserContent(params.text, params.existing),
+    schema: extractionSchema(withChanges),
+    system: buildExtractionSystem(withChanges),
+    content: buildExtractionUserContent(params.text, params.existing, withChanges),
     signal: params.signal
   })
 }

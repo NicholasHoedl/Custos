@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookText, FileInput, ScrollText, Search, StickyNote } from 'lucide-react'
+import { BookText, CalendarClock, FileInput, ScrollText, Search, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -11,7 +11,7 @@ import { Input } from '@renderer/components/ui/input'
 
 export type EntityFilter = EntityType | 'all'
 /** Which non-entity pane the capture detail area shows when no entity is selected. */
-export type CapturePanel = 'session' | 'notes' | 'recap' | 'import'
+export type CapturePanel = 'session' | 'notes' | 'recap' | 'import' | 'backfill'
 
 const FILTERS: EntityFilter[] = ['all', ...ENTITY_TYPES]
 
@@ -31,6 +31,8 @@ interface EntityBrowserProps {
   onShowRecap: () => void
   /** Clear the selection and show the import pane in the detail pane. */
   onShowImport: () => void
+  /** Clear the selection and show the backfill interview in the detail pane. */
+  onShowBackfill: () => void
 }
 
 // Master list of all entities in the campaign, filtered client-side by type (chips, with live counts)
@@ -46,7 +48,8 @@ export function EntityBrowser({
   onShowSessionLog,
   onShowNotes,
   onShowRecap,
-  onShowImport
+  onShowImport,
+  onShowBackfill
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
 
@@ -109,6 +112,18 @@ export function EntityBrowser({
         >
           <FileInput className="size-4" />
           Import
+        </button>
+        <button
+          onClick={onShowBackfill}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+            !selectedId && panel === 'backfill'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+          )}
+        >
+          <CalendarClock className="size-4" />
+          Backfill
         </button>
       </div>
       <div className="border-b border-border">

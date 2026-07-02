@@ -1,16 +1,20 @@
-import type { EntityType } from './entity-types'
+import type { EntityType, Lifecycle } from './entity-types'
+import type { RelationKey } from './relations'
 
-// ---- Paste-and-extract import (v1: entities + notes) ----
+// ---- Paste-and-extract import + backfill interview (changeset v2) ----
 // The model proposes new entities + notes from pasted raw text; the user reviews/edits/confirms each
 // item; we apply in one transaction. Proposed (not-yet-created) entities are referenced by LOCAL INDEX:
 // in the model's JSON a NEW entity is "#0","#1",… (its position in `entities`), and an EXISTING entity
 // is its real id (the prompt lists candidate ids). The validator normalizes those strings to EntityRef.
-// Relationship extraction is intentionally deferred (see plan §Fast-follow); stated relationships
-// survive as note prose in v1.
+// Changeset v2 (ADR-018, backfill): extraction can ALSO emit status/relationship CHANGES — gated by
+// `withChanges` so the plain Import pane is unchanged — which apply stamps at the batch's session so
+// the backfilled past feeds Chronology's as-of reconstruction (ADR-017).
 
 export interface ExtractRequest {
   campaignId: string
   text: string
+  /** Changeset v2: also extract status/relationship changes (backfill interview). Default false. */
+  withChanges?: boolean
 }
 
 /** A reference to an entity in the changeset — a proposed-new one (by index) or an existing id. */
@@ -26,6 +30,10 @@ export interface RawExtraction {
     attributes?: { key: string; value: string }[]
   }[]
   notes: { content: string; entityRefs: string[]; tags?: string[] }[]
+  /** Changeset v2 (withChanges only): state changes the text narrates, e.g. a death or a completion. */
+  statusChanges?: { entityRef: string; lifecycle?: string; status?: string }[]
+  /** Changeset v2 (withChanges only): relationships that formed or ended during the described events. */
+  relationshipChanges?: { fromRef: string; toRef: string; relation: string; action: string }[]
 }
 
 /** A possible existing match for a proposed entity (drives the "link instead of create" choice). */
@@ -53,9 +61,26 @@ export interface ProposedNote {
   tags: string[]
 }
 
+/** A validated status/lifecycle change, to be stamped at the batch's session on apply (ADR-018). */
+export interface ProposedStatusChange {
+  entityRef: EntityRef
+  lifecycle: Lifecycle
+  status: string | null
+}
+
+/** A validated relationship change: form opens an interval at the session; sever closes one. */
+export interface ProposedRelationshipChange {
+  fromRef: EntityRef
+  toRef: EntityRef
+  relation: RelationKey
+  action: 'form' | 'sever'
+}
+
 export interface ExtractionProposal {
   entities: ProposedEntity[]
   notes: ProposedNote[]
+  statusChanges: ProposedStatusChange[]
+  relationshipChanges: ProposedRelationshipChange[]
 }
 
 export type ExtractFailureReason = 'no_key' | 'offline' | 'api' | 'invalid' | 'empty'
@@ -74,6 +99,9 @@ export interface ConfirmedEntity {
   status?: string
   attributes?: Record<string, unknown>
   linkToEntityId?: string // required when action === 'link'
+  /** Backfill: the session to stamp this entity's baseline at (its first appearance). Falls back to
+   *  the changeset's sessionId. Omit for "the batch's session" (or pre-tracking when that is null). */
+  sessionId?: string
 }
 
 export interface ConfirmedNote {
@@ -83,16 +111,36 @@ export interface ConfirmedNote {
   include: boolean
 }
 
+export interface ConfirmedStatusChange {
+  entityRef: EntityRef
+  lifecycle: Lifecycle
+  status: string | null
+  include: boolean
+}
+
+export interface ConfirmedRelationshipChange {
+  fromRef: EntityRef
+  toRef: EntityRef
+  relation: RelationKey
+  action: 'form' | 'sever'
+  include: boolean
+}
+
 export interface ConfirmedChangeset {
   campaignId: string
   sessionId: string | null
   entities: ConfirmedEntity[]
   notes: ConfirmedNote[]
+  /** Changeset v2 (backfill) — absent for the plain Import pane. */
+  statusChanges?: ConfirmedStatusChange[]
+  relationshipChanges?: ConfirmedRelationshipChange[]
 }
 
 export interface ApplyResult {
   createdEntityIds: string[]
   linkedEntityIds: string[]
   createdNoteIds: string[]
-  skipped: { kind: 'entity' | 'note'; reason: string }[]
+  statusChangesApplied: number
+  relationshipChangesApplied: number
+  skipped: { kind: 'entity' | 'note' | 'change'; reason: string }[]
 }

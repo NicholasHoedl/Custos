@@ -125,3 +125,117 @@ describe('import.service — extract (validate + dedup)', () => {
     expect(extractFn).not.toHaveBeenCalled()
   })
 })
+
+describe('import.service — changeset v2 (status + relationship changes, ADR-018)', () => {
+  it('resolves status-change refs, validates or derives lifecycles, and drops unusable entries', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const manor = createEntity(ctx, { campaignId, type: 'location', name: 'Tresendar Manor' })
+    extractFn.mockResolvedValue({
+      entities: [{ type: 'npc', name: 'Duke Halric' }],
+      notes: [],
+      statusChanges: [
+        { entityRef: '#0', lifecycle: 'ended', status: 'Slain' }, // valid, new ref
+        { entityRef: manor.id, status: 'Ruined by fire' }, // no lifecycle → derived 'ended'
+        { entityRef: '#0', lifecycle: 'bogus', status: 'Wounded' }, // bad lifecycle → derived 'active'
+        { entityRef: '#9', lifecycle: 'ended' }, // dangling ref → dropped
+        { entityRef: '#0' } // neither lifecycle nor status → dropped
+      ],
+      relationshipChanges: []
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.statusChanges).toEqual([
+      { entityRef: { kind: 'new', index: 0 }, lifecycle: 'ended', status: 'Slain' },
+      {
+        entityRef: { kind: 'existing', entityId: manor.id },
+        lifecycle: 'ended',
+        status: 'Ruined by fire'
+      },
+      { entityRef: { kind: 'new', index: 0 }, lifecycle: 'active', status: 'Wounded' }
+    ])
+  })
+
+  it('validates relationship changes: refs, known relation, type-allowedness on form, dedup', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const inn = createEntity(ctx, { campaignId, type: 'location', name: 'Stonehill Inn' })
+    extractFn.mockResolvedValue({
+      entities: [
+        { type: 'npc', name: 'Aldric' },
+        { type: 'npc', name: 'Mirna' }
+      ],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [
+        { fromRef: '#0', toRef: inn.id, relation: 'located_in', action: 'form' }, // valid form
+        { fromRef: '#0', toRef: '#1', relation: 'ally_of', action: 'sever' }, // valid sever
+        { fromRef: '#0', toRef: inn.id, relation: 'owns', action: 'form' }, // npc→location disallowed
+        { fromRef: '#0', toRef: inn.id, relation: 'buddies', action: 'form' }, // unknown relation
+        { fromRef: '#0', toRef: '#0', relation: 'ally_of', action: 'form' }, // self-reference
+        { fromRef: '#0', toRef: '#9', relation: 'ally_of', action: 'form' }, // dangling ref
+        { fromRef: '#0', toRef: inn.id, relation: 'located_in', action: 'form' } // exact duplicate
+      ]
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.relationshipChanges).toEqual([
+      {
+        fromRef: { kind: 'new', index: 0 },
+        toRef: { kind: 'existing', entityId: inn.id },
+        relation: 'located_in',
+        action: 'form'
+      },
+      {
+        fromRef: { kind: 'new', index: 0 },
+        toRef: { kind: 'new', index: 1 },
+        relation: 'ally_of',
+        action: 'sever'
+      }
+    ])
+  })
+
+  it('rewrites change refs onto collapsed intra-batch duplicates', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    extractFn.mockResolvedValue({
+      entities: [
+        { type: 'npc', name: 'Iarno' },
+        { type: 'npc', name: 'Iarno' } // duplicate → collapsed onto #0
+      ],
+      notes: [],
+      statusChanges: [{ entityRef: '#1', lifecycle: 'ended', status: 'Dead' }],
+      relationshipChanges: []
+    })
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.statusChanges[0].entityRef).toEqual({ kind: 'new', index: 0 })
+  })
+
+  it('a proposal carrying ONLY changes is not "empty"; absent arrays validate to empty', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Glasstaff' })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [{ entityRef: npc.id, lifecycle: 'ended', status: 'Dead' }],
+      relationshipChanges: []
+    })
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true) // a lone status change is a real proposal
+
+    // Plain-import shape (no change arrays at all) still validates, with empty change arrays.
+    extractFn.mockResolvedValue({ entities: [{ type: 'npc', name: 'Sildar' }], notes: [] })
+    const res2 = await extract(ctx, { campaignId, text: 't' }, sig())
+    expect(res2.ok).toBe(true)
+    if (!res2.ok) return
+    expect(res2.proposal.statusChanges).toEqual([])
+    expect(res2.proposal.relationshipChanges).toEqual([])
+  })
+})

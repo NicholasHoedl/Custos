@@ -61,10 +61,13 @@ export function stateAsOf(
     .all()
   if (rows.length === 0) return null
   // Latest applicable = highest since_session_number (NULL = earliest), tie-broken by recordedAt.
+  // recordedAt ties use >= so the LATER row wins: rows iterate in insertion order (the entity-id
+  // index walks rowids), and a backfill batch can write a baseline + a change in the same millisecond
+  // — the change, applied second, must win at that session.
   const best = rows.reduce((a, b) => {
     const as = a.sinceSessionNumber ?? Number.NEGATIVE_INFINITY
     const bs = b.sinceSessionNumber ?? Number.NEGATIVE_INFINITY
-    return bs > as || (bs === as && b.recordedAt > a.recordedAt) ? b : a
+    return bs > as || (bs === as && b.recordedAt >= a.recordedAt) ? b : a
   })
   return { lifecycle: best.lifecycle as Lifecycle, status: best.status }
 }

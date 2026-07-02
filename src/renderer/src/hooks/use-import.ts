@@ -4,6 +4,8 @@ import type {
   ConfirmedChangeset,
   ConfirmedEntity,
   ConfirmedNote,
+  ConfirmedRelationshipChange,
+  ConfirmedStatusChange,
   ExtractFailureReason,
   ExtractionProposal,
   ProposedEntity
@@ -30,25 +32,37 @@ function seedEntity(p: ProposedEntity): ConfirmedEntity {
   }
 }
 
-/** Two-phase import: extract (Claude) → editable review draft → apply (one transaction). */
-export function useImport(): {
+/**
+ * Two-phase import: extract (Claude) → editable review draft → apply (one transaction).
+ * With `withChanges` (backfill, ADR-018) extraction also proposes status/relationship changes, and
+ * `apply` accepts a session override (roster → session 1; beats → the session under review) instead
+ * of the app's active session.
+ */
+export function useImport(opts?: { withChanges?: boolean }): {
   status: ImportStatus
   proposal: ExtractionProposal | null
   entities: ConfirmedEntity[]
   notes: ConfirmedNote[]
+  statusChanges: ConfirmedStatusChange[]
+  relationshipChanges: ConfirmedRelationshipChange[]
   reason: ExtractFailureReason | null
   error: string | null
   result: ApplyResult | null
   setEntities: Dispatch<SetStateAction<ConfirmedEntity[]>>
   setNotes: Dispatch<SetStateAction<ConfirmedNote[]>>
+  setStatusChanges: Dispatch<SetStateAction<ConfirmedStatusChange[]>>
+  setRelationshipChanges: Dispatch<SetStateAction<ConfirmedRelationshipChange[]>>
   extract: (text: string) => void
-  apply: () => void
+  apply: (sessionIdOverride?: string | null) => void
   reset: () => void
 } {
+  const withChanges = opts?.withChanges ?? false
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [proposal, setProposal] = useState<ExtractionProposal | null>(null)
   const [entities, setEntities] = useState<ConfirmedEntity[]>([])
   const [notes, setNotes] = useState<ConfirmedNote[]>([])
+  const [statusChanges, setStatusChanges] = useState<ConfirmedStatusChange[]>([])
+  const [relationshipChanges, setRelationshipChanges] = useState<ConfirmedRelationshipChange[]>([])
   const [reason, setReason] = useState<ExtractFailureReason | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApplyResult | null>(null)
@@ -63,7 +77,7 @@ export function useImport(): {
       setError(null)
       setResult(null)
       ledger.import
-        .extract({ campaignId: activeCampaignId, text })
+        .extract({ campaignId: activeCampaignId, text, withChanges })
         .then((res) => {
           if (!res.ok) {
             setStatus('idle')
@@ -80,6 +94,10 @@ export function useImport(): {
               include: true
             }))
           )
+          setStatusChanges(res.proposal.statusChanges.map((c) => ({ ...c, include: true })))
+          setRelationshipChanges(
+            res.proposal.relationshipChanges.map((c) => ({ ...c, include: true }))
+          )
           setStatus('review')
         })
         .catch((e) => {
@@ -87,37 +105,44 @@ export function useImport(): {
           setError(String(e))
         })
     },
-    [activeCampaignId]
+    [activeCampaignId, withChanges]
   )
 
-  const apply = useCallback(() => {
-    if (!activeCampaignId) return
-    setStatus('applying')
-    setError(null)
-    const payload: ConfirmedChangeset = {
-      campaignId: activeCampaignId,
-      sessionId: activeSessionId,
-      entities,
-      notes
-    }
-    ledger.import
-      .apply(payload)
-      .then((res) => {
-        setResult(res)
-        setStatus('done')
-        useUiStore.getState().bumpEntities() // refresh entity lists across the app
-      })
-      .catch((e) => {
-        setStatus('error')
-        setError(String(e))
-      })
-  }, [activeCampaignId, activeSessionId, entities, notes])
+  const apply = useCallback(
+    (sessionIdOverride?: string | null) => {
+      if (!activeCampaignId) return
+      setStatus('applying')
+      setError(null)
+      const payload: ConfirmedChangeset = {
+        campaignId: activeCampaignId,
+        sessionId: sessionIdOverride !== undefined ? sessionIdOverride : activeSessionId,
+        entities,
+        notes,
+        statusChanges,
+        relationshipChanges
+      }
+      ledger.import
+        .apply(payload)
+        .then((res) => {
+          setResult(res)
+          setStatus('done')
+          useUiStore.getState().bumpEntities() // refresh entity lists across the app
+        })
+        .catch((e) => {
+          setStatus('error')
+          setError(String(e))
+        })
+    },
+    [activeCampaignId, activeSessionId, entities, notes, statusChanges, relationshipChanges]
+  )
 
   const reset = useCallback(() => {
     setStatus('idle')
     setProposal(null)
     setEntities([])
     setNotes([])
+    setStatusChanges([])
+    setRelationshipChanges([])
     setReason(null)
     setError(null)
     setResult(null)
@@ -128,11 +153,15 @@ export function useImport(): {
     proposal,
     entities,
     notes,
+    statusChanges,
+    relationshipChanges,
     reason,
     error,
     result,
     setEntities,
     setNotes,
+    setStatusChanges,
+    setRelationshipChanges,
     extract,
     apply,
     reset
