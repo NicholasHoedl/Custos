@@ -4,13 +4,12 @@ import { toast } from 'sonner'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
-  LIFECYCLES,
-  LIFECYCLE_LABELS,
   type Entity,
   type EntityType,
   type Lifecycle
 } from '@shared/entity-types'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
+import { lifecycleHeuristic } from '@shared/lifecycle'
 import { ledger } from '@renderer/lib/ipc'
 import { useUiStore } from '@renderer/store/ui-store'
 import {
@@ -107,8 +106,14 @@ export function EntityForm({
   function onTypeChange(next: EntityType): void {
     setType(next)
     setExtraRows(toRows(attributes, profileKeys(next)))
-    const opts = profileFor(next).status
-    setStatus((s) => (opts && opts.includes(s) ? s : ''))
+    // Keep the status only if it's a preset of the new type, adopting that preset's lifecycle; otherwise
+    // clear it — a status-less entity reads as `unknown` until one is set.
+    const match = profileFor(next).status?.find((o) => o.label === status)
+    if (match) setLifecycle(match.lifecycle)
+    else {
+      setStatus('')
+      setLifecycle('unknown')
+    }
   }
 
   // updateEntity replaces `attributes` wholesale, so the payload must re-emit every key worth keeping:
@@ -360,28 +365,31 @@ export function EntityForm({
           {prof.status && (
             <div className="space-y-1.5">
               <Label htmlFor="ef-status">Status</Label>
-              <StatusCombobox id="ef-status" value={status} onChange={setStatus} options={prof.status} />
+              <StatusCombobox
+                id="ef-status"
+                value={status}
+                onChange={(v, lc) => {
+                  setStatus(v)
+                  setLifecycle(lc ?? lifecycleHeuristic(v.trim() || null))
+                }}
+                options={prof.status}
+              />
+              {(lifecycle === 'ended' || lifecycle === 'presumed_ended') && (
+                <label className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    checked={lifecycle === 'presumed_ended'}
+                    onChange={(e) => setLifecycle(e.target.checked ? 'presumed_ended' : 'ended')}
+                  />
+                  Presumed / unconfirmed — believed over, but the party hasn’t confirmed it.
+                </label>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Where this stands now — the AI trusts it for “now vs. then.”
+              </p>
             </div>
           )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ef-lifecycle">Lifecycle</Label>
-            <Select value={lifecycle} onValueChange={(v) => setLifecycle(v as Lifecycle)}>
-              <SelectTrigger id="ef-lifecycle">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LIFECYCLES.map((lc) => (
-                  <SelectItem key={lc} value={lc}>
-                    {LIFECYCLE_LABELS[lc]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              Whether this still exists / is in play — the AI trusts it for “now vs. then.”
-            </p>
-          </div>
 
           {prof.fields.map(renderField)}
 

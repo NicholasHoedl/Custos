@@ -25,11 +25,12 @@ export interface RecallChunk {
   text: string
 }
 
-/** A cited source surfaced under the answer (clickable → open the entity/note). */
+/** A cited source surfaced under the answer (clickable → open the entity/note). The entity fields are
+ *  null for a campaign-lore note (a note owned by no entity — ADR-021); the UI shows it non-clickable. */
 export interface RecallSource {
-  entityId: string
-  entityType: EntityType
-  entityName: string
+  entityId: string | null
+  entityType: EntityType | null
+  entityName: string | null
   noteId: string | null
   sessionLabel: string | null
   snippet?: string // shown in the offline / retrieval-only view

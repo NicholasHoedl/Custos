@@ -31,6 +31,7 @@ vi.mock('../../../src/main/services/claude.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/main/services/claude.service')>()
   return { ...actual, isAvailable: isAvailableFn, extractChangeset: extractFn }
 })
+vi.mock('electron-log/main', () => ({ default: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
 import { makeTestDb } from '../../helpers/test-db'
 import { createCampaign } from '../../../src/main/services/campaign.service'
@@ -71,6 +72,32 @@ describe('import.service — extract (validate + dedup)', () => {
       { kind: 'new', index: 0 },
       { kind: 'new', index: 2 }
     ])
+  })
+
+  it('maps a truncated model response to the too_long reason (big-paste guidance)', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    // A paste too large to extract in one shot exhausts the output budget → structuredCall throws
+    // 'truncated'; the user should be told to split it, not shown the generic "couldn't read that".
+    extractFn.mockRejectedValue(new Error('truncated'))
+
+    const res = await extract(ctx, { campaignId, text: 'an enormous paste' }, sig())
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.reason).toBe('too_long')
+  })
+
+  it('maps a rejected API key (401) to the bad_key reason', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    extractFn.mockRejectedValue(
+      new Error('401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}')
+    )
+
+    const res = await extract(ctx, { campaignId, text: 'some notes' }, sig())
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.reason).toBe('bad_key')
   })
 
   it('collapses intra-batch duplicate names (rewriting refs) and surfaces existing matches', async () => {

@@ -256,6 +256,7 @@ function CreateCampaignDialog({
         name: trimmed,
         description: description.trim() || undefined
       })
+      useUiStore.getState().bumpCampaigns()
       toast.success('Campaign created', { description: trimmed })
       onCreated(campaign)
       onOpenChange(false)
@@ -440,6 +441,7 @@ function DeleteCampaignDialog({
     setBusy(true)
     try {
       await ledger.campaign.delete(campaign.id)
+      useUiStore.getState().bumpCampaigns()
       toast.success('Campaign deleted', { description: campaign.name })
       onOpenChange(false)
       onDeleted()
@@ -520,7 +522,7 @@ function SessionControl({ campaignId }: { campaignId: string }) {
     setBusy(true)
     try {
       const session = await ledger.session.create({ campaignId })
-      refresh()
+      useUiStore.getState().bumpSessions()
       setActiveSession(session.id)
       toast.success(`Session ${session.number} started`)
     } catch (err) {
@@ -717,6 +719,7 @@ function DeleteSessionDialog({
     setBusy(true)
     try {
       await ledger.session.delete(session.id)
+      useUiStore.getState().bumpSessions()
       toast.success(`Session ${session.number} deleted`)
       onOpenChange(false)
       onDeleted()
@@ -1019,7 +1022,9 @@ function PresentEntitiesSelector({ campaignId }: { campaignId: string }) {
   const setPresentEntities = useAppStore((s) => s.setPresentEntities)
   const [open, setOpen] = useState(false)
 
-  const options = entities.filter((e) => e.type === 'npc' || e.type === 'faction')
+  const options = entities.filter(
+    (e) => e.type === 'npc' || e.type === 'faction' || e.type === 'creature'
+  )
   if (options.length === 0) return null
 
   const selected = new Set(presentEntityIds)

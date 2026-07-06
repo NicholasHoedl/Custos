@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Check, Download, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { Check, Download, Eye, EyeOff, FileDown, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AppSettings } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
+import { useAppStore } from '@renderer/store/app-store'
 import { useSettings } from '@renderer/hooks/use-settings'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
@@ -20,11 +21,13 @@ import {
 export function SettingsView() {
   const { settings, update } = useSettings()
   const { status: onb, progress, downloading, error: modelError, download } = useOnboarding()
+  const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const [keyInput, setKeyInput] = useState('')
   const [keyExists, setKeyExists] = useState(false)
   const [show, setShow] = useState(false)
   const [busy, setBusy] = useState(false)
   const [reindexing, setReindexing] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     ledger.apikey
@@ -76,6 +79,25 @@ export function SettingsView() {
       toast.error('Re-index failed', { description: String(err) })
     } finally {
       setReindexing(false)
+    }
+  }
+
+  async function exportCampaign() {
+    if (!activeCampaignId || exporting) return
+    setExporting(true)
+    try {
+      const res = await ledger.campaign.export(activeCampaignId)
+      if (res.ok) {
+        toast.success('Campaign exported', {
+          description: `${res.counts.entities} entities · ${res.counts.notes} notes · ${res.counts.links} links → ${res.path}`
+        })
+      } else if ('error' in res) {
+        toast.error('Export failed', { description: res.error })
+      } // canceled → no toast
+    } catch (err) {
+      toast.error('Export failed', { description: String(err) })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -225,6 +247,28 @@ export function SettingsView() {
               {modelError ? 'Retry download' : 'Download model (~30 MB)'}
             </Button>
           </div>
+        )}
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium text-foreground">Export campaign</h2>
+        <p className="text-sm text-muted-foreground">
+          Save the active campaign to a JSON file — a portable backup of every entity, note, link,
+          session, and event. (Search embeddings are omitted; they rebuild automatically on load.)
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={exportCampaign}
+          disabled={!activeCampaignId || exporting}
+        >
+          <FileDown className="size-4" />
+          {exporting ? 'Exporting…' : 'Export to JSON'}
+        </Button>
+        {!activeCampaignId && (
+          <p className="text-xs text-muted-foreground">Select a campaign first.</p>
         )}
       </section>
     </PaneShell>

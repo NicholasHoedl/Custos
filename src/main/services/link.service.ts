@@ -122,6 +122,16 @@ export function deleteLink(ctx: DbContext, id: string): void {
   ctx.drizzle.delete(schema.entityLink).where(eq(schema.entityLink.id, id)).run()
 }
 
+/** Every relationship edge in a campaign (all intervals — live and severed). For export/backup. */
+export function listLinksForCampaign(ctx: DbContext, campaignId: string): EntityLink[] {
+  return ctx.drizzle
+    .select()
+    .from(schema.entityLink)
+    .where(eq(schema.entityLink.campaignId, campaignId))
+    .all()
+    .map(rowToLink)
+}
+
 /**
  * All relationships touching an entity, correctly oriented. Chronology (ADR-017): by default returns
  * only LIVE (open-interval) relationships; pass `asOf` to return those live at that session number.

@@ -26,6 +26,7 @@ function chunk(over: Partial<Chunk> = {}): Chunk {
     sessionId: 's1',
     sessionLabel: 'Session 3',
     content: 'an evil wizard who leads the Redbrands',
+    confidence: 'confirmed',
     score: 0.9,
     ...over
   }

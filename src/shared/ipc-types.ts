@@ -7,6 +7,7 @@ import type {
   EventLogEntry,
   Lifecycle,
   Note,
+  NoteConfidence,
   Session,
   StatusHistoryEntry
 } from './entity-types'
@@ -24,6 +25,7 @@ import type {
 import type { SuggestRequest, SuggestResult } from './suggest-types'
 import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
 import type { ApplyResult, ConfirmedChangeset, ExtractRequest, ExtractResult } from './import-types'
+import type { CampaignExportResult } from './export-types'
 
 // ---- Input payloads ----
 export interface CreateCampaignInput {
@@ -66,15 +68,18 @@ export interface UpdateEntityInput {
   sessionId?: string // capture context: active session id, stamps a status/lifecycle change
 }
 export interface CreateNoteInput {
-  entityIds: string[] // the note is associated with one or more entities (M2M); must be non-empty
+  campaignId: string // the note's home campaign (required); the note may tag 0..N entities
+  entityIds: string[] // entities this note tags (M2M); may be empty (a campaign-level world fact)
   sessionId?: string
   content: string
   tags?: string[]
+  confidence?: NoteConfidence // epistemic weight; defaults to 'confirmed'
 }
 export interface UpdateNoteInput {
   content?: string
-  entityIds?: string[] // when present, replaces the note's entity associations (must be non-empty)
+  entityIds?: string[] // when present, replaces the note's entity associations
   tags?: string[]
+  confidence?: NoteConfidence
 }
 export interface CreateEventInput {
   sessionId: string
@@ -107,6 +112,8 @@ export interface LedgerApi {
     create(input: CreateCampaignInput): Promise<Campaign>
     update(id: string, patch: UpdateCampaignInput): Promise<Campaign>
     delete(id: string): Promise<void>
+    /** Serialize the campaign to a JSON file via a save dialog (export-only, backup + portability). */
+    export(campaignId: string): Promise<CampaignExportResult>
   }
   session: {
     list(campaignId: string): Promise<Session[]>
@@ -204,6 +211,7 @@ export const IPC = {
   campaignCreate: 'campaign:create',
   campaignUpdate: 'campaign:update',
   campaignDelete: 'campaign:delete',
+  campaignExport: 'campaign:export',
   sessionList: 'session:list',
   sessionGet: 'session:get',
   sessionCreate: 'session:create',

@@ -33,4 +33,17 @@ describe('relation registry', () => {
     expect(isRelationAllowed('located_in', 'npc', 'item')).toBe(false)
     expect(isRelationAllowed('bogus', 'npc', 'location')).toBe(false)
   })
+
+  it('creatures can be located, involved, owned, and opposed (C1)', () => {
+    // A creature lives somewhere, is involved in quests/events, can hoard items, and is an actor for
+    // ally/enemy edges — but stays out of social/org relations (member_of, knows, quest_giver_of).
+    const fromLocation = relationsForTypes('creature', 'location').map((r) => r.key)
+    expect(fromLocation).toContain('located_in')
+    expect(relationsForTypes('creature', 'quest').map((r) => r.key)).toContain('involved_in')
+    expect(isRelationAllowed('owns', 'creature', 'item')).toBe(true)
+    expect(isRelationAllowed('enemy_of', 'creature', 'npc')).toBe(true)
+    expect(isRelationAllowed('ally_of', 'pc', 'creature')).toBe(true)
+    expect(isRelationAllowed('member_of', 'creature', 'faction')).toBe(false)
+    expect(isRelationAllowed('knows', 'creature', 'npc')).toBe(false)
+  })
 })

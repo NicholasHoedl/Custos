@@ -50,6 +50,7 @@ export function QuickAddBar({ campaignId, sessionId, restoring = false, onCreate
       const entity = await ledger.entity.create({ campaignId, type, name: trimmed })
       if (note.trim()) {
         await ledger.note.create({
+          campaignId,
           entityIds: [entity.id],
           sessionId: sessionId ?? undefined,
           content: note.trim()

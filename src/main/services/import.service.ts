@@ -1,8 +1,16 @@
-import { ENTITY_TYPES, LIFECYCLES, type Entity, type EntityType, type Lifecycle } from '@shared/entity-types'
+import {
+  ENTITY_TYPES,
+  LIFECYCLES,
+  type Entity,
+  type EntityType,
+  type Lifecycle,
+  type NoteConfidence
+} from '@shared/entity-types'
 import type {
   ApplyResult,
   ConfirmedChangeset,
   EntityRef,
+  ExtractFailureReason,
   ExtractionProposal,
   ExtractRequest,
   ExtractResult,
@@ -23,7 +31,8 @@ import { createNote } from './note.service'
 import { indexEntity, indexNote } from './embedding-index.service'
 import { getSettings } from './settings.service'
 import { extractChangeset as claudeExtract, isAvailable } from './claude.service'
-import { classifyError, isOnline } from './ai-util'
+import { classifyError, isAuthError, isOnline } from './ai-util'
+import log from 'electron-log/main'
 
 const ENTITY_TYPE_SET = new Set<string>(ENTITY_TYPES)
 
@@ -65,11 +74,17 @@ export async function extract(
     }
     return { ok: true, proposal }
   } catch (err) {
-    return {
-      ok: false,
-      reason: classifyError(err),
-      message: err instanceof Error ? err.message : String(err)
-    }
+    // Log the real cause — otherwise every non-network failure (a truncated response, a schema error
+    // during a stale-migration dev restart, an unparseable reply) collapses to a generic toast with no
+    // trace. See logs/main.log.
+    log.error('import.extract failed', err)
+    const message = err instanceof Error ? err.message : String(err)
+    // Surface the two actionable causes distinctly instead of the catch-all "couldn't read that":
+    // a big paste that exhausts the output budget mid-JSON ('truncated' → too_long), and a rejected
+    // API key (401 → bad_key). Everything else falls through to the shared classifier.
+    const reason: ExtractFailureReason =
+      message === 'truncated' ? 'too_long' : isAuthError(err) ? 'bad_key' : classifyError(err)
+    return { ok: false, reason, message }
   }
 }
 
@@ -181,7 +196,9 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
     const tags = (Array.isArray(n.tags) ? n.tags : [])
       .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
       .map((t) => t.trim())
-    notes.push({ content: n.content.trim(), entityRefs: refs, tags })
+    const confidence: NoteConfidence =
+      n.confidence === 'rumored' || n.confidence === 'suspected' ? n.confidence : 'confirmed'
+    notes.push({ content: n.content.trim(), entityRefs: refs, tags, confidence })
   }
 
   // ---- Changeset v2 (ADR-018): status + relationship changes (absent unless withChanges) ----
@@ -372,10 +389,12 @@ export function applyChangeset(
         continue
       }
       const note = createNote(ctx, {
+        campaignId: payload.campaignId,
         entityIds,
         sessionId: payload.sessionId ?? undefined,
         content: cn.content,
-        tags: cn.tags
+        tags: cn.tags,
+        confidence: cn.confidence
       })
       result.createdNoteIds.push(note.id)
     }

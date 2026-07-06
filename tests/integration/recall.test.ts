@@ -46,14 +46,42 @@ import { createSession } from '../../src/main/services/session.service'
 import { createEntity, updateEntity } from '../../src/main/services/entity.service'
 import { createNote } from '../../src/main/services/note.service'
 import { createLink } from '../../src/main/services/link.service'
-import { BruteForceVectorStore } from '../../src/main/services/vector-store.service'
-import { ask } from '../../src/main/services/recall.service'
+import {
+  BruteForceVectorStore,
+  type RetrievedChunk
+} from '../../src/main/services/vector-store.service'
+import { ask, chunksToSources } from '../../src/main/services/recall.service'
 
 function unit(i: number): Float32Array {
   const v = new Float32Array(384)
   v[i] = 1
   return v
 }
+
+describe('chunksToSources (retrieval-only fallback sources)', () => {
+  const loreChunk = (noteId: string, content: string): RetrievedChunk => ({
+    kind: 'note',
+    entityId: null,
+    entityName: null,
+    entityType: null,
+    noteId,
+    sessionId: null,
+    sessionLabel: null,
+    content,
+    confidence: 'confirmed',
+    score: 1
+  })
+
+  it('keeps two distinct lore notes as separate sources with null entity fields', () => {
+    const sources = chunksToSources([
+      loreChunk('n1', 'first world fact'),
+      loreChunk('n2', 'second world fact')
+    ])
+    expect(sources).toHaveLength(2) // distinct noteIds → not collapsed by the dedupe key
+    expect(sources.every((s) => s.entityId === null && s.entityName === null)).toBe(true)
+    expect(sources.map((s) => s.noteId)).toEqual(['n1', 'n2'])
+  })
+})
 
 describe('recall RAG pipeline (mocked AI)', () => {
   it('embeds the query, retrieves the right note, streams the answer, returns sources', async () => {
@@ -63,11 +91,12 @@ describe('recall RAG pipeline (mocked AI)', () => {
     const session = createSession(ctx, { campaignId })
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric Vane' })
     const relevant = createNote(ctx, {
+      campaignId,
       entityIds: [npc.id],
       sessionId: session.id,
       content: 'Aldric warned the party about the north road ambush.'
     })
-    const other = createNote(ctx, { entityIds: [npc.id], content: 'Aldric mentioned turnip prices.' })
+    const other = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'Aldric mentioned turnip prices.' })
     store.upsertNote(relevant.id, unit(0), 'h1')
     store.upsertNote(other.id, unit(1), 'h2')
 
@@ -137,7 +166,7 @@ describe('recall RAG pipeline (mocked AI)', () => {
       toEntityId: manor.id,
       relation: 'located_in'
     })
-    const note = createNote(ctx, { entityIds: [glasstaff.id], content: 'Glasstaff led the Redbrands.' })
+    const note = createNote(ctx, { campaignId, entityIds: [glasstaff.id], content: 'Glasstaff led the Redbrands.' })
     store.upsertNote(note.id, unit(0), 'h')
     embedFn.mockResolvedValue(unit(0))
     claudeRecall.mockResolvedValue([])
@@ -263,11 +292,13 @@ describe('recall RAG pipeline (mocked AI)', () => {
     updateEntity(ctx, duke.id, { status: 'Slain', lifecycle: 'ended', sessionId: s3.id })
 
     const pastNote = createNote(ctx, {
+      campaignId,
       entityIds: [duke.id],
       sessionId: s1.id,
       content: 'The Duke pledged aid on the north road.'
     })
     const futureNote = createNote(ctx, {
+      campaignId,
       entityIds: [duke.id],
       sessionId: s3.id,
       content: 'The Duke was slain at the feast.'

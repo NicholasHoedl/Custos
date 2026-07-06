@@ -31,11 +31,11 @@ type Send = (channel: string, payload: unknown) => void
 
 const TOP_K = 8
 
-function chunksToSources(chunks: RetrievedChunk[]): RecallSource[] {
+export function chunksToSources(chunks: RetrievedChunk[]): RecallSource[] {
   const seen = new Set<string>()
   const out: RecallSource[] = []
   for (const c of chunks) {
-    const key = `${c.entityId}:${c.noteId ?? ''}`
+    const key = `${c.entityId ?? 'lore'}:${c.noteId ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)
     out.push({
@@ -82,7 +82,7 @@ export async function ask(
     const fuzzy = store.fuzzyEntityChunks(
       campaignId,
       query,
-      new Set(denseChunks.map((c) => c.entityId)),
+      new Set(denseChunks.map((c) => c.entityId).filter((id): id is string => id !== null)),
       2,
       asOf
     )
@@ -150,9 +150,10 @@ export async function ask(
     // One batched read for the retrieved entities (instead of a getEntity per chunk).
     const entitiesById = listEntitiesByIds(
       ctx,
-      chunks.map((c) => c.entityId)
+      chunks.map((c) => c.entityId).filter((id): id is string => id !== null)
     )
     for (const c of chunks) {
+      if (!c.entityId || !c.entityName) continue // campaign-lore note: no entity to ground
       if (seen.has(c.entityId)) continue
       seen.add(c.entityId)
       relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId, asOf) })
@@ -161,7 +162,7 @@ export async function ask(
         const st = resolveEntityState(ctx, ent, asOf)
         stateItems.push({
           name: c.entityName,
-          type: c.entityType,
+          type: ent.type,
           status: st.status,
           lifecycle: st.lifecycle
         })

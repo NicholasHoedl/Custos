@@ -7,6 +7,7 @@ import type {
   EventLogEntry,
   Lifecycle,
   Note,
+  NoteConfidence,
   Session,
   StatusHistoryEntry
 } from '@shared/entity-types'
@@ -72,10 +73,12 @@ export function rowToEntity(r: typeof schema.entity.$inferSelect): Entity {
 export function rowToNote(r: typeof schema.note.$inferSelect, entityIds: string[]): Note {
   return {
     id: r.id,
+    campaignId: r.campaignId,
     entityIds,
     sessionId: r.sessionId,
     content: r.content,
     tags: parseArray(r.tags),
+    confidence: (r.confidence as NoteConfidence) ?? 'confirmed',
     createdAt: r.createdAt
   }
 }

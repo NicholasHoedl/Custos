@@ -14,10 +14,17 @@ export async function isOnline(): Promise<boolean> {
   }
 }
 
+/** True when a thrown error is an Anthropic auth failure — a missing, revoked, or invalid API key. */
+export function isAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /invalid x-api-key|authentication_error|\b401\b/i.test(msg)
+}
+
 /** Map a thrown error to a coarse failure kind shared across the AI features. */
 export function classifyError(err: unknown): 'no_key' | 'offline' | 'api' {
   const msg = err instanceof Error ? err.message : String(err)
-  if (msg === 'no_key') return 'no_key'
+  // A present-but-rejected key (401) has the same remedy as no key: set a valid one in Settings.
+  if (msg === 'no_key' || isAuthError(err)) return 'no_key'
   if (/network|fetch|ENOTFOUND|ECONN|timeout|getaddrinfo/i.test(msg)) return 'offline'
   return 'api'
 }

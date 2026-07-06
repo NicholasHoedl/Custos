@@ -27,7 +27,8 @@ const api: LedgerApi = {
     get: (id) => ipcRenderer.invoke(IPC.campaignGet, id),
     create: (input) => ipcRenderer.invoke(IPC.campaignCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.campaignUpdate, id, patch),
-    delete: (id) => ipcRenderer.invoke(IPC.campaignDelete, id)
+    delete: (id) => ipcRenderer.invoke(IPC.campaignDelete, id),
+    export: (campaignId) => ipcRenderer.invoke(IPC.campaignExport, campaignId)
   },
   session: {
     list: (campaignId) => ipcRenderer.invoke(IPC.sessionList, campaignId),

@@ -1,4 +1,4 @@
-import type { EntityType, Lifecycle } from './entity-types'
+import type { EntityType, Lifecycle, NoteConfidence } from './entity-types'
 import type { RelationKey } from './relations'
 
 // ---- Paste-and-extract import + backfill interview (changeset v2) ----
@@ -29,7 +29,7 @@ export interface RawExtraction {
     status?: string
     attributes?: { key: string; value: string }[]
   }[]
-  notes: { content: string; entityRefs: string[]; tags?: string[] }[]
+  notes: { content: string; entityRefs: string[]; tags?: string[]; confidence?: string }[]
   /** Changeset v2 (withChanges only): state changes the text narrates, e.g. a death or a completion. */
   statusChanges?: { entityRef: string; lifecycle?: string; status?: string }[]
   /** Changeset v2 (withChanges only): relationships that formed or ended during the described events. */
@@ -59,6 +59,7 @@ export interface ProposedNote {
   content: string
   entityRefs: EntityRef[]
   tags: string[]
+  confidence: NoteConfidence // epistemic weight (ADR-021); validator defaults to 'confirmed'
 }
 
 /** A validated status/lifecycle change, to be stamped at the batch's session on apply (ADR-018). */
@@ -83,7 +84,14 @@ export interface ExtractionProposal {
   relationshipChanges: ProposedRelationshipChange[]
 }
 
-export type ExtractFailureReason = 'no_key' | 'offline' | 'api' | 'invalid' | 'empty'
+export type ExtractFailureReason =
+  | 'no_key'
+  | 'bad_key'
+  | 'offline'
+  | 'api'
+  | 'invalid'
+  | 'empty'
+  | 'too_long'
 
 export type ExtractResult =
   | { ok: true; proposal: ExtractionProposal }
@@ -108,6 +116,7 @@ export interface ConfirmedNote {
   content: string
   entityRefs: EntityRef[]
   tags: string[]
+  confidence: NoteConfidence
   include: boolean
 }
 

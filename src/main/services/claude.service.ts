@@ -7,7 +7,7 @@ import {
   type StorySuggestion
 } from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
-import { ENTITY_TYPES, LIFECYCLES, type Lifecycle } from '@shared/entity-types'
+import { ENTITY_TYPES, LIFECYCLES, NOTE_CONFIDENCES, type Lifecycle } from '@shared/entity-types'
 import { RELATIONS } from '@shared/relations'
 import type { RawExtraction } from '@shared/import-types'
 import type { RetrievedChunk } from './vector-store.service'
@@ -166,13 +166,21 @@ export function formatState(
   }
   const seen = new Set<string>()
   for (const it of items) {
-    // Surface an entity that carries a status OR is no longer active (an ended NPC/quest the model must
-    // not treat as live). A live entity with no status is unremarkable — skip it to keep the block tight.
-    if (!it.status && it.lifecycle !== 'ended') continue
+    // Surface an entity that carries a status OR is no longer (certainly/presumably) active — an ended
+    // or presumed-ended NPC/quest the model must not treat as plainly live. A live entity with no status
+    // is unremarkable; skip it to keep the block tight.
+    if (!it.status && it.lifecycle !== 'ended' && it.lifecycle !== 'presumed_ended') continue
     const key = `${it.name}:${it.type}`
     if (seen.has(key)) continue
     seen.add(key)
-    const mark = it.lifecycle === 'ended' ? ' [ended]' : ''
+    // `presumed_ended` is deliberately marked as UNCONFIRMED so the model hedges (e.g. "presumed dead")
+    // rather than asserting the end as fact.
+    const mark =
+      it.lifecycle === 'ended'
+        ? ' [ended]'
+        : it.lifecycle === 'presumed_ended'
+          ? ' [presumed ended — unconfirmed]'
+          : ''
     const status = it.status ? `: ${it.status}` : ''
     lines.push(`- ${it.name} (${it.type})${mark}${status}`)
   }
@@ -231,7 +239,7 @@ export function buildUserContent(
   const content: Anthropic.ContentBlockParam[] = chunks.map((c) => ({
     type: 'document',
     source: { type: 'text', media_type: 'text/plain', data: c.content },
-    title: c.sessionLabel ? `${c.entityName} — ${c.sessionLabel}` : c.entityName,
+    title: chunkTitle(c),
     citations: { enabled: true }
   }))
   if (state) {
@@ -253,6 +261,20 @@ export function buildUserContent(
   return content
 }
 
+/** The citeable document title for a chunk, suffixed with an epistemic tag so the model HEDGES a rumor
+ *  or a hunch rather than asserting it as fact (ADR-021). Entity chunks are always 'confirmed'. */
+function chunkTitle(c: RetrievedChunk): string {
+  const name = c.entityName ?? 'Campaign lore' // an entity-less lore note (ADR-021) has no entity name
+  const base = c.sessionLabel ? `${name} — ${c.sessionLabel}` : name
+  const tag =
+    c.confidence === 'rumored'
+      ? ' · (rumored)'
+      : c.confidence === 'suspected'
+        ? ' · (suspected)'
+        : ''
+  return `${base}${tag}`
+}
+
 function mapSources(message: Anthropic.Message, chunks: RetrievedChunk[]): RecallSource[] {
   const cited = new Set<number>()
   for (const block of message.content) {
@@ -270,7 +292,7 @@ function mapSources(message: Anthropic.Message, chunks: RetrievedChunk[]): Recal
   const seen = new Set<string>()
   const out: RecallSource[] = []
   for (const c of selected) {
-    const key = `${c.entityId}:${c.noteId ?? ''}`
+    const key = `${c.entityId ?? 'lore'}:${c.noteId ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)
     out.push({
@@ -555,8 +577,7 @@ export function buildSuggestUserContent(
   if (chunks.length) {
     const notes = chunks
       .map((c) => {
-        const title = c.sessionLabel ? `${c.entityName} — ${c.sessionLabel}` : c.entityName
-        return `## ${title}\n${c.content}`
+        return `## ${chunkTitle(c)}\n${c.content}`
       })
       .join('\n\n')
     content.push({
@@ -602,6 +623,7 @@ interface StructuredCallOpts {
   system: Anthropic.TextBlockParam[]
   content: Anthropic.ContentBlockParam[]
   signal?: AbortSignal
+  maxTokens?: number // output budget (shared with adaptive thinking); defaults to 8192
 }
 
 /**
@@ -615,7 +637,7 @@ async function structuredCall(opts: StructuredCallOpts): Promise<Record<string, 
   const message = await c.messages.create(
     {
       model: opts.model,
-      max_tokens: 8192,
+      max_tokens: opts.maxTokens ?? 8192,
       thinking: { type: 'adaptive' },
       output_config: { effort: opts.effort, format: { type: 'json_schema', schema: opts.schema } },
       system: opts.system,
@@ -656,11 +678,13 @@ const EXTRACTION_INSTRUCTIONS = `You extract structured campaign data from paste
 
 ONLY WHAT THE TEXT SUPPORTS. Extract only entities and facts the text states or strongly implies — invent nothing. Prefer fewer, high-confidence items. If the text contains none of a kind, return an empty array.
 
-ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance. Never invent an attribute value the text doesn't give.
+ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event, creature), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance; creature: abilities, tactics, weakness, habitat. Never invent an attribute value the text doesn't give.
 
 An "event" entity is ONLY for a large-scale event that changes the WORLD — a city destroyed, a ruler assassinated, a war declared, a plague, a historically significant happening (usually independent of the party). What the party did, found, fought, or witnessed in a session is a NOTE, never an event entity — unless the outcome itself is world-changing (they killed the king).
 
-NOTES. Capture the narrative beats and facts as short notes, each tagged to the entities it concerns. Write every note in neutral THIRD PERSON ("the party", entity names — never "I"/"we"/"my") so it reads correctly for any character. A relationship the text states (who owns or leads or is allied with whom, where something is located) belongs in a note's prose — describe it there.
+A "creature" is a monster, beast, or hazard the party fights or faces — a dragon, undead, a swarm, an aberration. Use it instead of npc for non-person threats; a named person is an npc even if dangerous.
+
+NOTES. Capture the narrative beats and facts as short notes, each tagged to the entities it concerns. Write every note in neutral THIRD PERSON ("the party", entity names — never "I"/"we"/"my") so it reads correctly for any character. A relationship the text states (who owns or leads or is allied with whom, where something is located) belongs in a note's prose — describe it there. When the text HEDGES a beat — a rumor, a guess, a "?", "potentially", "presumably" — set that note's confidence to "rumored" (heard secondhand) or "suspected" (the party's own hypothesis); omit it for anything stated plainly (it defaults to "confirmed").
 
 REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its position in your entities array — "#0", "#1", and so on. Reference an EXISTING entity by the id shown in the existing-entities list. Every note must reference at least one entity. Prefer linking to an existing entity (by id) over proposing a duplicate of it.`
 
@@ -727,7 +751,8 @@ function extractionSchema(withChanges: boolean): Record<string, unknown> {
           properties: {
             content: { type: 'string' },
             entityRefs: { type: 'array', items: { type: 'string' } },
-            tags: { type: 'array', items: { type: 'string' } }
+            tags: { type: 'array', items: { type: 'string' } },
+            confidence: { type: 'string', enum: [...NOTE_CONFIDENCES] }
           },
           required: ['content', 'entityRefs']
         }
@@ -820,6 +845,9 @@ export async function extractChangeset(params: ExtractChangesetParams): Promise<
     schema: extractionSchema(withChanges),
     system: buildExtractionSystem(withChanges),
     content: buildExtractionUserContent(params.text, params.existing, withChanges),
+    // A full-session paste extracts into many entities + notes — a larger budget than the 8192 default
+    // (shared with adaptive thinking) so a real-world paste doesn't truncate mid-JSON.
+    maxTokens: 16384,
     signal: params.signal
   })
 }
@@ -941,8 +969,7 @@ export function buildDirectionsUserContent(
   if (chunks.length) {
     const notes = chunks
       .map((c) => {
-        const title = c.sessionLabel ? `${c.entityName} — ${c.sessionLabel}` : c.entityName
-        return `## ${title}\n${c.content}`
+        return `## ${chunkTitle(c)}\n${c.content}`
       })
       .join('\n\n')
     content.push({

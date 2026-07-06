@@ -29,8 +29,8 @@ describe('vector-store (brute-force cosine)', () => {
   })
 
   it('ranks the closest note first and is campaign-scoped', () => {
-    const n1 = createNote(ctx, { entityIds: [npc.id], content: 'the north road ambush' })
-    const n2 = createNote(ctx, { entityIds: [npc.id], content: 'turnip prices' })
+    const n1 = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'the north road ambush' })
+    const n2 = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'turnip prices' })
     store.upsertNote(n1.id, vec(0), 'h1')
     store.upsertNote(n2.id, vec(1), 'h2')
 
@@ -52,7 +52,7 @@ describe('vector-store (brute-force cosine)', () => {
     // A note tagged to two entities must not produce two identical chunks (no prompt duplication).
     const zara = createEntity(ctx, { campaignId, type: 'npc', name: 'Zara' })
     const aldous = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldous' })
-    const shared = createNote(ctx, { entityIds: [zara.id, aldous.id], content: 'a shared secret' })
+    const shared = createNote(ctx, { campaignId, entityIds: [zara.id, aldous.id], content: 'a shared secret' })
     store.upsertNote(shared.id, vec(3), 'h')
 
     const noteChunks = store.search(vec(3), campaignId, 10).filter((c) => c.kind === 'note')
@@ -62,13 +62,34 @@ describe('vector-store (brute-force cosine)', () => {
   })
 
   it('tracks content hashes and removes', () => {
-    const n = createNote(ctx, { entityIds: [npc.id], content: 'x' })
+    const n = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'x' })
     store.upsertNote(n.id, vec(0), 'h1')
     expect(store.noteHash(n.id)).toBe('h1')
     store.upsertNote(n.id, vec(2), 'h2') // re-embed updates the hash
     expect(store.noteHash(n.id)).toBe('h2')
     store.removeNote(n.id)
     expect(store.noteHash(n.id)).toBeNull()
+  })
+
+  it('surfaces an entity-less lore note as a chunk with null entity fields, campaign-scoped', () => {
+    const lore = createNote(ctx, {
+      campaignId,
+      entityIds: [],
+      content: 'the ancient runes ward against demons'
+    })
+    store.upsertNote(lore.id, vec(5), 'hl')
+
+    const hit = store.search(vec(5), campaignId, 5).find((c) => c.noteId === lore.id)
+    expect(hit).toBeTruthy()
+    expect(hit!.kind).toBe('note')
+    expect(hit!.entityId).toBeNull()
+    expect(hit!.entityName).toBeNull()
+    expect(hit!.entityType).toBeNull()
+    expect(hit!.confidence).toBe('confirmed')
+
+    // Scoped by note.campaignId — a different campaign never sees it.
+    const other = createCampaign(ctx, { name: 'Other' }).id
+    expect(store.search(vec(5), other, 5).some((c) => c.noteId === lore.id)).toBe(false)
   })
 })
 
@@ -93,7 +114,7 @@ describe('fuzzy entity matching (typo-tolerant retrieval)', () => {
       name: 'Iarno "Glasstaff" Albrek',
       description: 'The masked Redbrand leader.'
     })
-    createNote(ctx, { entityIds: [glass.id], content: 'We took his staff and he begged.' })
+    createNote(ctx, { campaignId, entityIds: [glass.id], content: 'We took his staff and he begged.' })
     createEntity(ctx, { campaignId, type: 'npc', name: 'Sildar Hallwinter' }) // should NOT match
 
     const hits = store.fuzzyEntityChunks(campaignId, 'who is glastav?', new Set(), 2)
@@ -115,9 +136,9 @@ describe('as-of clamp (chronology — no future-knowledge leak)', () => {
     const s1 = createSession(ctx, { campaignId }) // session 1
     createSession(ctx, { campaignId }) // session 2
     const s3 = createSession(ctx, { campaignId }) // session 3
-    const past = createNote(ctx, { entityIds: [npc.id], sessionId: s1.id, content: 'past note' })
-    const future = createNote(ctx, { entityIds: [npc.id], sessionId: s3.id, content: 'future note' })
-    const undated = createNote(ctx, { entityIds: [npc.id], content: 'timeless note' })
+    const past = createNote(ctx, { campaignId, entityIds: [npc.id], sessionId: s1.id, content: 'past note' })
+    const future = createNote(ctx, { campaignId, entityIds: [npc.id], sessionId: s3.id, content: 'future note' })
+    const undated = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'timeless note' })
     for (const id of [past.id, future.id, undated.id]) store.upsertNote(id, vec(0), 'h')
 
     // As of session 2: the session-3 note vanishes; session-1 + undated remain.
@@ -145,8 +166,8 @@ describe('as-of clamp (chronology — no future-knowledge leak)', () => {
     const s1 = createSession(ctx, { campaignId }) // 1
     createSession(ctx, { campaignId }) // 2
     const s3 = createSession(ctx, { campaignId }) // 3
-    createNote(ctx, { entityIds: [glass.id], sessionId: s1.id, content: 'took his staff early' })
-    createNote(ctx, { entityIds: [glass.id], sessionId: s3.id, content: 'a later betrayal' })
+    createNote(ctx, { campaignId, entityIds: [glass.id], sessionId: s1.id, content: 'took his staff early' })
+    createNote(ctx, { campaignId, entityIds: [glass.id], sessionId: s3.id, content: 'a later betrayal' })
 
     const contents = store
       .fuzzyEntityChunks(campaignId, 'who is glastav?', new Set(), 5, 2)
@@ -154,5 +175,24 @@ describe('as-of clamp (chronology — no future-knowledge leak)', () => {
       .map((c) => c.content)
     expect(contents.some((c) => c.includes('early'))).toBe(true) // session 1 ≤ 2
     expect(contents.some((c) => c.includes('betrayal'))).toBe(false) // session 3 > 2 → clamped out
+  })
+
+  it('applies the as-of clamp to entity-less lore notes too', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const s1 = createSession(ctx, { campaignId })
+    createSession(ctx, { campaignId })
+    const s3 = createSession(ctx, { campaignId })
+    const early = createNote(ctx, { campaignId, entityIds: [], sessionId: s1.id, content: 'early lore' })
+    const late = createNote(ctx, { campaignId, entityIds: [], sessionId: s3.id, content: 'late lore' })
+    for (const id of [early.id, late.id]) store.upsertNote(id, vec(6), 'h')
+
+    const asOf2 = store
+      .search(vec(6), campaignId, 10, 2)
+      .filter((c) => c.kind === 'note')
+      .map((c) => c.noteId)
+    expect(asOf2).toContain(early.id)
+    expect(asOf2).not.toContain(late.id)
   })
 })

@@ -3,7 +3,17 @@
 
 // 'event' = WORLD-SCALE history (a city destroyed, a king assassinated — ADR-019), NOT a session
 // beat; the party's own beats live in the event_log table.
-export type EntityType = 'npc' | 'location' | 'faction' | 'quest' | 'item' | 'pc' | 'event'
+// 'creature' = a monster/beast/hazard (a dragon, undead, a plant-swarm) — has tactics/weakness, not a
+// social persona; distinct from 'npc' (a person). PC-only features (persona, in-character modes) skip it.
+export type EntityType =
+  | 'npc'
+  | 'location'
+  | 'faction'
+  | 'quest'
+  | 'item'
+  | 'pc'
+  | 'event'
+  | 'creature'
 
 export const ENTITY_TYPES: readonly EntityType[] = [
   'npc',
@@ -12,7 +22,8 @@ export const ENTITY_TYPES: readonly EntityType[] = [
   'quest',
   'item',
   'pc',
-  'event'
+  'event',
+  'creature'
 ]
 
 /** Human labels for entity types (UI). */
@@ -23,18 +34,33 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
   quest: 'Quest',
   item: 'Item',
   pc: 'Player Character',
-  event: 'Event'
+  event: 'Event',
+  creature: 'Creature'
 }
 
-/** Chronology (ADR-017): the coarse lifecycle the AI trusts for past-vs-present reasoning. */
-export type Lifecycle = 'active' | 'ended' | 'unknown'
+/** Chronology (ADR-017): the coarse lifecycle the AI trusts for past-vs-present reasoning.
+ *  `presumed_ended` = believed gone/dead but UNCONFIRMED — the AI hedges instead of asserting it. */
+export type Lifecycle = 'active' | 'ended' | 'presumed_ended' | 'unknown'
 
-export const LIFECYCLES: readonly Lifecycle[] = ['active', 'ended', 'unknown']
+export const LIFECYCLES: readonly Lifecycle[] = ['active', 'ended', 'presumed_ended', 'unknown']
 
 export const LIFECYCLE_LABELS: Record<Lifecycle, string> = {
   active: 'Active',
   ended: 'Ended',
+  presumed_ended: 'Presumed ended',
   unknown: 'Unknown'
+}
+
+/** Epistemic weight of a note (ADR-021): `confirmed` = observed/known; `rumored` = heard secondhand;
+ *  `suspected` = the party's own hypothesis. The AI is told this so it hedges rather than asserting. */
+export type NoteConfidence = 'confirmed' | 'rumored' | 'suspected'
+
+export const NOTE_CONFIDENCES: readonly NoteConfidence[] = ['confirmed', 'rumored', 'suspected']
+
+export const NOTE_CONFIDENCE_LABELS: Record<NoteConfidence, string> = {
+  confirmed: 'Confirmed',
+  rumored: 'Rumored',
+  suspected: 'Suspected'
 }
 
 export interface Campaign {
@@ -72,10 +98,12 @@ export interface Entity {
 
 export interface Note {
   id: string
-  entityIds: string[] // the entities this note is associated with (M2M); always ≥1
+  campaignId: string // the note's home campaign (ADR-021) — a note may tag 0..N entities
+  entityIds: string[] // the entities this note is associated with (M2M); MAY be empty (campaign lore)
   sessionId: string | null
   content: string
   tags: string[]
+  confidence: NoteConfidence // epistemic weight the AI is told (ADR-021)
   createdAt: number
 }
 

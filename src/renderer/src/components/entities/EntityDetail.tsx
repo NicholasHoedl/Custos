@@ -103,6 +103,11 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
                 Ended
               </span>
             )}
+            {entity.lifecycle === 'presumed_ended' && (
+              <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive/70">
+                Presumed ended
+              </span>
+            )}
           </div>
           <h2 className="font-display text-2xl font-semibold text-foreground">{entity.name}</h2>
           {hierarchy && hierarchy.ancestors.length > 0 && (

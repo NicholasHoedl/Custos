@@ -1,4 +1,4 @@
-import type { EntityType } from './entity-types'
+import type { EntityType, Lifecycle } from './entity-types'
 
 // The per-type "profile": which promoted fields (traits/goals/status) apply, plus the ordered list of
 // type-specific fields stored in the entity `attributes` JSON bag. One source of truth for the entity
@@ -15,10 +15,18 @@ export interface ProfileField {
   placeholder?: string
 }
 
+/** A curated status option and the coarse lifecycle it implies (ADR-017). Picking it sets BOTH the
+ *  free-text status and the lifecycle; a custom typed status falls back to `lifecycleHeuristic`.
+ *  `presumed_ended` is only reached via a preset (Missing/Lost) or the "presumed" toggle — never derived. */
+export interface StatusPreset {
+  label: string
+  lifecycle: Lifecycle
+}
+
 export interface EntityProfile {
   traits: boolean
   goals: boolean
-  status: readonly string[] | null // dropdown presets (custom values allowed); null = no status concept
+  status: readonly StatusPreset[] | null // curated presets (custom text allowed); null = no status concept
   fields: readonly ProfileField[] // ordered type-specific fields -> attributes[key]
 }
 
@@ -26,7 +34,11 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   pc: {
     traits: true,
     goals: true,
-    status: ['Active', 'Inactive', 'Dead'],
+    status: [
+      { label: 'Active', lifecycle: 'active' },
+      { label: 'Inactive', lifecycle: 'active' },
+      { label: 'Dead', lifecycle: 'ended' }
+    ],
     fields: [
       { key: 'player', label: 'Player', kind: 'text', placeholder: 'Who runs this character?' },
       { key: 'ancestry', label: 'Ancestry', kind: 'text', placeholder: 'e.g. Half-elf' },
@@ -43,16 +55,45 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   npc: {
     traits: true,
     goals: true,
-    status: ['Alive', 'Dead', 'Missing', 'Unknown'],
+    status: [
+      { label: 'Alive', lifecycle: 'active' },
+      { label: 'Dead', lifecycle: 'ended' },
+      { label: 'Missing', lifecycle: 'presumed_ended' },
+      { label: 'Unknown', lifecycle: 'unknown' }
+    ],
     fields: [
       { key: 'race', label: 'Race', kind: 'text', placeholder: 'e.g. Human' },
       { key: 'role', label: 'Role', kind: 'text', placeholder: 'e.g. Innkeeper' }
     ]
   },
+  // A monster/beast/hazard the party faces (dragon, undead, plant-swarm). Tactics/weakness, not a
+  // social persona — traits capture temperament; no goals/backstory. (Creature/monster, from real notes.)
+  creature: {
+    traits: true,
+    goals: false,
+    status: [
+      { label: 'Active', lifecycle: 'active' },
+      { label: 'Dormant', lifecycle: 'active' },
+      { label: 'Defeated', lifecycle: 'ended' },
+      { label: 'Unknown', lifecycle: 'unknown' }
+    ],
+    fields: [
+      { key: 'abilities', label: 'Abilities', kind: 'list', placeholder: 'Add an ability' },
+      { key: 'tactics', label: 'Tactics', kind: 'textarea', placeholder: 'How it fights or behaves' },
+      { key: 'weakness', label: 'Weakness', kind: 'text', placeholder: 'e.g. vulnerable to fire' },
+      { key: 'habitat', label: 'Habitat', kind: 'text', placeholder: 'e.g. deep forest' }
+    ]
+  },
   location: {
     traits: false,
     goals: false,
-    status: ['Unexplored', 'Explored', 'Safe', 'Hostile', 'Destroyed'],
+    status: [
+      { label: 'Unexplored', lifecycle: 'unknown' },
+      { label: 'Explored', lifecycle: 'active' },
+      { label: 'Safe', lifecycle: 'active' },
+      { label: 'Hostile', lifecycle: 'active' },
+      { label: 'Destroyed', lifecycle: 'ended' }
+    ],
     fields: [
       {
         key: 'kind',
@@ -67,7 +108,12 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   faction: {
     traits: false,
     goals: true,
-    status: ['Active', 'Disbanded', 'Allied', 'Hostile'],
+    status: [
+      { label: 'Active', lifecycle: 'active' },
+      { label: 'Disbanded', lifecycle: 'ended' },
+      { label: 'Allied', lifecycle: 'active' },
+      { label: 'Hostile', lifecycle: 'active' }
+    ],
     fields: [
       { key: 'alignment', label: 'Alignment', kind: 'text', placeholder: 'e.g. Lawful Evil' },
       { key: 'reach', label: 'Reach', kind: 'text', placeholder: 'e.g. regional' }
@@ -76,7 +122,12 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   quest: {
     traits: false,
     goals: false,
-    status: ['Active', 'Completed', 'Failed', 'On Hold'],
+    status: [
+      { label: 'Active', lifecycle: 'active' },
+      { label: 'Completed', lifecycle: 'ended' },
+      { label: 'Failed', lifecycle: 'ended' },
+      { label: 'On Hold', lifecycle: 'active' }
+    ],
     fields: [
       { key: 'objective', label: 'Objective', kind: 'textarea', placeholder: 'What must be done?' },
       { key: 'reward', label: 'Reward', kind: 'text', placeholder: 'e.g. 500 gp' },
@@ -86,7 +137,12 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   item: {
     traits: false,
     goals: false,
-    status: ['Owned', 'Stashed', 'Lost', 'Destroyed'],
+    status: [
+      { label: 'Owned', lifecycle: 'active' },
+      { label: 'Stashed', lifecycle: 'active' },
+      { label: 'Lost', lifecycle: 'presumed_ended' },
+      { label: 'Destroyed', lifecycle: 'ended' }
+    ],
     fields: [
       {
         key: 'rarity',
@@ -109,7 +165,11 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   event: {
     traits: false,
     goals: false,
-    status: null,
+    status: [
+      { label: 'Occurred', lifecycle: 'ended' },
+      { label: 'Ongoing', lifecycle: 'active' },
+      { label: 'Foretold', lifecycle: 'unknown' }
+    ],
     fields: [
       { key: 'date', label: 'Date', kind: 'text', placeholder: 'e.g. 14th of Flamerule' },
       {

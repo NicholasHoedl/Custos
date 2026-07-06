@@ -10,7 +10,7 @@ import {
   updateEntity
 } from '../../../src/main/services/entity.service'
 import { getEntityHistory } from '../../../src/main/services/chronology.service'
-import { createNote, listNotesForEntity } from '../../../src/main/services/note.service'
+import { createNote, listAllNotes, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
 import { createSession } from '../../../src/main/services/session.service'
 import { createLink, listForEntity } from '../../../src/main/services/link.service'
@@ -76,12 +76,12 @@ describe('entity.service', () => {
     expect(u.updatedAt).toBeGreaterThanOrEqual(e.updatedAt)
   })
 
-  it('deletes an entity and cascades to its notes, links, and event references', () => {
+  it('deletes an entity, keeping its note as campaign lore and cascading links + event refs', () => {
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
     const inn = createEntity(ctx, { campaignId, type: 'location', name: 'Copper Kettle' })
     const session = createSession(ctx, { campaignId })
 
-    createNote(ctx, { entityIds: [npc.id], content: 'owes a favor' })
+    const note = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'owes a favor' })
     createLink(ctx, { campaignId, fromEntityId: npc.id, toEntityId: inn.id, relation: 'located_in' })
     const event = createEvent(ctx, {
       sessionId: session.id,
@@ -92,7 +92,9 @@ describe('entity.service', () => {
     deleteEntity(ctx, npc.id)
 
     expect(getEntity(ctx, npc.id)).toBeNull()
-    expect(listNotesForEntity(ctx, npc.id)).toHaveLength(0) // its only note was orphan-removed
+    expect(listNotesForEntity(ctx, npc.id)).toHaveLength(0) // its note_entity link is gone...
+    // ...but the note itself survives as entity-less campaign lore (ADR-021).
+    expect(listAllNotes(ctx, campaignId).find((n) => n.id === note.id)?.entityIds).toEqual([])
     expect(listForEntity(ctx, inn.id)).toHaveLength(0) // link cascade-deleted (both ends)
 
     const events = listEvents(ctx, session.id)
@@ -103,12 +105,12 @@ describe('entity.service', () => {
     expect(getEntity(ctx, inn.id)?.name).toBe('Copper Kettle') // the other entity is untouched
   })
 
-  it('on delete, keeps shared notes but orphan-removes notes left with no entities (+ embedding)', () => {
+  it('on delete keeps a shared note under its other entities and a solo note as lore (+ embeddings)', () => {
     const store = new BruteForceVectorStore(ctx)
     const a = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
     const b = createEntity(ctx, { campaignId, type: 'npc', name: 'Brynn' })
-    const shared = createNote(ctx, { entityIds: [a.id, b.id], content: 'they plotted together' })
-    const solo = createNote(ctx, { entityIds: [a.id], content: 'a secret only about Aldric' })
+    const shared = createNote(ctx, { campaignId, entityIds: [a.id, b.id], content: 'they plotted together' })
+    const solo = createNote(ctx, { campaignId, entityIds: [a.id], content: 'a secret only about Aldric' })
     store.upsertNote(shared.id, unit(0), 'hs')
     store.upsertNote(solo.id, unit(1), 'hso')
 
@@ -120,8 +122,9 @@ describe('entity.service', () => {
     expect(brynnNotes[0].entityIds).toEqual([b.id])
     expect(store.noteHash(shared.id)).toBe('hs')
 
-    // The solo note had only Aldric → orphaned → removed, and its embedding cascaded away.
-    expect(store.noteHash(solo.id)).toBeNull()
+    // The solo note loses its only tag but SURVIVES as entity-less lore — its embedding is NOT dropped.
+    expect(listAllNotes(ctx, campaignId).find((n) => n.id === solo.id)?.entityIds).toEqual([])
+    expect(store.noteHash(solo.id)).toBe('hso')
   })
 
   // ---- Chronology capture (M3) ----

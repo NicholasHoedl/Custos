@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Info, Link2, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
@@ -46,6 +46,20 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [dialogOpen, setDialogOpen] = useState(false)
 
+  // Keyboard: press "L" (while an entity is open and you're not typing) to open the link picker.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (dialogOpen || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'l') return
+      const el = document.activeElement as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return
+      e.preventDefault()
+      setDialogOpen(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dialogOpen])
+
   async function sever(id: string) {
     try {
       await ledger.link.sever(id) // soft close — kept in the timeline as ended (chronology)
@@ -68,7 +82,12 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Relationships</h3>
-        <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDialogOpen(true)}
+          title="Link to another entity (press L)"
+        >
           <Link2 className="size-3.5" />
           Link to…
         </Button>
@@ -97,7 +116,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => sever(rel.link.id)}
-                      className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label="Unlink (keeps history)"
                     >
                       <X className="size-3.5" />
@@ -109,7 +128,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => hardDelete(rel.link.id)}
-                      className="rounded p-1 text-muted-foreground/40 transition-colors hover:text-destructive"
+                      className="rounded p-1 text-muted-foreground/40 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label="Delete permanently"
                     >
                       <Trash2 className="size-3.5" />
@@ -150,6 +169,7 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
   const [relation, setRelation] = useState<RelationKey | ''>('')
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
+  const relationTriggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -158,6 +178,12 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
       setDescription('')
     }
   }, [open])
+
+  // Once a target is picked (keyboard: type → arrow → Enter in the Command), move focus to the
+  // relationship select so the whole flow stays keyboard-native without reaching for the mouse.
+  useEffect(() => {
+    if (other) relationTriggerRef.current?.focus()
+  }, [other])
 
   const allowed = other ? relationsForTypes(entity.type, other.type) : []
 
@@ -223,7 +249,7 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
             <div className="space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Relationship</span>
               <Select value={relation} onValueChange={(v) => setRelation(v as RelationKey)}>
-                <SelectTrigger>
+                <SelectTrigger ref={relationTriggerRef}>
                   <SelectValue placeholder="Choose a relationship…" />
                 </SelectTrigger>
                 <SelectContent>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { BookOpen } from 'lucide-react'
 import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
+import { OnboardingChecklist } from '@renderer/components/OnboardingChecklist'
 import { QuickAddBar } from '@renderer/components/capture/QuickAddBar'
 import { EventFeed } from '@renderer/components/capture/EventFeed'
 import {
@@ -31,14 +31,11 @@ export function CaptureView() {
   const restoringSession = sessionsLoading && activeSessionId === null
 
   if (!activeCampaignId) {
+    // No campaign yet: the welcome IS the empty state (it carries the create-campaign step).
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-        <BookOpen className="size-10 text-muted-foreground/50" />
-        <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">
-            Create or pick a campaign in the sidebar to start capturing.
-          </p>
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="w-full max-w-lg">
+          <OnboardingChecklist />
         </div>
       </div>
     )
@@ -46,7 +43,8 @@ export function CaptureView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border p-3">
+      <div className="space-y-3 border-b border-border p-3">
+        <OnboardingChecklist />
         <QuickAddBar
           campaignId={activeCampaignId}
           sessionId={activeSessionId}

@@ -146,7 +146,7 @@ export async function suggest(
     const fuzzy = store.fuzzyEntityChunks(
       campaignId,
       queryText,
-      new Set(denseChunks.map((c) => c.entityId)),
+      new Set(denseChunks.map((c) => c.entityId).filter((id): id is string => id !== null)),
       2,
       asOf
     )
@@ -184,9 +184,10 @@ export async function suggest(
     // One batched read for the retrieved entities (instead of a getEntity per chunk).
     const entitiesById = listEntitiesByIds(
       ctx,
-      chunks.map((c) => c.entityId)
+      chunks.map((c) => c.entityId).filter((id): id is string => id !== null)
     )
     for (const c of chunks) {
+      if (!c.entityId || !c.entityName) continue // campaign-lore note: no entity to ground
       if (seen.has(c.entityId)) continue
       seen.add(c.entityId)
       relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId, asOf) })
@@ -195,7 +196,7 @@ export async function suggest(
         const st = resolveEntityState(ctx, ent, asOf)
         stateItems.push({
           name: c.entityName,
-          type: c.entityType,
+          type: ent.type,
           status: st.status,
           lifecycle: st.lifecycle
         })

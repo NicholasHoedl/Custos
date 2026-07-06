@@ -182,7 +182,8 @@ Session
   date         TEXT (ISO date, "2026-06-25")
   createdAt    INTEGER (unix ms)
 
-EntityType ENUM: 'npc' | 'location' | 'faction' | 'quest' | 'item' | 'pc' | 'event'
+EntityType ENUM: 'npc' | 'location' | 'faction' | 'quest' | 'item' | 'pc' | 'event' | 'creature'
+  (free-text TEXT — no CHECK; a new type needs no migration. 'creature' = a monster/beast/hazard, ADR-021)
 
 Entity
   id           UUID PK
@@ -193,18 +194,20 @@ Entity
   traits       TEXT (JSON array of strings — used heavily for PC in Suggest)
   goals        TEXT (JSON array of strings — for NPC / PC)
   status       TEXT ('active' | 'inactive' | 'dead' | 'resolved' | ...) — free-text
-  lifecycle    TEXT ('active' | 'ended' | 'unknown') NOT NULL — coarse in-play flag (ADR-017)
+  lifecycle    TEXT ('active' | 'ended' | 'presumed_ended' | 'unknown') NOT NULL — coarse in-play flag (ADR-017, ADR-021)
   createdAt    INTEGER (unix ms)
   updatedAt    INTEGER (unix ms)
 
 Note
   id           UUID PK
+  campaignId   UUID FK → Campaign.id (NOT NULL — the note's home; a note is a first-class campaign child, ADR-021)
   sessionId    UUID FK → Session.id (nullable — "when"; the session the note belongs to)
   content      TEXT NOT NULL
   tags         TEXT (JSON array of strings)
+  confidence   TEXT ('confirmed' | 'rumored' | 'suspected') NOT NULL default 'confirmed' — epistemic weight the AI hedges on (ADR-021)
   createdAt    INTEGER (unix ms)
 
-NoteEntity   (note ↔ entity, MANY-TO-MANY — a note may tag one OR several entities; SPEC §10)
+NoteEntity   (note ↔ entity, MANY-TO-MANY — a note may tag ZERO, one, OR several entities; an untagged note is campaign lore, ADR-021)
   noteId       UUID FK → Note.id     ┐ composite PK
   entityId     UUID FK → Entity.id   ┘
   createdAt    INTEGER (unix ms)
@@ -229,7 +232,7 @@ EventLog
 StatusHistory   (append-only status/lifecycle trail — ADR-017; drives "as of session N")
   id                  UUID PK
   entityId            UUID FK → Entity.id
-  lifecycle           TEXT ('active' | 'ended' | 'unknown')
+  lifecycle           TEXT ('active' | 'ended' | 'presumed_ended' | 'unknown')
   status              TEXT (nullable)
   sinceSessionNumber  INTEGER (nullable — NULL = pre-tracking baseline)
   recordedAt          INTEGER (unix ms)

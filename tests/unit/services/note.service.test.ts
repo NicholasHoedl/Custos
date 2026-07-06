@@ -27,19 +27,23 @@ describe('note.service (note ↔ many entities)', () => {
   })
 
   it('creates a note associated with multiple entities, deduping the input ids', () => {
-    const note = createNote(ctx, { entityIds: [a, b, a], content: 'they met at the inn' })
+    const note = createNote(ctx, { campaignId, entityIds: [a, b, a], content: 'they met at the inn' })
     expect(note.content).toBe('they met at the inn')
     expect(note.entityIds).toHaveLength(2) // duplicate `a` collapsed
     expect([...note.entityIds].sort()).toEqual([a, b].sort())
   })
 
-  it('rejects a note with no entities', () => {
-    expect(() => createNote(ctx, { entityIds: [], content: 'orphan' })).toThrow()
+  it('creates an entity-less note as campaign lore (ADR-021)', () => {
+    const lore = createNote(ctx, { campaignId, entityIds: [], content: 'the runes mean "beware"' })
+    expect(lore.entityIds).toEqual([])
+    expect(lore.campaignId).toBe(campaignId)
+    // It appears in the campaign feed even though it tags no entity.
+    expect(listAllNotes(ctx, campaignId).map((n) => n.id)).toContain(lore.id)
   })
 
   it('lists a shared note under each of its entities, populated with all its entityIds', () => {
-    const shared = createNote(ctx, { entityIds: [a, b], content: 'shared' })
-    createNote(ctx, { entityIds: [a], content: 'only A' })
+    const shared = createNote(ctx, { campaignId, entityIds: [a, b], content: 'shared' })
+    createNote(ctx, { campaignId, entityIds: [a], content: 'only A' })
 
     expect(listNotesForEntity(ctx, a).map((n) => n.content).sort()).toEqual(['only A', 'shared'])
     const bNotes = listNotesForEntity(ctx, b)
@@ -49,8 +53,8 @@ describe('note.service (note ↔ many entities)', () => {
   })
 
   it('listAllNotes returns each note once (deduped), scoped to the campaign', () => {
-    const shared = createNote(ctx, { entityIds: [a, b], content: 'shared' }) // 2 links → must appear once
-    const solo = createNote(ctx, { entityIds: [a], content: 'solo' })
+    const shared = createNote(ctx, { campaignId, entityIds: [a, b], content: 'shared' }) // 2 links → must appear once
+    const solo = createNote(ctx, { campaignId, entityIds: [a], content: 'solo' })
 
     const all = listAllNotes(ctx, campaignId)
     expect(all).toHaveLength(2)
@@ -61,7 +65,7 @@ describe('note.service (note ↔ many entities)', () => {
   })
 
   it('updateNote replaces the entity links and edits content', () => {
-    const note = createNote(ctx, { entityIds: [a], content: 'v1' })
+    const note = createNote(ctx, { campaignId, entityIds: [a], content: 'v1' })
     const updated = updateNote(ctx, note.id, { content: 'v2', entityIds: [b] })
 
     expect(updated.content).toBe('v2')
@@ -70,26 +74,44 @@ describe('note.service (note ↔ many entities)', () => {
     expect(listNotesForEntity(ctx, b).map((n) => n.id)).toEqual([note.id]) // now under B
   })
 
-  it('updateNote rejects clearing all entities and rolls back', () => {
-    const note = createNote(ctx, { entityIds: [a], content: 'keep me' })
-    expect(() => updateNote(ctx, note.id, { entityIds: [] })).toThrow()
-    expect(listNotesForEntity(ctx, a).map((n) => n.id)).toEqual([note.id]) // association unchanged
+  it('updateNote can clear all entity links, leaving the note as campaign lore', () => {
+    const note = createNote(ctx, { campaignId, entityIds: [a], content: 'keep me' })
+    const updated = updateNote(ctx, note.id, { entityIds: [] })
+    expect(updated.entityIds).toEqual([])
+    expect(listNotesForEntity(ctx, a)).toHaveLength(0) // unlinked from A
+    expect(listAllNotes(ctx, campaignId).map((n) => n.id)).toContain(note.id) // but still in the campaign
   })
 
   it('deletes a note, removing it from every entity it was under', () => {
-    const shared = createNote(ctx, { entityIds: [a, b], content: 'shared' })
+    const shared = createNote(ctx, { campaignId, entityIds: [a, b], content: 'shared' })
     deleteNote(ctx, shared.id)
     expect(listNotesForEntity(ctx, a)).toHaveLength(0)
     expect(listNotesForEntity(ctx, b)).toHaveLength(0)
   })
 
+  it('round-trips confidence, defaulting to confirmed and patching it on update', () => {
+    const rumor = createNote(ctx, {
+      campaignId,
+      entityIds: [a],
+      content: 'heard a rumor',
+      confidence: 'rumored'
+    })
+    expect(rumor.confidence).toBe('rumored')
+
+    const plain = createNote(ctx, { campaignId, entityIds: [a], content: 'a plain fact' })
+    expect(plain.confidence).toBe('confirmed') // default when omitted
+
+    const promoted = updateNote(ctx, rumor.id, { confidence: 'confirmed' })
+    expect(promoted.confidence).toBe('confirmed')
+  })
+
   it('listNotesForSession returns only that session’s notes, populated with their entityIds', () => {
     const s1 = createSession(ctx, { campaignId }).id
     const s2 = createSession(ctx, { campaignId }).id
-    const first = createNote(ctx, { entityIds: [a, b], content: 'first', sessionId: s1 })
-    createNote(ctx, { entityIds: [a], content: 'second', sessionId: s1 })
-    createNote(ctx, { entityIds: [b], content: 'other session', sessionId: s2 })
-    createNote(ctx, { entityIds: [a], content: 'no session' }) // sessionId null → excluded
+    const first = createNote(ctx, { campaignId, entityIds: [a, b], content: 'first', sessionId: s1 })
+    createNote(ctx, { campaignId, entityIds: [a], content: 'second', sessionId: s1 })
+    createNote(ctx, { campaignId, entityIds: [b], content: 'other session', sessionId: s2 })
+    createNote(ctx, { campaignId, entityIds: [a], content: 'no session' }) // sessionId null → excluded
 
     const notes = listNotesForSession(ctx, s1)
     expect(notes.map((n) => n.content).sort()).toEqual(['first', 'second'])

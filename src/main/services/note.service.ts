@@ -1,11 +1,9 @@
-import { asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { asc, desc, eq, inArray } from 'drizzle-orm'
 import type { Note } from '@shared/entity-types'
 import type { CreateNoteInput, UpdateNoteInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { newId, now, rowToNote, serializeArray } from './serialize'
-
-const NO_ENTITIES = 'A note must be associated with at least one entity'
 
 /** noteId -> its full set of associated entity ids, for the given notes (one round-trip). */
 function entityIdsFor(ctx: DbContext, noteIds: string[]): Map<string, string[]> {
@@ -41,17 +39,16 @@ export function listNotesForEntity(ctx: DbContext, entityId: string): Note[] {
   return rows.map((n) => rowToNote(n, byNote.get(n.id) ?? []))
 }
 
-/** Every note linked to any entity in the campaign (deduped, newest first) — the Notes manager feed. */
+/** Every note in the campaign (newest first) — the Notes manager feed. Notes are first-class campaign
+ *  children (note.campaignId, ADR-021), so this reads the note table directly; entity-less lore is
+ *  included, and each note carries its (possibly empty) set of entity ids. */
 export function listAllNotes(ctx: DbContext, campaignId: string): Note[] {
   const rows = ctx.drizzle
-    .selectDistinct({ note: schema.note })
+    .select()
     .from(schema.note)
-    .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
-    .innerJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
-    .where(eq(schema.entity.campaignId, campaignId))
+    .where(eq(schema.note.campaignId, campaignId))
     .orderBy(desc(schema.note.createdAt))
     .all()
-    .map((r) => r.note)
   const byNote = entityIdsFor(
     ctx,
     rows.map((n) => n.id)
@@ -62,13 +59,11 @@ export function listAllNotes(ctx: DbContext, campaignId: string): Note[] {
 /** Notes captured during one session (chronological order), each carrying its full set of entity ids. */
 export function listNotesForSession(ctx: DbContext, sessionId: string): Note[] {
   const rows = ctx.drizzle
-    .selectDistinct({ note: schema.note })
+    .select()
     .from(schema.note)
-    .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
     .where(eq(schema.note.sessionId, sessionId))
     .orderBy(asc(schema.note.createdAt))
     .all()
-    .map((r) => r.note)
   const byNote = entityIdsFor(
     ctx,
     rows.map((n) => n.id)
@@ -78,20 +73,24 @@ export function listNotesForSession(ctx: DbContext, sessionId: string): Note[] {
 
 export function createNote(ctx: DbContext, input: CreateNoteInput): Note {
   const entityIds = [...new Set(input.entityIds)]
-  if (entityIds.length === 0) throw new Error(NO_ENTITIES)
   const createdAt = now()
   const row = {
     id: newId(),
+    campaignId: input.campaignId,
     sessionId: input.sessionId ?? null,
     content: input.content,
     tags: serializeArray(input.tags),
+    confidence: input.confidence ?? 'confirmed',
     createdAt
   }
   ctx.drizzle.transaction((tx) => {
     tx.insert(schema.note).values(row).run()
-    tx.insert(schema.noteEntity)
-      .values(entityIds.map((entityId) => ({ noteId: row.id, entityId, createdAt })))
-      .run()
+    // A note MAY stand alone as campaign lore (ADR-021); only write join rows when it tags entities.
+    if (entityIds.length > 0) {
+      tx.insert(schema.noteEntity)
+        .values(entityIds.map((entityId) => ({ noteId: row.id, entityId, createdAt })))
+        .run()
+    }
   })
   return rowToNote(row, entityIds)
 }
@@ -101,17 +100,20 @@ export function updateNote(ctx: DbContext, id: string, patch: UpdateNoteInput): 
     const set: Partial<typeof schema.note.$inferInsert> = {}
     if (patch.content !== undefined) set.content = patch.content
     if (patch.tags !== undefined) set.tags = serializeArray(patch.tags)
+    if (patch.confidence !== undefined) set.confidence = patch.confidence
     if (Object.keys(set).length > 0) {
       tx.update(schema.note).set(set).where(eq(schema.note.id, id)).run()
     }
     if (patch.entityIds !== undefined) {
       const entityIds = [...new Set(patch.entityIds)]
-      if (entityIds.length === 0) throw new Error(NO_ENTITIES) // rolls back the transaction
       const createdAt = now()
+      // Replace the note's entity links; clearing them all is allowed — the note survives as lore.
       tx.delete(schema.noteEntity).where(eq(schema.noteEntity.noteId, id)).run()
-      tx.insert(schema.noteEntity)
-        .values(entityIds.map((entityId) => ({ noteId: id, entityId, createdAt })))
-        .run()
+      if (entityIds.length > 0) {
+        tx.insert(schema.noteEntity)
+          .values(entityIds.map((entityId) => ({ noteId: id, entityId, createdAt })))
+          .run()
+      }
     }
   })
   const r = ctx.drizzle.select().from(schema.note).where(eq(schema.note.id, id)).get()
@@ -122,22 +124,4 @@ export function updateNote(ctx: DbContext, id: string, patch: UpdateNoteInput): 
 export function deleteNote(ctx: DbContext, id: string): void {
   // FK cascade (foreign_keys = ON at runtime) clears the note's note_entity links + its embedding.
   ctx.drizzle.delete(schema.note).where(eq(schema.note.id, id)).run()
-}
-
-/**
- * Delete notes left with zero entity associations. A note must always have ≥1 entity, so call this
- * after a delete that cascades note_entity links — an entity delete (orphans notes tagged only to it)
- * or a campaign delete (note rows have no campaign FK, so they don't cascade and must be swept here).
- * Each removed note's embedding cascades away via FK; shared notes (still linked) are untouched.
- */
-export function deleteOrphanNotes(ctx: DbContext): void {
-  const orphans = ctx.drizzle
-    .select({ id: schema.note.id })
-    .from(schema.note)
-    .leftJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
-    .where(isNull(schema.noteEntity.noteId))
-    .all()
-    .map((r) => r.id)
-  if (orphans.length === 0) return
-  ctx.drizzle.delete(schema.note).where(inArray(schema.note.id, orphans)).run()
 }

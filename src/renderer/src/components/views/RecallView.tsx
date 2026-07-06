@@ -226,22 +226,23 @@ function ModeToggle({
 function Sources({ sources }: { sources: RecallSource[] }) {
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const setActiveView = useUiStore((s) => s.setActiveView)
-  function open(s: RecallSource) {
-    setSelectedEntity(s.entityId)
+  function open(entityId: string) {
+    setSelectedEntity(entityId)
     setActiveView('capture')
   }
   return (
     <div className="space-y-2 border-t border-border pt-3">
       <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Sources</h3>
       <ul className="space-y-1.5">
-        {sources.map((s, i) => (
-          <li key={`${s.entityId}-${s.noteId ?? i}`}>
-            <button
-              onClick={() => open(s)}
-              className="w-full rounded-md border border-border bg-card/40 px-3 py-2 text-left transition-colors hover:border-primary/50"
-            >
+        {sources.map((s, i) => {
+          // A campaign-lore note (ADR-021) belongs to no entity — show it as a non-clickable card.
+          const eid = s.entityId
+          const body = (
+            <>
               <span className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">{s.entityName}</span>
+                <span className="text-sm font-medium text-foreground">
+                  {s.entityName ?? 'Campaign lore'}
+                </span>
                 {s.sessionLabel && (
                   <span className="font-mono text-[10px] text-muted-foreground">{s.sessionLabel}</span>
                 )}
@@ -251,9 +252,25 @@ function Sources({ sources }: { sources: RecallSource[] }) {
                   {s.snippet}
                 </span>
               )}
-            </button>
-          </li>
-        ))}
+            </>
+          )
+          return (
+            <li key={`${eid ?? 'lore'}-${s.noteId ?? i}`}>
+              {eid ? (
+                <button
+                  onClick={() => open(eid)}
+                  className="w-full rounded-md border border-border bg-card/40 px-3 py-2 text-left transition-colors hover:border-primary/50"
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className="w-full rounded-md border border-border bg-card/40 px-3 py-2 text-left">
+                  {body}
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

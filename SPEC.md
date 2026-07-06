@@ -305,6 +305,15 @@ extraction (as `relationshipChanges`).
 city destroyed, a ruler assassinated), distinct from the party's session log; the extraction prompts
 enforce the boundary so ordinary beats stay notes.
 
+**Creature type, note confidence & campaign lore** (ADR-021) — four modeling additions from
+dogfooding a real set of messy player notes: a first-class **`creature`** entity type (tactics /
+abilities / weakness, not a social persona); a **`presumed_ended`** lifecycle for a believed-but-
+unconfirmed death or loss (the AI hedges instead of asserting it); per-note **confidence**
+(`confirmed` / `rumored` / `suspected`) injected into the RAG document title so the model hedges
+rumors and the party's own hypotheses; and **entity-less campaign lore** — a note is now a first-class
+campaign child (`note.campaignId`) that MAY tag **0..N** entities, so a world-fact owned by no single
+entity has a home (surfaced in Recall as a non-clickable "Campaign lore" source).
+
 **Operational hardening** (ADR-020) — the data-safety + resilience layer: rotating pre-migration DB
 backups (`VACUUM INTO`, keep 5, in `userData/backups`); a persistent main-process log
 (`electron-log` → `userData/logs/main.log`) and logged WAL-checkpoint failures; a startup

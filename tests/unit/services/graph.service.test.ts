@@ -52,7 +52,7 @@ describe('graph traversal', () => {
     const aldric = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
     const inn = loc('Copper Kettle')
     const sword = createEntity(ctx, { campaignId, type: 'item', name: 'Sword' })
-    createNote(ctx, { entityIds: [aldric.id], content: 'Gruff innkeeper' })
+    createNote(ctx, { campaignId, entityIds: [aldric.id], content: 'Gruff innkeeper' })
     link(aldric, inn, 'located_in', 'runs it')
     link(aldric, sword, 'owns')
 

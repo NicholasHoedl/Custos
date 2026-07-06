@@ -25,10 +25,11 @@ function fetchFailed(what: string) {
 
 export function useCampaigns(): { campaigns: Campaign[]; refresh: () => void } {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const campaignsVersion = useUiStore((s) => s.campaignsVersion)
   const refresh = useCallback(() => {
     ledger.campaign.list().then(setCampaigns).catch(fetchFailed('campaigns'))
   }, [])
-  useEffect(() => refresh(), [refresh])
+  useEffect(() => refresh(), [refresh, campaignsVersion])
   return { campaigns, refresh }
 }
 
@@ -41,6 +42,7 @@ export function useSessions(campaignId: string | null): {
   // `loading` is true until the first list resolves — lets capture surfaces distinguish "still
   // restoring the session" from "this campaign genuinely has no sessions" (T3).
   const [loading, setLoading] = useState(true)
+  const sessionsVersion = useUiStore((s) => s.sessionsVersion)
   const refresh = useCallback(() => {
     if (!campaignId) {
       setSessions([])
@@ -59,7 +61,7 @@ export function useSessions(campaignId: string | null): {
         fetchFailed('sessions')(e)
       })
   }, [campaignId])
-  useEffect(() => refresh(), [refresh])
+  useEffect(() => refresh(), [refresh, sessionsVersion])
   return { sessions, loading, refresh }
 }
 

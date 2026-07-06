@@ -55,9 +55,16 @@ describe('import.service — applyChangeset', () => {
             { kind: 'existing', entityId: phandalin.id }
           ],
           tags: ['npc'],
+          confidence: 'confirmed',
           include: true
         },
-        { content: 'left out', entityRefs: [{ kind: 'new', index: 0 }], tags: [], include: false }
+        {
+          content: 'left out',
+          entityRefs: [{ kind: 'new', index: 0 }],
+          tags: [],
+          confidence: 'confirmed',
+          include: false
+        }
       ]
     }
 
@@ -96,6 +103,7 @@ describe('import.service — applyChangeset', () => {
           content: 'bad',
           entityRefs: [{ kind: 'existing', entityId: 'does-not-exist' }],
           tags: [],
+          confidence: 'confirmed',
           include: true
         }
       ]

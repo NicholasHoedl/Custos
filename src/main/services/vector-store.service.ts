@@ -1,19 +1,21 @@
 import { and, eq, isNull, lte, or } from 'drizzle-orm'
-import type { EntityType } from '@shared/entity-types'
+import type { EntityType, NoteConfidence } from '@shared/entity-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { EMBED_DIM, EMBED_MODEL } from './embedding-constants'
 
 // A retrieved RAG candidate — a note or an entity's own description — with its similarity score.
+// The entity fields are NULL for a campaign-lore note (a note tagged to no entity — ADR-021).
 export interface RetrievedChunk {
   kind: 'note' | 'entity'
-  entityId: string
-  entityName: string
-  entityType: EntityType
+  entityId: string | null
+  entityName: string | null
+  entityType: EntityType | null
   noteId: string | null
   sessionId: string | null
   sessionLabel: string | null
   content: string
+  confidence: NoteConfidence // epistemic weight (ADR-021); entity chunks are always 'confirmed'
   score: number
 }
 
@@ -173,15 +175,16 @@ export class BruteForceVectorStore implements VectorStore {
   search(query: Float32Array, campaignId: string, k: number, asOf?: number): RetrievedChunk[] {
     const chunks: RetrievedChunk[] = []
 
-    // Notes are M2M with entities (note_entity). A note linked to N entities would otherwise produce N
-    // identical chunks; emit ONE chunk per note, attributed to a representative entity — the first by
-    // name (orderBy + first-seen wins). The single-entity RetrievedChunk shape stays unchanged so all
-    // downstream (recall/suggest gather, mapSources, scene pinning) is untouched.
+    // Notes are M2M with entities (note_entity) and campaign-scoped by their own note.campaignId. A note
+    // linked to N entities would otherwise produce N identical chunks; emit ONE chunk per note, attributed
+    // to a representative entity — the first by name (orderBy + first-seen wins). The entity is LEFT-joined
+    // so an entity-less lore note (ADR-021) still surfaces as one chunk with null entity fields.
     const noteRows = this.ctx.drizzle
       .select({
         noteId: schema.noteEmbedding.noteId,
         vector: schema.noteEmbedding.vector,
         content: schema.note.content,
+        confidence: schema.note.confidence,
         entityId: schema.entity.id,
         sessionId: schema.note.sessionId,
         sessionNumber: schema.session.number,
@@ -190,14 +193,14 @@ export class BruteForceVectorStore implements VectorStore {
       })
       .from(schema.noteEmbedding)
       .innerJoin(schema.note, eq(schema.note.id, schema.noteEmbedding.noteId))
-      .innerJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
-      .innerJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
+      .leftJoin(schema.noteEntity, eq(schema.noteEntity.noteId, schema.note.id))
+      .leftJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
       .leftJoin(schema.session, eq(schema.session.id, schema.note.sessionId))
       .where(
         asOf === undefined
-          ? eq(schema.entity.campaignId, campaignId)
+          ? eq(schema.note.campaignId, campaignId)
           : and(
-              eq(schema.entity.campaignId, campaignId),
+              eq(schema.note.campaignId, campaignId),
               // No future leak: only notes from sessions <= N; undated (null-session) notes pass through.
               or(isNull(schema.note.sessionId), lte(schema.session.number, asOf))
             )
@@ -213,11 +216,12 @@ export class BruteForceVectorStore implements VectorStore {
         kind: 'note',
         entityId: n.entityId,
         entityName: n.entityName,
-        entityType: n.entityType as EntityType,
+        entityType: n.entityType as EntityType | null,
         noteId: n.noteId,
         sessionId: n.sessionId,
         sessionLabel: n.sessionNumber != null ? `Session ${n.sessionNumber}` : null,
         content: n.content,
+        confidence: n.confidence as NoteConfidence,
         score: dot(query, toVec(n.vector))
       })
     }
@@ -245,6 +249,7 @@ export class BruteForceVectorStore implements VectorStore {
         sessionId: null,
         sessionLabel: null,
         content: e.description ? `${e.name}: ${e.description}` : e.name,
+        confidence: 'confirmed',
         score: dot(query, toVec(e.vector))
       })
     }
@@ -290,12 +295,14 @@ export class BruteForceVectorStore implements VectorStore {
         sessionId: null,
         sessionLabel: null,
         content: e.description ? `${e.name}: ${e.description}` : e.name,
+        confidence: 'confirmed',
         score
       })
       const notes = this.ctx.drizzle
         .select({
           id: schema.note.id,
           content: schema.note.content,
+          confidence: schema.note.confidence,
           sessionId: schema.note.sessionId,
           sessionNumber: schema.session.number
         })
@@ -322,6 +329,7 @@ export class BruteForceVectorStore implements VectorStore {
           sessionId: n.sessionId,
           sessionLabel: n.sessionNumber != null ? `Session ${n.sessionNumber}` : null,
           content: n.content,
+          confidence: n.confidence as NoteConfidence,
           score
         })
       }

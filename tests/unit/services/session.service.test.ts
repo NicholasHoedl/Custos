@@ -33,7 +33,7 @@ describe('session.service', () => {
   it('deletes a session, cascading its events and nulling its notes’ session link', () => {
     const session = createSession(ctx, { campaignId })
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
-    createNote(ctx, { entityIds: [npc.id], sessionId: session.id, content: 'a captured note' })
+    createNote(ctx, { campaignId, entityIds: [npc.id], sessionId: session.id, content: 'a captured note' })
     createEvent(ctx, { sessionId: session.id, content: 'something happened' })
 
     deleteSession(ctx, session.id)

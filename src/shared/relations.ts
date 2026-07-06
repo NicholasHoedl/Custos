@@ -32,7 +32,7 @@ export interface RelationDef {
   hierarchical: boolean // located_in/contains, member_of/has_member — walked by the hierarchy CTE
 }
 
-const ACTOR: EntityType[] = ['npc', 'faction', 'pc']
+const ACTOR: EntityType[] = ['npc', 'faction', 'pc', 'creature']
 
 export const RELATIONS: Record<RelationKey, RelationDef> = {
   located_in: {
@@ -41,7 +41,7 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
     inverse: 'contains',
     inverseKey: 'contains',
     symmetric: false,
-    fromTypes: ['npc', 'location', 'item', 'faction', 'pc'],
+    fromTypes: ['npc', 'location', 'item', 'faction', 'pc', 'creature'],
     toTypes: ['location'],
     hierarchical: true
   },
@@ -52,7 +52,7 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
     inverseKey: 'located_in',
     symmetric: false,
     fromTypes: ['location'],
-    toTypes: ['npc', 'location', 'item', 'faction', 'pc'],
+    toTypes: ['npc', 'location', 'item', 'faction', 'pc', 'creature'],
     hierarchical: true
   },
   member_of: {
@@ -81,7 +81,7 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
     inverse: 'owned by',
     inverseKey: 'owned_by',
     symmetric: false,
-    fromTypes: ['npc', 'pc', 'faction'],
+    fromTypes: ['npc', 'pc', 'faction', 'creature'],
     toTypes: ['item'],
     hierarchical: false
   },
@@ -92,7 +92,7 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
     inverseKey: 'owns',
     symmetric: false,
     fromTypes: ['item'],
-    toTypes: ['npc', 'pc', 'faction'],
+    toTypes: ['npc', 'pc', 'faction', 'creature'],
     hierarchical: false
   },
   quest_giver_of: {
@@ -122,7 +122,7 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
     inverseKey: 'involved_in',
     symmetric: false,
     fromTypes: ['quest', 'event'],
-    toTypes: ['npc', 'location', 'faction', 'item', 'pc'],
+    toTypes: ['npc', 'location', 'faction', 'item', 'pc', 'creature'],
     hierarchical: false
   },
   involved_in: {
@@ -131,7 +131,7 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
     inverse: 'involves',
     inverseKey: 'involves',
     symmetric: false,
-    fromTypes: ['npc', 'location', 'faction', 'item', 'pc'],
+    fromTypes: ['npc', 'location', 'faction', 'item', 'pc', 'creature'],
     toTypes: ['quest', 'event'],
     hierarchical: false
   },

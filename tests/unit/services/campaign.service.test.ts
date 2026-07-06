@@ -9,7 +9,7 @@ import {
 } from '../../../src/main/services/campaign.service'
 import { createEntity, getEntity, listEntities } from '../../../src/main/services/entity.service'
 import { createSession, listSessions } from '../../../src/main/services/session.service'
-import { createNote, listNotesForEntity } from '../../../src/main/services/note.service'
+import { createNote, listAllNotes, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
 import { createLink } from '../../../src/main/services/link.service'
 import { BruteForceVectorStore } from '../../../src/main/services/vector-store.service'
@@ -37,6 +37,22 @@ describe('campaign.service', () => {
     expect(u.updatedAt).toBeGreaterThanOrEqual(c.updatedAt)
   })
 
+  it('cascades entity-less lore notes when the campaign is deleted', () => {
+    const store = new BruteForceVectorStore(ctx)
+    const doomed = createCampaign(ctx, { name: 'Doomed lore' }).id
+    const lore = createNote(ctx, { campaignId: doomed, entityIds: [], content: 'a world fact' })
+    store.upsertNote(lore.id, unit(0), 'h')
+
+    const survivor = createCampaign(ctx, { name: 'Survivor' }).id
+    const keep = createNote(ctx, { campaignId: survivor, entityIds: [], content: 'kept lore' })
+
+    deleteCampaign(ctx, doomed)
+
+    expect(listAllNotes(ctx, doomed)).toHaveLength(0)
+    expect(store.noteHash(lore.id)).toBeNull() // embedding cascaded off the deleted note row
+    expect(listAllNotes(ctx, survivor).map((n) => n.id)).toEqual([keep.id]) // other campaign untouched
+  })
+
   it('deletes a campaign and cascades to its sessions, entities, notes, links, and events', () => {
     const campaignId = createCampaign(ctx, { name: 'Doomed' }).id
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
@@ -44,6 +60,7 @@ describe('campaign.service', () => {
     const session = createSession(ctx, { campaignId })
     const store = new BruteForceVectorStore(ctx)
     const note = createNote(ctx, {
+      campaignId,
       entityIds: [npc.id],
       sessionId: session.id,
       content: 'owes a favor'

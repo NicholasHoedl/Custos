@@ -94,6 +94,41 @@ function seededPreChronologyDb(foreignKeys: 'ON' | 'OFF'): Database.Database {
   return db
 }
 
+/** A DB migrated up to (but not including) 0006, with notes across TWO campaigns + a note embedding. */
+function seededPre0006Db(foreignKeys: 'ON' | 'OFF'): Database.Database {
+  const db = new Database(':memory:')
+  db.pragma(`foreign_keys = ${foreignKeys}`)
+  applyInTransaction(
+    db,
+    migrationFiles().filter((f) => f < '0006')
+  )
+  const camp = db.prepare(
+    'INSERT INTO campaign (id, name, description, created_at, updated_at) VALUES (?,?,?,?,?)'
+  )
+  camp.run('c1', 'Phandelver', null, 1, 1)
+  camp.run('c2', 'Avernus', null, 1, 1)
+  // lifecycle omitted → its 0005 default ('unknown') fills in.
+  const ent = db.prepare(
+    'INSERT INTO entity (id, campaign_id, type, name, description, traits, goals, attributes, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+  )
+  ent.run('e1', 'c1', 'npc', 'Glasstaff', null, null, null, null, null, 1, 1)
+  ent.run('e2', 'c2', 'npc', 'Zariel', null, null, null, null, null, 1, 1)
+  // Pre-0006 note has no campaign_id / confidence; association is via note_entity only.
+  const note = db.prepare(
+    'INSERT INTO note (id, session_id, content, tags, created_at) VALUES (?,?,?,?,?)'
+  )
+  note.run('n1', null, 'Glasstaff led the Redbrands.', null, 123) // tagged to e1 -> c1
+  note.run('n2', null, 'Zariel rules Avernus.', null, 124) // tagged to e2 -> c2
+  const ne = db.prepare('INSERT INTO note_entity (note_id, entity_id, created_at) VALUES (?,?,?)')
+  ne.run('n1', 'e1', 1)
+  ne.run('n2', 'e2', 1)
+  // The critical FK-referencing-note row: it must survive the table rebuild (DROP + RENAME).
+  db.prepare(
+    'INSERT INTO note_embedding (note_id, model, dim, vector, content_hash, updated_at) VALUES (?,?,?,?,?,?)'
+  ).run('n1', 'm', 1, Buffer.from([0, 1, 2, 3]), 'h', 1)
+  return db
+}
+
 describe('note M2M migration (0003 backfill + 0004 column drop)', () => {
   it('with FK off (the production toggle): backfills the join and preserves the embedding', () => {
     const db = seededPreReworkDb('OFF')
@@ -195,6 +230,72 @@ describe('chronology migration (0005 lifecycle backfill + validity intervals)', 
     // Sever l1 (set an end); a fresh OPEN duplicate is then allowed — the reformed relationship.
     db.prepare('UPDATE entity_link SET end_session_number = 2 WHERE id = ?').run('l1')
     expect(() => insert('l3', 3, null)).not.toThrow()
+    db.close()
+  })
+})
+
+describe('note campaign_id + confidence migration (0006 table rebuild)', () => {
+  it('with FK off (production toggle): backfills campaign_id per note, defaults confidence, preserves children', () => {
+    const db = seededPre0006Db('OFF')
+    applyInTransaction(
+      db,
+      migrationFiles().filter((f) => f >= '0006')
+    )
+
+    // Each note's campaign_id resolves independently from its own tagged entity's campaign.
+    expect(db.prepare('SELECT campaign_id FROM note WHERE id = ?').get('n1')).toEqual({
+      campaign_id: 'c1'
+    })
+    expect(db.prepare('SELECT campaign_id FROM note WHERE id = ?').get('n2')).toEqual({
+      campaign_id: 'c2'
+    })
+    // Confidence defaults to 'confirmed' for every migrated note.
+    expect(db.prepare('SELECT confidence FROM note WHERE id = ?').get('n1')).toEqual({
+      confidence: 'confirmed'
+    })
+    // The rebuild did NOT cascade-wipe the note's embedding or its entity join rows.
+    expect(db.prepare('SELECT count(*) AS c FROM note_embedding').get()).toEqual({ c: 1 })
+    expect(db.prepare('SELECT count(*) AS c FROM note_entity').get()).toEqual({ c: 2 })
+    // The two new columns exist and the note content survived intact.
+    const cols = (db.prepare('PRAGMA table_info(note)').all() as Array<{ name: string }>).map(
+      (c) => c.name
+    )
+    expect(cols).toContain('campaign_id')
+    expect(cols).toContain('confidence')
+    expect(db.prepare('SELECT content FROM note WHERE id = ?').get('n1')).toEqual({
+      content: 'Glasstaff led the Redbrands.'
+    })
+    db.close()
+  })
+
+  it('drops a pre-existing note with no entity link (else its NULL campaign_id would abort the migration)', () => {
+    const db = seededPre0006Db('OFF')
+    // A legacy linkless note: the prepended DELETE removes it so the NOT-NULL campaign_id backfill holds.
+    db.prepare(
+      'INSERT INTO note (id, session_id, content, tags, created_at) VALUES (?,?,?,?,?)'
+    ).run('orphan', null, 'belongs to no entity', null, 1)
+
+    expect(() =>
+      applyInTransaction(
+        db,
+        migrationFiles().filter((f) => f >= '0006')
+      )
+    ).not.toThrow()
+    expect(db.prepare('SELECT count(*) AS c FROM note WHERE id = ?').get('orphan')).toEqual({ c: 0 })
+    expect(db.prepare('SELECT count(*) AS c FROM note').get()).toEqual({ c: 2 }) // n1 + n2 survive
+    db.close()
+  })
+
+  it('with FK on: the rebuild WOULD cascade-wipe children — why migrate() must disable them', () => {
+    const db = seededPre0006Db('ON')
+    applyInTransaction(
+      db,
+      migrationFiles().filter((f) => f >= '0006')
+    )
+    // DROP TABLE note cascades to its embedding + join rows (the loss the index.ts FK toggle prevents).
+    // If either assertion ever flips to a nonzero count, the FK-off guard around migrate() is gone.
+    expect(db.prepare('SELECT count(*) AS c FROM note_entity').get()).toEqual({ c: 0 })
+    expect(db.prepare('SELECT count(*) AS c FROM note_embedding').get()).toEqual({ c: 0 })
     db.close()
   })
 })

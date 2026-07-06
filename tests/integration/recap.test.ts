@@ -60,6 +60,7 @@ describe('recap.service', () => {
       status: 'Defeated'
     })
     createNote(ctx, {
+      campaignId,
       entityIds: [glasstaff.id],
       content: 'Glasstaff led the Redbrands.',
       sessionId: session.id
@@ -112,7 +113,7 @@ describe('recap.service', () => {
     const campaignId = createCampaign(ctx, { name: 'C' }).id
     const session = createSession(ctx, { campaignId })
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'X' })
-    createNote(ctx, { entityIds: [npc.id], content: 'something happened', sessionId: session.id })
+    createNote(ctx, { campaignId, entityIds: [npc.id], content: 'something happened', sessionId: session.id })
     isAvailableFn.mockReturnValue(false)
 
     const { events, send } = collector()

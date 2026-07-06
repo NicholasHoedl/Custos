@@ -1,16 +1,32 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronsUpDown, Pencil, StickyNote, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { ENTITY_TYPES, ENTITY_TYPE_LABELS, type Entity, type Note } from '@shared/entity-types'
+import {
+  ENTITY_TYPES,
+  ENTITY_TYPE_LABELS,
+  NOTE_CONFIDENCES,
+  NOTE_CONFIDENCE_LABELS,
+  type Entity,
+  type Note,
+  type NoteConfidence
+} from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { useAllNotes, useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
+import { PaneHeader, PaneShell } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Badge } from '@renderer/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 import {
   Command,
@@ -48,6 +64,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
 
   const [content, setContent] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [confidence, setConfidence] = useState<NoteConfidence>('confirmed')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -62,6 +79,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
   function resetComposer(): void {
     setContent('')
     setSelectedIds([])
+    setConfidence('confirmed')
     setEditingId(null)
   }
 
@@ -69,20 +87,23 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
     setEditingId(note.id)
     setContent(note.content)
     setSelectedIds(note.entityIds)
+    setConfidence(note.confidence)
   }
 
   async function save(): Promise<void> {
     const text = content.trim()
-    if (!text || selectedIds.length === 0 || busy) return
+    if (!text || busy) return // entity tagging is optional — an untagged note is campaign lore (ADR-021)
     setBusy(true)
     try {
       if (editingId) {
-        await ledger.note.update(editingId, { content: text, entityIds: selectedIds })
+        await ledger.note.update(editingId, { content: text, entityIds: selectedIds, confidence })
         toast.success('Note updated')
       } else {
         await ledger.note.create({
+          campaignId,
           content: text,
           entityIds: selectedIds,
+          confidence,
           sessionId: activeSessionId ?? undefined
         })
         toast.success('Note saved')
@@ -106,14 +127,15 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
     }
   }
 
-  const canSave = content.trim().length > 0 && selectedIds.length > 0 && !busy
+  const canSave = content.trim().length > 0 && !busy
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
-      <header>
-        <h1 className="font-display text-3xl font-semibold text-foreground">Notes</h1>
-        <p className="text-sm text-muted-foreground">Write once, file it under everyone it touches.</p>
-      </header>
+    <PaneShell size="reading">
+      <PaneHeader
+        title="Notes"
+        size="lg"
+        description="Write once, file it under everyone it touches."
+      />
 
       <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
         <Textarea
@@ -146,12 +168,27 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
             ))}
           </div>
         )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Confidence</span>
+          <Select value={confidence} onValueChange={(v) => setConfidence(v as NoteConfidence)}>
+            <SelectTrigger className="h-8 w-[140px] text-xs" aria-label="Note confidence">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {NOTE_CONFIDENCES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {NOTE_CONFIDENCE_LABELS[c]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">
             {editingId
               ? 'Editing a note'
               : selectedIds.length === 0
-                ? 'Tag at least one entity'
+                ? 'No entities tagged — saves as campaign lore'
                 : ' '}
           </span>
           <div className="flex items-center gap-2">
@@ -167,7 +204,8 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
         </div>
         {entities.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Add entities in Capture first — a note must be filed under at least one.
+            No entities yet — notes save as campaign lore. Add people, places, and things in Capture to
+            tag them.
           </p>
         )}
       </div>
@@ -190,7 +228,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
           ))
         )}
       </div>
-    </div>
+    </PaneShell>
   )
 }
 
@@ -236,9 +274,16 @@ function NoteCard({
           )
         })}
       </div>
-      <span className="mt-1.5 block font-mono text-[10px] text-muted-foreground">
-        {formatTimestamp(note.createdAt)}
-      </span>
+      <div className="mt-1.5 flex items-center gap-2">
+        {note.confidence !== 'confirmed' && (
+          <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400/90">
+            {NOTE_CONFIDENCE_LABELS[note.confidence]}
+          </span>
+        )}
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {formatTimestamp(note.createdAt)}
+        </span>
+      </div>
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           onClick={onEdit}

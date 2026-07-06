@@ -23,6 +23,7 @@ function chunk(over: Partial<Chunk> = {}): Chunk {
     sessionId: 's1',
     sessionLabel: 'Session 3',
     content: 'an evil wizard who leads the Redbrands',
+    confidence: 'confirmed',
     score: 0.9,
     ...over
   }
@@ -63,6 +64,20 @@ describe('recall prompt assembly', () => {
     expect(doc.title).toContain('Glastav')
     expect(doc.title).toContain('Session 3')
     expect(content[content.length - 1]).toEqual({ type: 'text', text: 'Who is Glastav?' })
+  })
+
+  it('suffixes the document title with an epistemic tag for rumored/suspected notes (so the model hedges)', () => {
+    const content = buildUserContent('q', [
+      chunk({ entityName: 'Rumor', sessionLabel: null, confidence: 'rumored' }),
+      chunk({ entityName: 'Hunch', sessionLabel: null, confidence: 'suspected' }),
+      chunk({ entityName: 'Fact', sessionLabel: null, confidence: 'confirmed' })
+    ])
+    const titles = content
+      .filter((b) => (b as { type?: string }).type === 'document')
+      .map((b) => (b as { title: string }).title)
+    expect(titles).toContain('Rumor · (rumored)')
+    expect(titles).toContain('Hunch · (suspected)')
+    expect(titles).toContain('Fact') // confirmed carries no tag
   })
 })
 
@@ -129,6 +144,16 @@ describe('current-state grounding', () => {
   it('surfaces an ended entity even with no free-text status', () => {
     const out = formatState(null, [{ name: 'Gone', type: 'npc', status: null, lifecycle: 'ended' }])
     expect(out).toContain('- Gone (npc) [ended]')
+  })
+
+  it('marks presumed_ended as UNCONFIRMED so the model hedges, not asserts (C2)', () => {
+    const out = formatState(null, [
+      { name: 'Gundren', type: 'npc', status: 'Missing', lifecycle: 'presumed_ended' },
+      { name: 'Vanished', type: 'creature', status: null, lifecycle: 'presumed_ended' }
+    ])
+    expect(out).toContain('- Gundren (npc) [presumed ended — unconfirmed]: Missing')
+    expect(out).toContain('- Vanished (creature) [presumed ended — unconfirmed]') // surfaced w/o status
+    expect(out).not.toContain('[ended]') // distinct from the confirmed-ended marker
   })
 
   it('uses an AS OF anchor (not "the present") when asOf is set', () => {

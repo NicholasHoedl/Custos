@@ -3,7 +3,6 @@ import type { Campaign } from '@shared/entity-types'
 import type { CreateCampaignInput, UpdateCampaignInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
-import { deleteOrphanNotes } from './note.service'
 import { newId, now, rowToCampaign } from './serialize'
 
 export function listCampaigns(ctx: DbContext): Campaign[] {
@@ -43,11 +42,10 @@ export function updateCampaign(ctx: DbContext, id: string, patch: UpdateCampaign
   return c
 }
 
-// Deletes a campaign and everything under it. Sessions, entities, links, event-log entries, embeddings,
-// and personas cascade away via their foreign keys (onDelete: 'cascade'). Notes are M2M (note_entity)
-// and have no campaign FK, so the cascade only clears their links — the now-orphaned note rows (and
-// their embeddings) are swept by deleteOrphanNotes.
+// Deletes a campaign and everything under it. Sessions, entities, links, event-log entries, notes,
+// embeddings, and personas all cascade away via their foreign keys (onDelete: 'cascade'). Notes now
+// carry a first-class campaign_id FK (ADR-021), so entity-less lore is swept with the campaign too;
+// note_embedding then cascades off the deleted note rows.
 export function deleteCampaign(ctx: DbContext, id: string): void {
   ctx.drizzle.delete(schema.campaign).where(eq(schema.campaign.id, id)).run()
-  deleteOrphanNotes(ctx)
 }

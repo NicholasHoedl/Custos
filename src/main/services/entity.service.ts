@@ -4,7 +4,6 @@ import type { CreateEntityInput, UpdateEntityInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { lifecycleHeuristic } from './chronology.service'
-import { deleteOrphanNotes } from './note.service'
 import { resolveCaptureSessionNumber } from './session.service'
 import { newId, now, rowToEntity, serializeArray, serializeObject } from './serialize'
 
@@ -107,10 +106,10 @@ export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInpu
 /**
  * Deletes an entity. Foreign keys (with `foreign_keys = ON`) cascade the cleanup: its note_entity
  * links and every entity_link touching it (either end) are removed, and any event_log reference is set
- * to null (the session log entry survives). Notes are M2M, so a shared note survives losing this one
- * entity; a note then left with no entities is removed by deleteOrphanNotes. See schema.ts onDelete.
+ * to null (the session log entry survives). Notes are M2M and first-class campaign children (ADR-021),
+ * so a note outlives losing this entity — a shared note stays under its others, and a note tagged only
+ * to this one becomes entity-less campaign lore. See schema.ts onDelete.
  */
 export function deleteEntity(ctx: DbContext, id: string): void {
   ctx.drizzle.delete(schema.entity).where(eq(schema.entity.id, id)).run()
-  deleteOrphanNotes(ctx)
 }

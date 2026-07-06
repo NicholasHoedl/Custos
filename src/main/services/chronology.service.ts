@@ -8,18 +8,10 @@ import { rowToStatusHistory } from './serialize'
 // is the timeline; it is denormalized into status_history.since_session_number and the entity_link
 // interval columns, so everything here is a pure, join-free integer comparison — trivially testable.
 
-const ENDED_KEYWORDS = ['dead', 'deceased', 'destroyed', 'ruined', 'disbanded', 'abandoned', 'gone']
-
-/**
- * Derive a coarse lifecycle from free-text status. MUST mirror the SQL `CASE` in migration 0005 so
- * backfilled rows and runtime writes agree: dead/destroyed/… → `ended`; blank → `unknown`; else
- * `active`.
- */
-export function lifecycleHeuristic(status: string | null): Lifecycle {
-  if (status === null || status.trim() === '') return 'unknown'
-  const s = status.toLowerCase()
-  return ENDED_KEYWORDS.some((k) => s.includes(k)) ? 'ended' : 'active'
-}
+// The status→lifecycle heuristic lives in @shared/lifecycle so the renderer can use it too (the merged
+// Status control derives lifecycle for a free-text status). Re-exported here so existing importers
+// (entity.service, import.service) and the migration-0005 mirror test keep their import path unchanged.
+export { lifecycleHeuristic } from '@shared/lifecycle'
 
 /**
  * Is a relationship interval live at session `n`? Started at or before n (or pre-tracking), and not
@@ -99,4 +91,18 @@ export function getEntityHistory(ctx: DbContext, entityId: string): StatusHistor
       const bs = b.sinceSessionNumber ?? Number.NEGATIVE_INFINITY
       return as - bs || a.recordedAt - b.recordedAt
     })
+}
+
+/** Every status_history row for a campaign's entities (via the entity join). For export/backup. */
+export function listStatusHistoryForCampaign(
+  ctx: DbContext,
+  campaignId: string
+): StatusHistoryEntry[] {
+  return ctx.drizzle
+    .select({ row: schema.statusHistory })
+    .from(schema.statusHistory)
+    .innerJoin(schema.entity, eq(schema.entity.id, schema.statusHistory.entityId))
+    .where(eq(schema.entity.campaignId, campaignId))
+    .all()
+    .map((r) => rowToStatusHistory(r.row))
 }

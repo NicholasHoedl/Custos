@@ -91,6 +91,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
               content: n.content,
               entityRefs: n.entityRefs,
               tags: n.tags,
+              confidence: n.confidence,
               include: true
             }))
           )

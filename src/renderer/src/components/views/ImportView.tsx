@@ -204,10 +204,22 @@ function ReasonBanner({ reason }: { reason: ExtractFailureReason }) {
     )
   if (reason === 'no_key')
     return <Banner icon={<KeyRound className="size-4" />}>No API key — add one in Settings.</Banner>
+  if (reason === 'bad_key')
+    return (
+      <Banner icon={<KeyRound className="size-4" />} tone="destructive">
+        Your API key was rejected — update it in Settings.
+      </Banner>
+    )
   if (reason === 'offline')
     return (
       <Banner icon={<WifiOff className="size-4" />}>
         You’re offline — Import needs an internet connection.
+      </Banner>
+    )
+  if (reason === 'too_long')
+    return (
+      <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+        That’s a lot of text at once — import it in smaller chunks (a section or two at a time).
       </Banner>
     )
   return (

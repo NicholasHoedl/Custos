@@ -15,6 +15,17 @@ export function listEvents(ctx: DbContext, sessionId: string): EventLogEntry[] {
     .map(rowToEvent)
 }
 
+/** Every event-log entry in a campaign (chronological). For export/backup. */
+export function listEventsForCampaign(ctx: DbContext, campaignId: string): EventLogEntry[] {
+  return ctx.drizzle
+    .select()
+    .from(schema.eventLog)
+    .where(eq(schema.eventLog.campaignId, campaignId))
+    .orderBy(asc(schema.eventLog.timestamp))
+    .all()
+    .map(rowToEvent)
+}
+
 export function createEvent(ctx: DbContext, input: CreateEventInput): EventLogEntry {
   // Derive campaignId from the session so the event stays campaign-scoped.
   const session = ctx.drizzle

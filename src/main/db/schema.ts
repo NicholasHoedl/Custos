@@ -83,18 +83,24 @@ export const statusHistory = sqliteTable(
   (t) => [index('status_history_entity_idx').on(t.entityId)]
 )
 
-// A note's content + provenance. Its entity association lives entirely in note_entity (M2M) — a note
-// has no entity_id column (dropped in 0004); it carries an optional session_id for "when".
+// A note's content + provenance. It carries a first-class campaign_id (its home) so a note can stand
+// alone as campaign lore; its entity association lives in note_entity (M2M) — a note MAY tag zero
+// entities (a world fact no single entity owns) or many (ADR-021). An optional session_id gives "when".
+// `confidence` is the epistemic weight the AI is told, so it hedges rumors/hypotheses (ADR-021).
 export const note = sqliteTable(
   'note',
   {
     id: text('id').primaryKey(),
+    campaignId: text('campaign_id')
+      .notNull()
+      .references(() => campaign.id, { onDelete: 'cascade' }),
     sessionId: text('session_id').references(() => session.id, { onDelete: 'set null' }),
     content: text('content').notNull(),
     tags: text('tags'), // JSON string[]
+    confidence: text('confidence').notNull().default('confirmed'), // NoteConfidence
     createdAt: integer('created_at').notNull()
   },
-  (t) => [index('note_session_idx').on(t.sessionId)]
+  (t) => [index('note_session_idx').on(t.sessionId), index('note_campaign_idx').on(t.campaignId)]
 )
 
 // One note ↔ many entities (M2M). After migration 0004 this is the SOLE source of truth for the
