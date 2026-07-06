@@ -67,6 +67,7 @@ export interface Campaign {
   id: string
   name: string
   description: string | null
+  mainCharacterId: string | null // the campaign's main character (a pc entity); default Recall/Suggest lens
   createdAt: number
   updatedAt: number
 }

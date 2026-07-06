@@ -25,6 +25,7 @@ export function createCampaign(ctx: DbContext, input: CreateCampaignInput): Camp
     id: newId(),
     name: input.name.trim(),
     description: input.description ?? null,
+    mainCharacterId: null,
     createdAt: ts,
     updatedAt: ts
   }
@@ -32,10 +33,34 @@ export function createCampaign(ctx: DbContext, input: CreateCampaignInput): Camp
   return rowToCampaign(row)
 }
 
+// A main-character pointer must reference a pc entity that lives in THIS campaign (or be null to clear).
+// Validated in the main process so a stale/hostile renderer can't point a campaign at a non-PC or an
+// entity from another campaign; a bad value rejects the update (the renderer only ever sends a PC it
+// listed for this campaign).
+function resolveMainCharacter(
+  ctx: DbContext,
+  campaignId: string,
+  entityId: string | null
+): string | null {
+  if (entityId === null) return null
+  const e = ctx.drizzle
+    .select({ type: schema.entity.type, campaignId: schema.entity.campaignId })
+    .from(schema.entity)
+    .where(eq(schema.entity.id, entityId))
+    .get()
+  if (!e || e.campaignId !== campaignId || e.type !== 'pc') {
+    throw new Error('Main character must be a player character in this campaign')
+  }
+  return entityId
+}
+
 export function updateCampaign(ctx: DbContext, id: string, patch: UpdateCampaignInput): Campaign {
   const set: Partial<typeof schema.campaign.$inferInsert> = { updatedAt: now() }
   if (patch.name !== undefined) set.name = patch.name.trim()
   if (patch.description !== undefined) set.description = patch.description
+  if (patch.mainCharacterId !== undefined) {
+    set.mainCharacterId = resolveMainCharacter(ctx, id, patch.mainCharacterId)
+  }
   ctx.drizzle.update(schema.campaign).set(set).where(eq(schema.campaign.id, id)).run()
   const c = getCampaign(ctx, id)
   if (!c) throw new Error(`Campaign ${id} not found`)

@@ -1,0 +1,1 @@
+ALTER TABLE `campaign` ADD `main_character_id` text REFERENCES entity(id) ON DELETE set null;

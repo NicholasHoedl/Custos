@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ViewKey = 'capture' | 'recall' | 'suggest' | 'settings'
+export type ViewKey = 'journal' | 'capture' | 'recall' | 'suggest' | 'settings'
 
 interface UiState {
   activeView: ViewKey
@@ -24,7 +24,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  activeView: 'capture',
+  activeView: 'journal',
   quickAddNonce: 0,
   searchFocusNonce: 0,
   entitiesVersion: 0,

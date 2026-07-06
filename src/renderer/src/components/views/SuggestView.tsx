@@ -35,6 +35,7 @@ import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
+import { SceneControls } from '@renderer/components/scene/SceneControls'
 import {
   Banner,
   PaneHeader,
@@ -160,6 +161,9 @@ export function SuggestView() {
           action={null}
         />
       ) : null}
+
+      {/* The scene (where the party is, who's present, the mode) — pinned into Suggest's grounding. */}
+      <SceneControls campaignId={activeCampaignId} />
 
       <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
         <Textarea

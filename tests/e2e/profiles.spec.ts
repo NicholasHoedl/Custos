@@ -15,42 +15,42 @@ test.afterAll(async () => {
   cleanup(userDataDir)
 })
 
-// Proves the per-type editor at runtime: traits as add/remove chips, the dropdown+custom status, and a
-// type-specific field — all round-tripping into the detail view.
+// Proves the per-type editor at runtime — reached now via the full "Add entity" form: traits as
+// add/remove chips, the dropdown+custom status, and a type-specific field — all round-tripping into
+// the detail view on create.
 test('per-type profile editor: chips, custom status, type-specific field', async () => {
   await page.getByRole('button', { name: 'New campaign' }).click()
   await page.getByLabel('Name').fill('Phandalin')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  const quickAdd = page.getByPlaceholder(/Quick add/)
-  await expect(quickAdd).toBeVisible()
-  await quickAdd.fill('Aldric Vane')
-  await quickAdd.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
+  // The Journal is the default view now; entity capture lives on the Capture view — navigate there.
+  await page.getByRole('button', { name: 'Capture' }).click()
 
-  // Open the editor.
-  await page.getByRole('button', { name: 'Edit' }).click()
+  // Open the full "Add entity" form (defaults to NPC) and drive its per-type fields directly.
+  await page.getByRole('button', { name: 'Add entity' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name').fill('Aldric Vane')
 
-  // Traits are chips now: add two (Enter), remove one (×).
-  const traits = page.getByLabel('Traits')
+  // Traits are chips: add two (Enter), remove one (×).
+  const traits = dialog.getByLabel('Traits')
   await traits.fill('gruff')
   await traits.press('Enter')
   await traits.fill('loyal')
   await traits.press('Enter')
-  await expect(page.getByRole('button', { name: 'Remove loyal' })).toBeVisible()
-  await page.getByRole('button', { name: 'Remove gruff' }).click()
-  await expect(page.getByRole('button', { name: 'Remove gruff' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Remove loyal' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Remove gruff' }).click()
+  await expect(dialog.getByRole('button', { name: 'Remove gruff' })).toHaveCount(0)
 
-  // Status: a curated dropdown that also accepts a custom typed value.
-  await page.locator('#ef-status').click()
+  // Status: a curated dropdown that also accepts a custom typed value (its popover is portalled).
+  await dialog.locator('#ef-status').click()
   await page.getByPlaceholder('Search or type…').fill('Cornered')
   await page.getByRole('option', { name: /Cornered/ }).click()
-  await expect(page.locator('#ef-status')).toContainText('Cornered')
+  await expect(dialog.locator('#ef-status')).toContainText('Cornered')
 
   // A type-specific field (NPC → Race).
-  await page.getByLabel('Race').fill('Half-orc')
+  await dialog.getByLabel('Race').fill('Half-orc')
 
-  await page.getByRole('button', { name: 'Save' }).click()
+  await dialog.getByRole('button', { name: 'Create' }).click()
 
   // Detail view reflects all of it.
   await expect(page.getByText('loyal')).toBeVisible()

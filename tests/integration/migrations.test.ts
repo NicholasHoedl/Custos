@@ -299,3 +299,37 @@ describe('note campaign_id + confidence migration (0006 table rebuild)', () => {
     db.close()
   })
 })
+
+describe('main character migration (0007 add column + FK set null)', () => {
+  it('adds main_character_id and self-clears it when the referenced pc is deleted (FK on)', () => {
+    const db = new Database(':memory:')
+    db.pragma('foreign_keys = OFF')
+    applyInTransaction(db, migrationFiles()) // every migration, including 0007
+    db.pragma('foreign_keys = ON')
+
+    const cols = (db.prepare('PRAGMA table_info(campaign)').all() as Array<{ name: string }>).map(
+      (c) => c.name
+    )
+    expect(cols).toContain('main_character_id')
+
+    db.prepare(
+      'INSERT INTO campaign (id, name, description, main_character_id, created_at, updated_at) VALUES (?,?,?,?,?,?)'
+    ).run('c1', 'Party', null, null, 1, 1)
+    db.prepare(
+      'INSERT INTO entity (id, campaign_id, type, name, created_at, updated_at) VALUES (?,?,?,?,?,?)'
+    ).run('pc1', 'c1', 'pc', 'Theron', 1, 1)
+    db.prepare('UPDATE campaign SET main_character_id = ? WHERE id = ?').run('pc1', 'c1')
+    expect(db.prepare('SELECT main_character_id AS m FROM campaign WHERE id = ?').get('c1')).toEqual({
+      m: 'pc1'
+    })
+
+    // Deleting the pc self-clears the pointer (ON DELETE SET NULL) — it does NOT block the delete or
+    // cascade-remove the campaign. If this flips, the 0007 hand-fix (adding ON DELETE set null) is gone.
+    db.prepare('DELETE FROM entity WHERE id = ?').run('pc1')
+    expect(db.prepare('SELECT main_character_id AS m FROM campaign WHERE id = ?').get('c1')).toEqual({
+      m: null
+    })
+    expect(db.prepare('SELECT count(*) AS c FROM campaign').get()).toEqual({ c: 1 })
+    db.close()
+  })
+})

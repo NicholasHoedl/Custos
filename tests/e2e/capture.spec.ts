@@ -15,33 +15,37 @@ test.afterAll(async () => {
   cleanup(userDataDir)
 })
 
+// Open the full "Add entity" form (top of the entity browser; defaults to NPC), fill it, and create.
+async function addEntity(name: string, description?: string): Promise<void> {
+  await page.getByRole('button', { name: 'Add entity' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name').fill(name)
+  if (description) await dialog.getByLabel('Description').fill(description)
+  await dialog.getByRole('button', { name: 'Create' }).click()
+}
+
 // Drives the real UI through the preload bridge — proves SPEC Flows A + B end-to-end at runtime:
-// campaign → session → quick-add entities → session-linked note → typed relationship → local search.
-test('capture flow: campaign, session, entities, note, link, search, delete', async () => {
+// campaign → session → add entities (full profile form) → typed relationship → local search → delete.
+test('capture flow: campaign, session, entities, link, search, delete', async () => {
   // Flow A — create and activate a campaign.
   await page.getByRole('button', { name: 'New campaign' }).click()
   await page.getByLabel('Name').fill('Phandalin')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // Quick-add appears only once a campaign is active.
-  const quickAdd = page.getByPlaceholder(/Quick add/)
-  await expect(quickAdd).toBeVisible()
+  // The Journal is the default view; entity capture lives on the Capture view — navigate there.
+  await page.getByRole('button', { name: 'Capture' }).click()
 
   // Start a session (auto-numbered).
   await page.getByRole('button', { name: 'New session' }).click()
   await expect(page.getByText(/Session 1/).first()).toBeVisible()
 
-  // Flow B — quick-add an NPC with an optional session-linked first note; it opens in the detail panel.
-  await quickAdd.fill('Aldric Vane')
-  await page.getByPlaceholder('First note (optional)').fill('Owes the party a favor.')
-  await quickAdd.press('Enter')
+  // Flow B — add an NPC via the full "Add entity" form; on create it opens in the detail panel.
+  await addEntity('Aldric Vane', 'Owes the party a favor.')
   await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
-  // The note shows under the entity in its (now read-only) note list.
   await expect(page.getByText('Owes the party a favor.')).toBeVisible()
 
   // A second NPC, so we have something to link to.
-  await quickAdd.fill('Mirna Dendrar')
-  await quickAdd.press('Enter')
+  await addEntity('Mirna Dendrar')
   await expect(page.getByRole('heading', { name: 'Mirna Dendrar' })).toBeVisible()
 
   // Re-select the first NPC and create a typed relationship to the second.
@@ -55,7 +59,7 @@ test('capture flow: campaign, session, entities, note, link, search, delete', as
   // The registry's directional label renders on the source entity.
   await expect(page.getByText('ally of')).toBeVisible()
 
-  // Local search finds the entity via its note content (note-hit → parent entity).
+  // Local search finds the entity via its description content.
   await page.getByPlaceholder('Search…').fill('favor')
   await expect(page.getByText(/favor/i).last()).toBeVisible()
   await page.getByPlaceholder('Search…').fill('')

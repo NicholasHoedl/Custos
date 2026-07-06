@@ -210,7 +210,7 @@ function ReasonBanner({ reason }: { reason: RecapReason | null }) {
   if (reason === 'empty')
     return (
       <Banner icon={<Sparkles className="size-4" />} className="mb-3">
-        This session has no beats or notes yet — capture some first, then recap it.
+        This session has no journal entries or notes yet — capture some first, then recap it.
       </Banner>
     )
   if (reason === 'no_key')

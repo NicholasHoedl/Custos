@@ -35,6 +35,7 @@ export interface CreateCampaignInput {
 export interface UpdateCampaignInput {
   name?: string
   description?: string | null
+  mainCharacterId?: string | null // a pc entity in this campaign, or null to clear (validated in the service)
 }
 export interface CreateSessionInput {
   campaignId: string

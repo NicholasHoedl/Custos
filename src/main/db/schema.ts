@@ -18,6 +18,11 @@ export const campaign = sqliteTable('campaign', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
+  // The campaign's protagonist from this user's seat: a pc entity whose lens defaults Recall/Suggest
+  // and frames the journal. Nullable (unset); self-clears if the PC is deleted. The FK is declared via
+  // a thunk because `entity` is defined below — campaign<->entity is a benign cycle, and migrate() runs
+  // with foreign_keys=OFF so creation order never matters. Nullable, so a plain ADD COLUMN is clean.
+  mainCharacterId: text('main_character_id').references(() => entity.id, { onDelete: 'set null' }),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull()
 })

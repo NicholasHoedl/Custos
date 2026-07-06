@@ -1,50 +1,44 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { AlertTriangle, FileText, KeyRound, Sparkles, WifiOff } from 'lucide-react'
-import type {
-  ConfirmedEntity,
-  ConfirmedNote,
-  EntityRef,
-  ExtractFailureReason,
-  MatchCandidate
-} from '@shared/import-types'
+import type { Session } from '@shared/entity-types'
+import type { ExtractFailureReason } from '@shared/import-types'
 import { plural } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { useEntities } from '@renderer/hooks/use-ledger'
+import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useImport } from '@renderer/hooks/use-import'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
-import { EntityRow, NoteRow } from '@renderer/components/capture/import-rows'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
+import { ChangesetReview } from '@renderer/components/capture/ChangesetReview'
 import { Banner, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
-// Paste raw text → Claude proposes entities + notes → review/edit/confirm each → apply in one txn.
-// Lives as a Capture pane (like Notes/Recap).
+// The target-session choice: 'active' stamps at the app's current session (the default); a session id
+// stamps at that specific session; SESSION_NONE leaves notes undated. This is what lets you import notes
+// taken elsewhere — or handed over by another player — and tie them (and any status/relationship
+// changes) to the session they actually belong to.
+const SESSION_NONE = '__none__'
+
+// Paste raw text → Claude proposes entities + notes + status/relationship changes → review/edit/confirm
+// each → apply in one transaction, stamped at a chosen session. A Capture pane (like Notes/Recap). The
+// extract/review/apply engine is shared with the Journal (ADR-014/018/022); `withChanges` turns on the
+// status/relationship proposals (this pane absorbed the old Backfill's capability).
 export function ImportView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const setActiveView = useUiStore((s) => s.setActiveView)
   const { status: onb } = useOnboarding()
   const { entities: campaignEntities } = useEntities(activeCampaignId)
-  const imp = useImport()
+  const { sessions } = useSessions(activeCampaignId)
+  const imp = useImport({ withChanges: true })
   const [text, setText] = useState('')
-
-  const matchesByIndex = useMemo(() => {
-    const m = new Map<number, MatchCandidate[]>()
-    imp.proposal?.entities.forEach((pe) => m.set(pe.index, pe.matches))
-    return m
-  }, [imp.proposal])
-
-  const existingName = (id: string): string =>
-    campaignEntities.find((e) => e.id === id)?.name ?? 'an entity'
-  const refName = (r: EntityRef): string =>
-    r.kind === 'existing'
-      ? existingName(r.entityId)
-      : (imp.entities.find((e) => e.index === r.index)?.name ?? 'new entity')
-
-  const patchEntity = (index: number, patch: Partial<ConfirmedEntity>): void =>
-    imp.setEntities((es) => es.map((e) => (e.index === index ? { ...e, ...patch } : e)))
-  const patchNote = (i: number, patch: Partial<ConfirmedNote>): void =>
-    imp.setNotes((ns) => ns.map((n, j) => (j === i ? { ...n, ...patch } : n)))
+  const [sessionChoice, setSessionChoice] = useState<string>('active')
 
   if (!onb.keyReady) {
     return (
@@ -65,6 +59,7 @@ export function ImportView() {
 
   if (imp.status === 'done' && imp.result) {
     const r = imp.result
+    const changes = r.statusChangesApplied + r.relationshipChangesApplied
     return (
       <PaneShell size="form">
         <Header />
@@ -72,8 +67,14 @@ export function ImportView() {
           <p className="text-sm text-foreground">
             Imported <strong>{r.createdEntityIds.length}</strong>{' '}
             {plural(r.createdEntityIds.length, 'new entity', 'new entities')}
-            {r.linkedEntityIds.length > 0 && <> · linked {r.linkedEntityIds.length}</>} ·{' '}
-            <strong>{r.createdNoteIds.length}</strong>{' '}
+            {r.linkedEntityIds.length > 0 && <> · linked {r.linkedEntityIds.length}</>}
+            {changes > 0 && (
+              <>
+                {' '}
+                · <strong>{changes}</strong> {plural(changes, 'change', 'changes')}
+              </>
+            )}{' '}
+            · <strong>{r.createdNoteIds.length}</strong>{' '}
             {plural(r.createdNoteIds.length, 'note', 'notes')}.
           </p>
           {r.skipped.length > 0 && (
@@ -100,58 +101,24 @@ export function ImportView() {
   }
 
   if (imp.status === 'review' || imp.status === 'applying') {
-    const creating = imp.entities.filter((e) => e.action === 'create').length
-    const linking = imp.entities.filter((e) => e.action === 'link').length
-    const noting = imp.notes.filter((n) => n.include).length
-    const applying = imp.status === 'applying'
+    // 'active' → let apply() use the app's current session; else stamp at the chosen session (or undated).
+    const applySession =
+      sessionChoice === 'active' ? undefined : sessionChoice === SESSION_NONE ? null : sessionChoice
     return (
       <PaneShell size="form">
         <Header />
-        <div className="flex-1 space-y-4 overflow-y-auto pr-1">
-          {imp.entities.length > 0 && (
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Entities
-              </h3>
-              {imp.entities.map((e) => (
-                <EntityRow
-                  key={e.index}
-                  entity={e}
-                  matches={matchesByIndex.get(e.index) ?? []}
-                  existingName={existingName}
-                  onPatch={(p) => patchEntity(e.index, p)}
-                />
-              ))}
-            </section>
-          )}
-          {imp.notes.length > 0 && (
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Notes
-              </h3>
-              {imp.notes.map((n, i) => (
-                <NoteRow key={i} note={n} refName={refName} onPatch={(p) => patchNote(i, p)} />
-              ))}
-            </section>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">
-            {creating} new · {linking} linked · {noting} {plural(noting, 'note', 'notes')}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={imp.reset} disabled={applying}>
-              Discard
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => imp.apply()}
-              disabled={applying || (creating === 0 && linking === 0 && noting === 0)}
-            >
-              {applying ? 'Applying…' : 'Apply'}
-            </Button>
+        {sessions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>These notes &amp; changes belong to</span>
+            <SessionPicker sessions={sessions} value={sessionChoice} onChange={setSessionChoice} />
           </div>
-        </div>
+        )}
+        <ChangesetReview
+          imp={imp}
+          campaignEntities={campaignEntities}
+          onApply={() => imp.apply(applySession)}
+          onDiscard={imp.reset}
+        />
       </PaneShell>
     )
   }
@@ -164,9 +131,9 @@ export function ImportView() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={10}
-        placeholder="Paste session notes, a chat log, or a backstory… Claude proposes entities and notes to add."
+        placeholder="Paste session notes, a chat log, or another player's write-up… Claude proposes the entities, notes, and status/relationship changes to add."
       />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs text-muted-foreground">
           {text.length.toLocaleString()} characters
           {text.length > 20000 ? ' — long pastes cost more and may be truncated' : ''}
@@ -186,11 +153,42 @@ export function ImportView() {
   )
 }
 
+// Ties this import to a session: the current one (default), a specific past session, or none (undated).
+function SessionPicker({
+  sessions,
+  value,
+  onChange
+}: {
+  sessions: Session[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-7 w-auto gap-1.5 text-xs">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="active">the current session</SelectItem>
+        {[...sessions]
+          .sort((a, b) => b.number - a.number)
+          .map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              Session {s.number}
+              {s.title ? ` — ${s.title}` : ''}
+            </SelectItem>
+          ))}
+        <SelectItem value={SESSION_NONE}>no session (undated)</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
 function Header() {
   return (
     <PaneHeader
       title="Import"
-      description="Paste raw text; review the entities and notes Claude proposes before adding them."
+      description="Paste notes from anywhere — Claude proposes the entities, notes, and status/relationship changes to add, tied to a session you choose."
     />
   )
 }

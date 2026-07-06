@@ -7,7 +7,12 @@ import {
   listCampaigns,
   updateCampaign
 } from '../../../src/main/services/campaign.service'
-import { createEntity, getEntity, listEntities } from '../../../src/main/services/entity.service'
+import {
+  createEntity,
+  deleteEntity,
+  getEntity,
+  listEntities
+} from '../../../src/main/services/entity.service'
 import { createSession, listSessions } from '../../../src/main/services/session.service'
 import { createNote, listAllNotes, listNotesForEntity } from '../../../src/main/services/note.service'
 import { createEvent, listEvents } from '../../../src/main/services/event.service'
@@ -87,5 +92,42 @@ describe('campaign.service', () => {
     expect(getCampaign(ctx, otherId)?.name).toBe('Survivor')
     expect(getEntity(ctx, safe.id)?.name).toBe('Safe')
     expect(listCampaigns(ctx).map((c) => c.name)).toEqual(['Survivor'])
+  })
+
+  describe('main character', () => {
+    it('is null on a new campaign', () => {
+      const c = createCampaign(ctx, { name: 'Fresh' })
+      expect(c.mainCharacterId).toBeNull()
+      expect(getCampaign(ctx, c.id)?.mainCharacterId).toBeNull()
+    })
+
+    it('sets a pc as the main character and clears it with null', () => {
+      const c = createCampaign(ctx, { name: 'Party' })
+      const pc = createEntity(ctx, { campaignId: c.id, type: 'pc', name: 'Theron' })
+      expect(updateCampaign(ctx, c.id, { mainCharacterId: pc.id }).mainCharacterId).toBe(pc.id)
+      expect(updateCampaign(ctx, c.id, { mainCharacterId: null }).mainCharacterId).toBeNull()
+    })
+
+    it('rejects a non-pc entity, persisting nothing', () => {
+      const c = createCampaign(ctx, { name: 'Party' })
+      const npc = createEntity(ctx, { campaignId: c.id, type: 'npc', name: 'Harrow' })
+      expect(() => updateCampaign(ctx, c.id, { mainCharacterId: npc.id })).toThrow()
+      expect(getCampaign(ctx, c.id)?.mainCharacterId).toBeNull()
+    })
+
+    it('rejects a pc from a different campaign', () => {
+      const a = createCampaign(ctx, { name: 'A' })
+      const b = createCampaign(ctx, { name: 'B' })
+      const pcB = createEntity(ctx, { campaignId: b.id, type: 'pc', name: 'Outsider' })
+      expect(() => updateCampaign(ctx, a.id, { mainCharacterId: pcB.id })).toThrow()
+    })
+
+    it('self-clears when the main-character pc is deleted (FK set null)', () => {
+      const c = createCampaign(ctx, { name: 'Party' })
+      const pc = createEntity(ctx, { campaignId: c.id, type: 'pc', name: 'Theron' })
+      updateCampaign(ctx, c.id, { mainCharacterId: pc.id })
+      deleteEntity(ctx, pc.id)
+      expect(getCampaign(ctx, c.id)?.mainCharacterId).toBeNull()
+    })
   })
 })

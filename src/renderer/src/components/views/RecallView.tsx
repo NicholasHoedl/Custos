@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { AlertTriangle, Download, KeyRound, RotateCcw, Search, Sparkles, WifiOff } from 'lucide-react'
-import type { RecallMode, RecallSource } from '@shared/recall-types'
-import { cn } from '@renderer/lib/utils'
+import { AlertTriangle, Download, KeyRound, RotateCcw, Search, WifiOff } from 'lucide-react'
+import type { RecallSource } from '@shared/recall-types'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useRecall } from '@renderer/hooks/use-recall'
@@ -20,12 +19,10 @@ import {
 
 export function RecallView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
-  const activePcId = useAppStore((s) => s.activePcId)
   const setActiveView = useUiStore((s) => s.setActiveView)
   const { status: onb, progress, downloading, error: setupError, download } = useOnboarding()
   const recall = useRecall()
   const [query, setQuery] = useState('')
-  const [mode, setMode] = useState<RecallMode>('in_character')
   const { sessions } = useSessions(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
 
@@ -41,13 +38,13 @@ export function RecallView() {
     )
   }
 
-  const canInCharacter = Boolean(activePcId)
-  const effectiveMode: RecallMode = canInCharacter ? mode : 'factual'
   const streaming = recall.status === 'streaming'
 
   function submit() {
     if (!query.trim() || streaming || !onb.modelReady) return
-    recall.ask(query, effectiveMode, asOf ?? undefined)
+    // In-character Recall is disabled in the UI for now (the logic stays in recall.service); ask
+    // factually. Restore the mode toggle below to bring it back.
+    recall.ask(query, 'factual', asOf ?? undefined)
   }
 
   return (
@@ -55,12 +52,7 @@ export function RecallView() {
       <PaneHeader
         title="Recall"
         size="lg"
-        description={
-          <>
-            Ask in plain language.{' '}
-            {canInCharacter ? 'Answered in character.' : 'Answered from your notes.'}
-          </>
-        }
+        description="Ask in plain language — answered from your notes."
         action={
           (query.trim().length > 0 || recall.status !== 'idle') && (
             <Button
@@ -122,7 +114,6 @@ export function RecallView() {
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <ModeToggle mode={effectiveMode} setMode={setMode} canInCharacter={canInCharacter} />
             <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
           </div>
           {streaming ? (
@@ -135,11 +126,6 @@ export function RecallView() {
             </Button>
           )}
         </div>
-        {!canInCharacter && (
-          <p className="text-xs text-muted-foreground">
-            Tip: select an active character in the sidebar to answer in character.
-          </p>
-        )}
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto">
@@ -177,49 +163,6 @@ export function RecallView() {
         {recall.sources.length > 0 && <Sources sources={recall.sources} />}
       </div>
     </PaneShell>
-  )
-}
-
-function ModeToggle({
-  mode,
-  setMode,
-  canInCharacter
-}: {
-  mode: RecallMode
-  setMode: (m: RecallMode) => void
-  canInCharacter: boolean
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
-      <button
-        type="button"
-        onClick={() => canInCharacter && setMode('in_character')}
-        disabled={!canInCharacter}
-        title={canInCharacter ? undefined : 'Select an active character to answer in character'}
-        className={cn(
-          'flex items-center gap-1 rounded px-2 py-1 transition-colors',
-          mode === 'in_character'
-            ? 'bg-primary/15 text-primary'
-            : 'text-muted-foreground hover:text-foreground',
-          !canInCharacter && 'cursor-not-allowed opacity-50'
-        )}
-      >
-        <Sparkles className="size-3" />
-        In character
-      </button>
-      <button
-        type="button"
-        onClick={() => setMode('factual')}
-        className={cn(
-          'rounded px-2 py-1 transition-colors',
-          mode === 'factual'
-            ? 'bg-primary/15 text-primary'
-            : 'text-muted-foreground hover:text-foreground'
-        )}
-      >
-        Just the facts
-      </button>
-    </div>
   )
 }
 

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { BookText, CalendarClock, FileInput, ScrollText, Search, StickyNote } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { BookText, FileInput, Plus, Search, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -7,32 +7,34 @@ import {
   type EntityType
 } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
+import { useUiStore } from '@renderer/store/ui-store'
+import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
+import { EntityForm } from '@renderer/components/entities/EntityForm'
 
 export type EntityFilter = EntityType | 'all'
 /** Which non-entity pane the capture detail area shows when no entity is selected. */
-export type CapturePanel = 'session' | 'notes' | 'recap' | 'import' | 'backfill'
+export type CapturePanel = 'notes' | 'recap' | 'import'
 
 const FILTERS: EntityFilter[] = ['all', ...ENTITY_TYPES]
 
 interface EntityBrowserProps {
   entities: Entity[]
+  campaignId: string
   selectedId: string | null
   filter: EntityFilter
   onFilterChange: (filter: EntityFilter) => void
   onSelect: (id: string) => void
+  /** Called after the "Add entity" form creates one, so the parent can select it. */
+  onCreated: (entity: Entity) => void
   /** The active non-entity pane (drives the header highlight when nothing is selected). */
   panel: CapturePanel
-  /** Clear the selection and show the session log in the detail pane. */
-  onShowSessionLog: () => void
   /** Clear the selection and show the notes pane in the detail pane. */
   onShowNotes: () => void
   /** Clear the selection and show the recap pane in the detail pane. */
   onShowRecap: () => void
   /** Clear the selection and show the import pane in the detail pane. */
   onShowImport: () => void
-  /** Clear the selection and show the backfill interview in the detail pane. */
-  onShowBackfill: () => void
 }
 
 // Master list of all entities in the campaign, filtered client-side by type (chips, with live counts)
@@ -40,18 +42,31 @@ interface EntityBrowserProps {
 // Selecting opens the entity in the detail panel.
 export function EntityBrowser({
   entities,
+  campaignId,
   selectedId,
   filter,
   onFilterChange,
   onSelect,
+  onCreated,
   panel,
-  onShowSessionLog,
   onShowNotes,
   onShowRecap,
-  onShowImport,
-  onShowBackfill
+  onShowImport
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+
+  // The global quick-add hotkey / Ctrl+K (ADR-010) now opens the full Add-entity form. Skip the initial
+  // mount so it only fires on an actual bump, not on first render.
+  const quickAddNonce = useUiStore((s) => s.quickAddNonce)
+  const firstNonce = useRef(true)
+  useEffect(() => {
+    if (firstNonce.current) {
+      firstNonce.current = false
+      return
+    }
+    setAddOpen(true)
+  }, [quickAddNonce])
 
   const byType = filter === 'all' ? entities : entities.filter((e) => e.type === filter)
   const q = query.trim().toLowerCase()
@@ -64,19 +79,19 @@ export function EntityBrowser({
 
   return (
     <div className="flex h-full flex-col">
+      <div className="border-b border-border p-2">
+        <Button className="w-full" onClick={() => setAddOpen(true)}>
+          <Plus className="size-4" />
+          Add entity
+        </Button>
+      </div>
+      <EntityForm
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        campaignId={campaignId}
+        onSaved={onCreated}
+      />
       <div className="space-y-1 border-b border-border p-2">
-        <button
-          onClick={onShowSessionLog}
-          className={cn(
-            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-            !selectedId && panel === 'session'
-              ? 'bg-primary/15 text-primary'
-              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-          )}
-        >
-          <ScrollText className="size-4" />
-          Session Log
-        </button>
         <button
           onClick={onShowNotes}
           className={cn(
@@ -112,18 +127,6 @@ export function EntityBrowser({
         >
           <FileInput className="size-4" />
           Import
-        </button>
-        <button
-          onClick={onShowBackfill}
-          className={cn(
-            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-            !selectedId && panel === 'backfill'
-              ? 'bg-primary/15 text-primary'
-              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-          )}
-        >
-          <CalendarClock className="size-4" />
-          Backfill
         </button>
       </div>
       <div className="border-b border-border">
