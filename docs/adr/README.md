@@ -30,6 +30,8 @@ ADR that supersedes the old one (don't edit the old one).
 | [016](016-suggest-multitag-overhaul.md) | Suggest output model v2: multi-tag moments + directions mode (supersedes ADR-009) | Accepted | 2026-06-30 |
 | [017](017-chronology-temporal-model.md) | Chronology: session-led temporal model (validity intervals + as-of reconstruction) | Accepted | 2026-07-01 |
 | [018](018-backfill-interview.md) | Backfill interview: roster-then-beats guided import onto the timeline | Accepted | 2026-07-02 |
+| [019](019-event-entity-rescope.md) | Event entities re-scoped: world history, not party beats | Accepted | 2026-07-02 |
+| [020](020-operational-hardening.md) | Operational hardening: DB backups, logging, startup recovery | Accepted | 2026-07-02 |
 
 ## Status legend
 

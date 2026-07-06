@@ -54,7 +54,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
     ledger.graph
       .hierarchy(entity.id, kind)
       .then(setHierarchy)
-      .catch(() => setHierarchy(null))
+      .catch(() => setHierarchy(null)) // intentional: the hierarchy tree is supplementary; degrade to hidden, not a toast
   }, [entity, isHierarchical])
 
   if (!entity) {

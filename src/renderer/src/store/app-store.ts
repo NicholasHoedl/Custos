@@ -4,6 +4,9 @@ import type { SceneContext, SceneMode, TimeOfDay } from '@shared/scene-types'
 const CAMPAIGN_KEY = 'ledger.activeCampaignId'
 const PC_KEY = 'ledger.activePcId'
 const SCENE_KEY = 'ledger.scene'
+// The active session is persisted PER CAMPAIGN (T3) so relaunch restores the session you were on —
+// and switching campaigns restores that campaign's session — instead of resetting to null.
+const sessionKey = (campaignId: string): string => `ledger.activeSessionId:${campaignId}`
 
 function persisted(key: string): string | null {
   return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null
@@ -39,18 +42,22 @@ function persistScene(scene: SceneContext): void {
 
 // The active selections that drive the whole app (campaign / session / player character), the current
 // "scene" (where the party is, the time, who's present, the quest in progress, whether in combat), and
-// the entity open in the detail panel. activeCampaignId / activePcId / scene persist so relaunch
-// restores context; the active PC and the scene are campaign-scoped and cleared when the campaign changes.
+// the entity open in the detail panel. activeCampaignId / activePcId / scene / (per-campaign) session
+// persist so relaunch restores context; the active PC and the scene are campaign-scoped and cleared
+// when the campaign changes.
 interface AppState {
   activeCampaignId: string | null
   activeSessionId: string | null
   activePcId: string | null
   selectedEntityId: string | null
+  /** The session picked in the Recap pane — survives pane switches (campaign-scoped, not persisted). */
+  recapSessionId: string | null
   scene: SceneContext
   setActiveCampaign: (id: string | null) => void
   setActiveSession: (id: string | null) => void
   setActivePc: (id: string | null) => void
   setSelectedEntity: (id: string | null) => void
+  setRecapSession: (id: string | null) => void
   setSceneLocation: (id: string | null) => void
   setEmbarkedQuest: (id: string | null) => void
   setNearbyPcs: (ids: string[]) => void
@@ -59,11 +66,14 @@ interface AppState {
   setTimeOfDay: (t: TimeOfDay | null) => void
 }
 
+const initialCampaign = persisted(CAMPAIGN_KEY)
+
 export const useAppStore = create<AppState>((set) => ({
-  activeCampaignId: persisted(CAMPAIGN_KEY),
-  activeSessionId: null,
+  activeCampaignId: initialCampaign,
+  activeSessionId: initialCampaign ? persisted(sessionKey(initialCampaign)) : null,
   activePcId: persisted(PC_KEY),
   selectedEntityId: null,
+  recapSessionId: null,
   scene: persistedScene(),
   setActiveCampaign: (id) => {
     persist(CAMPAIGN_KEY, id)
@@ -71,13 +81,19 @@ export const useAppStore = create<AppState>((set) => ({
     persistScene({ ...EMPTY_SCENE }) // the scene is campaign-scoped too
     set({
       activeCampaignId: id,
-      activeSessionId: null,
+      activeSessionId: id ? persisted(sessionKey(id)) : null, // restore this campaign's last session
       activePcId: null,
       selectedEntityId: null,
+      recapSessionId: null,
       scene: { ...EMPTY_SCENE }
     })
   },
-  setActiveSession: (id) => set({ activeSessionId: id }),
+  setActiveSession: (id) =>
+    set((s) => {
+      if (s.activeCampaignId) persist(sessionKey(s.activeCampaignId), id)
+      return { activeSessionId: id }
+    }),
+  setRecapSession: (id) => set({ recapSessionId: id }),
   setActivePc: (id) =>
     set((s) => {
       persist(PC_KEY, id)

@@ -1,7 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, BookText, KeyRound, RotateCcw, Sparkles, WifiOff } from 'lucide-react'
 import type { RecapReason } from '@shared/recap-types'
-import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useSessions } from '@renderer/hooks/use-ledger'
@@ -25,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@renderer/components/ui/alert-dialog'
+import { Banner, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
 // "Previously on…" — generate a neutral recap of a chosen session, grounded in that session's beats and
 // notes, streamed in and saved to the session's summary. Lives as a Capture pane (like Notes).
@@ -34,13 +34,19 @@ export function RecapView() {
   const { status: onb } = useOnboarding()
   const { sessions, refresh } = useSessions(activeCampaignId)
   const recap = useRecap()
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  // The picked session lives in the app store so it survives switching panes (e.g. Recap → Capture
+  // and back while working through a backlog of recaps).
+  const sessionId = useAppStore((s) => s.recapSessionId)
+  const setRecapSession = useAppStore((s) => s.setRecapSession)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  // Default to the newest session once the list loads (sessions come back newest-first).
+  // Default to the newest session once the list loads (sessions come back newest-first), and recover
+  // if the remembered session no longer exists (deleted).
   useEffect(() => {
-    if (!sessionId && sessions.length) setSessionId(sessions[0].id)
-  }, [sessions, sessionId])
+    if (sessions.length && (!sessionId || !sessions.some((s) => s.id === sessionId))) {
+      setRecapSession(sessions[0].id)
+    }
+  }, [sessions, sessionId, setRecapSession])
 
   // After a successful save, refresh the list so the stored summary is reflected in the picker state.
   useEffect(() => {
@@ -51,7 +57,7 @@ export function RecapView() {
   const streaming = recap.status === 'streaming'
 
   function pick(id: string) {
-    setSessionId(id)
+    setRecapSession(id)
     recap.reset()
   }
 
@@ -63,7 +69,7 @@ export function RecapView() {
 
   if (!onb.keyReady) {
     return (
-      <Wrap>
+      <PaneShell size="form">
         <SetupCard
           title="Add your API key to generate recaps"
           body="Recap uses Claude to summarize a session — add a key to enable it."
@@ -73,7 +79,7 @@ export function RecapView() {
             </Button>
           }
         />
-      </Wrap>
+      </PaneShell>
     )
   }
 
@@ -90,26 +96,24 @@ export function RecapView() {
   const body = recap.recap || (recap.status === 'idle' ? (selected?.summary ?? '') : '')
 
   return (
-    <Wrap>
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-foreground">Recap</h1>
-          <p className="text-sm text-muted-foreground">
-            A “previously on…” of a session, saved to its summary.
-          </p>
-        </div>
-        {(recap.recap || recap.status !== 'idle') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0 text-muted-foreground"
-            onClick={recap.reset}
-          >
-            <RotateCcw className="size-3.5" />
-            Reset
-          </Button>
-        )}
-      </header>
+    <PaneShell size="form">
+      <PaneHeader
+        title="Recap"
+        description="A “previously on…” of a session, saved to its summary."
+        action={
+          (recap.recap || recap.status !== 'idle') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={recap.reset}
+            >
+              <RotateCcw className="size-3.5" />
+              Reset
+            </Button>
+          )
+        }
+      />
 
       <div className="flex items-center gap-2">
         <Select value={sessionId ?? undefined} onValueChange={pick}>
@@ -140,7 +144,7 @@ export function RecapView() {
 
       <div className="flex-1 overflow-y-auto">
         {recap.status === 'error' && (
-          <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+          <Banner icon={<AlertTriangle className="size-4" />} tone="destructive" className="mb-3">
             Something went wrong: {recap.error?.message}
           </Banner>
         )}
@@ -186,12 +190,8 @@ export function RecapView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Wrap>
+    </PaneShell>
   )
-}
-
-function Wrap({ children }: { children: ReactNode }) {
-  return <div className="mx-auto flex h-full max-w-2xl flex-col gap-4 p-6">{children}</div>
 }
 
 function Centered({ title, body }: { title: string; body: string }) {
@@ -206,63 +206,24 @@ function Centered({ title, body }: { title: string; body: string }) {
   )
 }
 
-function SetupCard({ title, body, action }: { title: string; body: string; action: ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-      <span className="text-primary">
-        <KeyRound className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{body}</p>
-      </div>
-      <div className="shrink-0">{action}</div>
-    </div>
-  )
-}
-
 function ReasonBanner({ reason }: { reason: RecapReason | null }) {
   if (reason === 'empty')
     return (
-      <Banner icon={<Sparkles className="size-4" />}>
+      <Banner icon={<Sparkles className="size-4" />} className="mb-3">
         This session has no beats or notes yet — capture some first, then recap it.
       </Banner>
     )
   if (reason === 'no_key')
     return (
-      <Banner icon={<KeyRound className="size-4" />}>No API key — add one in Settings.</Banner>
+      <Banner icon={<KeyRound className="size-4" />} className="mb-3">
+        No API key — add one in Settings.
+      </Banner>
     )
   if (reason === 'offline')
     return (
-      <Banner icon={<WifiOff className="size-4" />}>
+      <Banner icon={<WifiOff className="size-4" />} className="mb-3">
         You’re offline — Recap needs an internet connection.
       </Banner>
     )
   return null
-}
-
-function Banner({
-  icon,
-  children,
-  tone = 'muted'
-}: {
-  icon: ReactNode
-  children: ReactNode
-  tone?: 'muted' | 'destructive'
-}) {
-  return (
-    <div
-      className={cn(
-        'mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
-        tone === 'destructive'
-          ? 'border-destructive/40 bg-destructive/10 text-foreground'
-          : 'border-border bg-muted/40 text-muted-foreground'
-      )}
-    >
-      <span className={tone === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}>
-        {icon}
-      </span>
-      <span>{children}</span>
-    </div>
-  )
 }

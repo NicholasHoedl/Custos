@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { AlertTriangle, FileText, KeyRound, Sparkles, WifiOff } from 'lucide-react'
 import type {
   ConfirmedEntity,
@@ -7,7 +7,7 @@ import type {
   ExtractFailureReason,
   MatchCandidate
 } from '@shared/import-types'
-import { cn } from '@renderer/lib/utils'
+import { plural } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useEntities } from '@renderer/hooks/use-ledger'
@@ -16,6 +16,7 @@ import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { EntityRow, NoteRow } from '@renderer/components/capture/import-rows'
+import { Banner, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
 // Paste raw text → Claude proposes entities + notes → review/edit/confirm each → apply in one txn.
 // Lives as a Capture pane (like Notes/Recap).
@@ -47,7 +48,7 @@ export function ImportView() {
 
   if (!onb.keyReady) {
     return (
-      <Wrap>
+      <PaneShell size="form">
         <Header />
         <SetupCard
           title="Add your API key to import"
@@ -58,14 +59,14 @@ export function ImportView() {
             </Button>
           }
         />
-      </Wrap>
+      </PaneShell>
     )
   }
 
   if (imp.status === 'done' && imp.result) {
     const r = imp.result
     return (
-      <Wrap>
+      <PaneShell size="form">
         <Header />
         <div className="rounded-lg border border-border bg-card/60 p-4">
           <p className="text-sm text-foreground">
@@ -94,7 +95,7 @@ export function ImportView() {
         >
           Import more
         </Button>
-      </Wrap>
+      </PaneShell>
     )
   }
 
@@ -104,7 +105,7 @@ export function ImportView() {
     const noting = imp.notes.filter((n) => n.include).length
     const applying = imp.status === 'applying'
     return (
-      <Wrap>
+      <PaneShell size="form">
         <Header />
         <div className="flex-1 space-y-4 overflow-y-auto pr-1">
           {imp.entities.length > 0 && (
@@ -151,13 +152,13 @@ export function ImportView() {
             </Button>
           </div>
         </div>
-      </Wrap>
+      </PaneShell>
     )
   }
 
   const extracting = imp.status === 'extracting'
   return (
-    <Wrap>
+    <PaneShell size="form">
       <Header />
       <Textarea
         value={text}
@@ -181,41 +182,16 @@ export function ImportView() {
         </Banner>
       )}
       {imp.reason && <ReasonBanner reason={imp.reason} />}
-    </Wrap>
+    </PaneShell>
   )
 }
 
 function Header() {
   return (
-    <header>
-      <h1 className="font-display text-2xl font-semibold text-foreground">Import</h1>
-      <p className="text-sm text-muted-foreground">
-        Paste raw text; review the entities and notes Claude proposes before adding them.
-      </p>
-    </header>
-  )
-}
-
-function Wrap({ children }: { children: ReactNode }) {
-  return <div className="mx-auto flex h-full max-w-2xl flex-col gap-4 p-6">{children}</div>
-}
-
-function plural(n: number, one: string, many: string): string {
-  return n === 1 ? one : many
-}
-
-function SetupCard({ title, body, action }: { title: string; body: string; action: ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-      <span className="text-primary">
-        <KeyRound className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{body}</p>
-      </div>
-      <div className="shrink-0">{action}</div>
-    </div>
+    <PaneHeader
+      title="Import"
+      description="Paste raw text; review the entities and notes Claude proposes before adding them."
+    />
   )
 }
 
@@ -238,31 +214,5 @@ function ReasonBanner({ reason }: { reason: ExtractFailureReason }) {
     <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
       Couldn’t read that — try again or rephrase.
     </Banner>
-  )
-}
-
-function Banner({
-  icon,
-  children,
-  tone = 'muted'
-}: {
-  icon: ReactNode
-  children: ReactNode
-  tone?: 'muted' | 'destructive'
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
-        tone === 'destructive'
-          ? 'border-destructive/40 bg-destructive/10 text-foreground'
-          : 'border-border bg-muted/40 text-muted-foreground'
-      )}
-    >
-      <span className={tone === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}>
-        {icon}
-      </span>
-      <span>{children}</span>
-    </div>
   )
 }

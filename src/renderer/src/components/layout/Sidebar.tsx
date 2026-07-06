@@ -427,7 +427,7 @@ function DeleteCampaignDialog({
       .then(([entities, sessions]) => {
         if (alive) setCounts({ entities: entities.length, sessions: sessions.length })
       })
-      .catch(() => {})
+      .catch(() => {}) // intentional: the delete dialog's "N entities / M sessions" hint is best-effort
     return () => {
       alive = false
     }

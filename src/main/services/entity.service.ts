@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { Entity, EntityType, Lifecycle } from '@shared/entity-types'
 import type { CreateEntityInput, UpdateEntityInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
@@ -24,6 +24,13 @@ export function listEntities(ctx: DbContext, campaignId: string, type?: EntityTy
 export function getEntity(ctx: DbContext, id: string): Entity | null {
   const r = ctx.drizzle.select().from(schema.entity).where(eq(schema.entity.id, id)).get()
   return r ? rowToEntity(r) : null
+}
+
+/** Batch-load entities by id in ONE query (grounding loops). Missing ids are simply absent. */
+export function listEntitiesByIds(ctx: DbContext, ids: string[]): Map<string, Entity> {
+  if (ids.length === 0) return new Map()
+  const rows = ctx.drizzle.select().from(schema.entity).where(inArray(schema.entity.id, ids)).all()
+  return new Map(rows.map((r) => [r.id, rowToEntity(r)]))
 }
 
 export function createEntity(ctx: DbContext, input: CreateEntityInput): Entity {

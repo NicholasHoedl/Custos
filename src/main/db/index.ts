@@ -1,9 +1,14 @@
 import { app } from 'electron'
+import fs from 'node:fs'
 import { join } from 'path'
 import Database from 'better-sqlite3'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import log from 'electron-log/main'
 import * as schema from './schema'
+import { backupDatabase } from './backup'
+
+const dlog = log.scope('db')
 
 export type LedgerDb = BetterSQLite3Database<typeof schema>
 
@@ -21,8 +26,17 @@ function migrationsFolder(): string {
 export function getDb(): LedgerDb {
   if (db) return db
   const file = join(app.getPath('userData'), 'ledger.db')
+  const existedBeforeOpen = fs.existsSync(file) // BEFORE open — opening creates the file
   rawDb = new Database(file)
   rawDb.pragma('journal_mode = WAL')
+  // Rotating pre-migration snapshot (T1 data safety): every launch of an existing DB banks a
+  // consistent restore point BEFORE migrations touch it. Never blocks startup.
+  if (existedBeforeOpen) {
+    const dest = backupDatabase(rawDb, join(app.getPath('userData'), 'backups'), 5, (m, e) =>
+      dlog.warn(m, e)
+    )
+    if (dest) dlog.info(`backup written: ${dest}`)
+  }
   db = drizzle(rawDb, { schema })
   // Run migrations with FK enforcement OFF, then restore it for all runtime queries. SQLite drops a
   // column by rebuilding the table (CREATE new / copy / DROP old / RENAME); with foreign_keys ON, the
@@ -62,8 +76,10 @@ export function closeDb(): void {
   if (!rawDb) return
   try {
     rawDb.pragma('wal_checkpoint(TRUNCATE)')
-  } catch {
-    // best-effort: if a checkpoint can't complete we still close cleanly below
+  } catch (err) {
+    // Still close below — but this is the exact failure class that once reverted committed data
+    // (stale WAL), so it must leave a trail (T1 data safety).
+    dlog.error('WAL checkpoint failed on quit — a stale WAL may remain', err)
   }
   rawDb.close()
   rawDb = null

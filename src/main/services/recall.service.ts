@@ -12,7 +12,7 @@ import type { DbContext } from './db-context'
 import type { RetrievedChunk, VectorStore } from './vector-store.service'
 import { resolveEntityState } from './chronology.service'
 import { embed, isModelReady } from './embedding.service'
-import { getEntity } from './entity.service'
+import { getEntity, listEntitiesByIds } from './entity.service'
 import { generatePersona, getPersona } from './persona.service'
 import { getSettings } from './settings.service'
 import { listForEntity } from './link.service'
@@ -147,11 +147,16 @@ export async function ask(
       []
     // Pin the current-scene entities into grounding first so they're always present, even off-vector.
     gatherPinned(ctx, scene.pinned, seen, relItems, stateItems, asOf)
+    // One batched read for the retrieved entities (instead of a getEntity per chunk).
+    const entitiesById = listEntitiesByIds(
+      ctx,
+      chunks.map((c) => c.entityId)
+    )
     for (const c of chunks) {
       if (seen.has(c.entityId)) continue
       seen.add(c.entityId)
       relItems.push({ name: c.entityName, views: listForEntity(ctx, c.entityId, asOf) })
-      const ent = getEntity(ctx, c.entityId)
+      const ent = entitiesById.get(c.entityId)
       if (ent) {
         const st = resolveEntityState(ctx, ent, asOf)
         stateItems.push({

@@ -30,7 +30,7 @@ export function SearchBox({ campaignId }: { campaignId: string }) {
       ledger.search
         .text(q, campaignId)
         .then(setResults)
-        .catch(() => setResults([]))
+        .catch(() => setResults([])) // intentional: a failed debounced keystroke degrades to no results, not a toast
     }, 180)
     return () => clearTimeout(handle)
   }, [query, campaignId])

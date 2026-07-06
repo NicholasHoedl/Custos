@@ -3,7 +3,7 @@ import type { RelationshipView } from '@shared/graph-types'
 import type { Lifecycle } from '@shared/entity-types'
 import { RECAP_CHUNK_CHANNEL, RECAP_DONE_CHANNEL, RECAP_ERROR_CHANNEL } from '@shared/ipc-types'
 import type { DbContext } from './db-context'
-import { getEntity } from './entity.service'
+import { listEntitiesByIds } from './entity.service'
 import { getSettings } from './settings.service'
 import { listForEntity } from './link.service'
 import { getSession, listSessions, updateSession } from './session.service'
@@ -66,8 +66,10 @@ export async function generateRecap(
     const relItems: { name: string; views: RelationshipView[] }[] = []
     const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
       []
+    // One batched read for the involved entities (instead of a getEntity per id).
+    const entitiesById = listEntitiesByIds(ctx, [...involvedIds])
     for (const id of involvedIds) {
-      const ent = getEntity(ctx, id)
+      const ent = entitiesById.get(id)
       if (!ent) continue
       nameById.set(id, ent.name)
       relItems.push({ name: ent.name, views: listForEntity(ctx, id) })

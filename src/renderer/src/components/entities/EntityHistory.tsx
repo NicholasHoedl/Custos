@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, History } from 'lucide-react'
+import { toast } from 'sonner'
 import { LIFECYCLE_LABELS, type StatusHistoryEntry } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
 import { Button } from '@renderer/components/ui/button'
@@ -18,8 +19,9 @@ export function EntityHistory({ entityId }: { entityId: string }) {
     if (next && rows === null) {
       try {
         setRows(await ledger.entity.history(entityId))
-      } catch {
+      } catch (err) {
         setRows([])
+        toast.error("Couldn't load history", { description: String(err) })
       }
     }
   }

@@ -16,12 +16,19 @@ export function PersonaEditor({ entityId }: { entityId: string }) {
   useEffect(() => {
     let ignore = false
     setLoading(true)
-    ledger.persona.get(entityId).then((p) => {
-      if (ignore) return
-      setPersona(p)
-      setDraft(p?.brief ?? '')
-      setLoading(false)
-    })
+    ledger.persona
+      .get(entityId)
+      .then((p) => {
+        if (ignore) return
+        setPersona(p)
+        setDraft(p?.brief ?? '')
+        setLoading(false)
+      })
+      .catch((err) => {
+        if (ignore) return
+        setLoading(false)
+        toast.error("Couldn't load persona", { description: String(err) })
+      })
     return () => {
       ignore = true
     }

@@ -1,6 +1,8 @@
 // Domain shapes shared across the main and renderer processes.
 // These are the parsed/typed forms; the DB row forms (JSON-as-text) live in src/main/db/schema.ts.
 
+// 'event' = WORLD-SCALE history (a city destroyed, a king assassinated — ADR-019), NOT a session
+// beat; the party's own beats live in the event_log table.
 export type EntityType = 'npc' | 'location' | 'faction' | 'quest' | 'item' | 'pc' | 'event'
 
 export const ENTITY_TYPES: readonly EntityType[] = [

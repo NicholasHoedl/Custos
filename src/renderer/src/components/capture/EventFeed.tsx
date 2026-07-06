@@ -8,11 +8,14 @@ import { Textarea } from '@renderer/components/ui/textarea'
 
 interface EventFeedProps {
   sessionId: string | null
+  /** True while the persisted session is still being restored (T3) — shown instead of the
+   *  "start a session" copy so a real zero-sessions campaign reads differently from a loading one. */
+  restoring?: boolean
 }
 
 // The chronological session feed — quotes and beats logged as they happen (P1-08). Shown in the
 // detail pane when no entity is selected, so the session timeline is always one glance away.
-export function EventFeed({ sessionId }: EventFeedProps) {
+export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   const { events, refresh } = useEvents(sessionId)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,7 +42,11 @@ export function EventFeed({ sessionId }: EventFeedProps) {
       <div className="border-b border-border p-4">
         <h2 className="font-display text-xl font-semibold text-foreground">Session log</h2>
         <p className="text-xs text-muted-foreground">
-          {sessionId ? 'Quotes and beats as they happen.' : 'Start a session to log events.'}
+          {restoring
+            ? 'Restoring session…'
+            : sessionId
+              ? 'Quotes and beats as they happen.'
+              : 'Start a session to log events.'}
         </p>
       </div>
 

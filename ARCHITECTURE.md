@@ -6,9 +6,13 @@
 evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
 store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest uses a **multi-tag, 8-option**
 model, not 4-of-7 fixed attitudes (ADR-016); **notes are many-to-many** via `note_entity` (SPEC §10);
-retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); and post-MVP features (current
-scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10. A
-**chronology** model is designed in ADR-017. The flagged sections below are being reconciled to match.
+retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); post-MVP features (current
+scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10; a
+**chronology** model (session-stamped history + "as of session N" reconstruction) shipped in
+ADR-017, with the **backfill interview** (ADR-018), **event re-scope to world history** (ADR-019),
+and an **operational-hardening** layer — DB backups, logging, crash recovery (ADR-020) — on top. The
+data model and module sections below are reconciled to match; older narrative sections remain
+MVP-era where the ADRs supersede them.
 
 ---
 
@@ -115,7 +119,7 @@ Transformers.js with ONNX runs the same model family in the Node.js main process
 │  │  │                    │   │                                   │
 │  │  │  SQLite DB         │   │                                   │
 │  │  │  (better-sqlite3   │   │                                   │
-│  │  │   + sqlite-vec     │   │                                   │
+│  │  │   + JS vectors     │   │                                   │
 │  │  │   + Drizzle ORM)   │   │                                   │
 │  │  └────────────────────┘   │                                   │
 │  │                           │                                   │
@@ -188,7 +192,8 @@ Entity
   description  TEXT
   traits       TEXT (JSON array of strings — used heavily for PC in Suggest)
   goals        TEXT (JSON array of strings — for NPC / PC)
-  status       TEXT ('active' | 'inactive' | 'dead' | 'resolved' | ...)
+  status       TEXT ('active' | 'inactive' | 'dead' | 'resolved' | ...) — free-text
+  lifecycle    TEXT ('active' | 'ended' | 'unknown') NOT NULL — coarse in-play flag (ADR-017)
   createdAt    INTEGER (unix ms)
   updatedAt    INTEGER (unix ms)
 
@@ -210,6 +215,8 @@ EntityLink
   toEntityId   UUID FK → Entity.id
   relation     TEXT ('member_of' | 'located_in' | 'involved_in' | 'owns' | 'allied_with' | ...)
   campaignId   UUID FK → Campaign.id
+  startSession INTEGER (nullable — session # the link formed; NULL = pre-tracking) — ADR-017
+  endSession   INTEGER (nullable — NULL = live; set on "sever" to close the validity interval) — ADR-017
 
 EventLog
   id           UUID PK
@@ -218,7 +225,19 @@ EventLog
   content      TEXT NOT NULL
   entityId     UUID FK → Entity.id (nullable — optional tag)
   timestamp    INTEGER (unix ms)
+
+StatusHistory   (append-only status/lifecycle trail — ADR-017; drives "as of session N")
+  id                  UUID PK
+  entityId            UUID FK → Entity.id
+  lifecycle           TEXT ('active' | 'ended' | 'unknown')
+  status              TEXT (nullable)
+  sinceSessionNumber  INTEGER (nullable — NULL = pre-tracking baseline)
+  recordedAt          INTEGER (unix ms)
 ```
+
+> Chronology note (ADR-017): session **numbers** are denormalized into `EntityLink.start/endSession`
+> and `StatusHistory.sinceSessionNumber` so as-of reconstruction is a join-free integer comparison.
+> A partial unique index keeps at most one *open* link per (from, to, relation).
 
 ### Vector Index (brute-force cosine — ADR-012)
 
@@ -458,6 +477,15 @@ All communication between renderer and main process goes through typed IPC chann
 
 ## 8. Folder / Module Structure
 
+> **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
+> Notably: the renderer groups feature panes under `components/views/` (`RecallView`, `SuggestView`,
+> `RecapView`, `ImportView`, `BackfillView`, `SettingsView`, `NotesView`), with a shared
+> `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
+> `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
+> `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, and `session`
+> services (backfill rides `import.service`); `db/` adds `backup.ts`. Packaging assets live in
+> `build/` (`icon.png`) with CI in `.github/workflows/`.
+
 ```
 ledger/
 ├── .claude/                        # (do not touch)
@@ -499,7 +527,7 @@ ledger/
 │   │   │   ├── entity.service.ts
 │   │   │   ├── note.service.ts
 │   │   │   ├── embedding.service.ts   # Transformers.js wrapper
-│   │   │   ├── vector-store.service.ts # sqlite-vec queries
+│   │   │   ├── vector-store.service.ts # brute-force JS cosine (ADR-012)
 │   │   │   ├── recall.service.ts      # retrieval orchestration
 │   │   │   ├── suggest.service.ts     # suggest orchestration
 │   │   │   ├── claude.service.ts      # @anthropic-ai/sdk wrapper
@@ -610,11 +638,25 @@ Network check: the main process pings `api.anthropic.com` before each Claude cal
 
 6. **Model files:** ONNX model files are downloaded from Hugging Face during an **explicit first-run onboarding step** (developer decision — not a silent background fetch; see ROADMAP Phase 2) and cached in `app.getPath('userData')/models/`. Model integrity should be verified against a known checksum (future improvement).
 
+### Data safety & operability (ADR-020)
+
+Beyond the security posture above, the operational path is hardened: rotating pre-migration DB
+backups (`VACUUM INTO`, keep 5, in `userData/backups`); a persistent main-process log (`electron-log`
+→ `userData/logs/main.log`) with logged WAL-checkpoint failures and captured uncaught exceptions; a
+startup migration-failure recovery dialog; a React error boundary around the renderer; and
+per-campaign session persistence. See ADR-020.
+
 ---
 
 ## 11. ADR Candidates
 
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
+
+> **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–020**, with status changes (e.g.
+> ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
+> (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
+> 020 (operational hardening).
 
 | # | Decision | Status |
 |---|---|---|

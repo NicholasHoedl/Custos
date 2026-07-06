@@ -73,6 +73,11 @@ AI semantic search over the user's notes. Natural-language queries return synthe
 
 ### Pillar 3: Suggest
 
+> **As shipped (ADR-016; see §10):** Suggest returns **8 tagged options** from a ~62-tag vocabulary
+> (one primary disposition + ≤2 secondary tags), plus an open-ended "what's next" **directions** mode.
+> The 4-of-7-attitudes design described below is the original MVP model, kept here as the historical
+> record.
+
 In-character action options during live play. Rather than a single suggestion, Ledger surfaces a **spread of plausible in-character responses** so the player can choose. Given the active PC's traits, goals, and the campaign's current situation, Claude determines which **4 attitudes** the PC is *most likely* to adopt and writes a **unique in-character action for each**.
 
 **What it means:**
@@ -114,7 +119,7 @@ The MVP delivers all three pillars at their simplest viable form. It is a single
 **Capture**
 - Campaign management: create, name, describe, and switch between campaigns
 - Session management: create sessions (numbered, dated, with a title/summary field) within a campaign
-- Entity CRUD for: NPCs, Locations, Factions, Quests/Plot Threads, Items, Player Characters (PCs)
+- Entity CRUD for: NPCs, Locations, Factions, Quests/Plot Threads, Items, Player Characters (PCs), and Events (world-scale history — see ADR-019)
 - Freeform notes attached to any entity, timestamped, linked to the session in which they were created
 - Timestamped event/quote log per session (quick one-liner capture with optional entity tag)
 - Basic entity linking (NPC → Location, NPC → Faction, Quest → NPC, etc.)
@@ -132,7 +137,7 @@ The MVP delivers all three pillars at their simplest viable form. It is a single
 - Suggest panel tied to active PC and campaign
 - Free-text situation input
 - RAG retrieval of relevant context
-- Claude Opus 4.8 (adaptive thinking + structured output) returns **4 attitude-based recommendations** — the model picks the 4 attitudes the PC is most likely to adopt and writes a unique in-character action for each
+- Claude Opus 4.8 (adaptive thinking + structured output) returns **4 attitude-based recommendations** — the model picks the 4 attitudes the PC is most likely to adopt and writes a unique in-character action for each *(shipped as **8 multi-tag options** + a **directions** mode — ADR-016; see §10)*
 - Results render as 4 distinct attitude cards
 - Graceful offline degradation (clear unavailable message)
 
@@ -295,6 +300,17 @@ roster-then-beats guided flow that turns freeform answers + partial notes into e
 notes, and **dated status/relationship changes** stamped at their sessions — so the backfilled past
 feeds Chronology's as-of reconstruction. This also delivered Import's deferred relationship
 extraction (as `relationshipChanges`).
+
+**Event entities re-scoped** (ADR-019) — the `event` entity type is now **world-scale history** (a
+city destroyed, a ruler assassinated), distinct from the party's session log; the extraction prompts
+enforce the boundary so ordinary beats stay notes.
+
+**Operational hardening** (ADR-020) — the data-safety + resilience layer: rotating pre-migration DB
+backups (`VACUUM INTO`, keep 5, in `userData/backups`); a persistent main-process log
+(`electron-log` → `userData/logs/main.log`) and logged WAL-checkpoint failures; a startup
+migration-failure recovery dialog; a React error boundary + a renderer IPC error-toast audit; and
+per-campaign session persistence. Shipped alongside **CI** (GitHub Actions: typecheck + lint + tests
+on Windows) and a signed **NSIS installer** (`npm run dist`).
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file

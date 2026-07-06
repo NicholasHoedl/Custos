@@ -103,14 +103,27 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
       }
     ]
   },
+  // Events are WORLD HISTORY (ADR-019): large-scale, world-impacting happenings — a city destroyed,
+  // a ruler assassinated, a war declared — usually independent of the party. What the party did or
+  // witnessed in a session belongs in the session log / notes, not here.
   event: {
     traits: false,
     goals: false,
     status: null,
     fields: [
       { key: 'date', label: 'Date', kind: 'text', placeholder: 'e.g. 14th of Flamerule' },
-      { key: 'outcome', label: 'Outcome', kind: 'textarea', placeholder: 'What happened?' },
-      { key: 'significance', label: 'Significance', kind: 'text', placeholder: 'Why it matters' }
+      {
+        key: 'outcome',
+        label: 'Outcome',
+        kind: 'textarea',
+        placeholder: 'What changed in the world?'
+      },
+      {
+        key: 'significance',
+        label: 'Significance',
+        kind: 'text',
+        placeholder: 'Why it matters to the region or realm'
+      }
     ]
   }
 }

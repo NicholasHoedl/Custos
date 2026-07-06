@@ -1,6 +1,7 @@
-import { app, shell, BrowserWindow, globalShortcut } from 'electron'
+import { app, dialog, shell, BrowserWindow, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import log from 'electron-log/main'
 import { APP_ID, APP_NAME, DEFAULT_HOTKEY } from '@shared/constants'
 import { QUICK_ADD_FOCUS_CHANNEL } from '@shared/ipc-types'
 import { getDb, dbHealthCheck, closeDb } from './db'
@@ -8,6 +9,11 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { warm } from './services/embedding.service'
 
 app.setName(APP_NAME)
+// Persistent main-process log (T2): userData/logs/main.log (1 MiB rotation). Main-only — no
+// log.initialize() (that wires renderer bridging; the renderer surfaces errors via toasts instead).
+log.transports.file.level = 'info'
+log.transports.console.level = is.dev ? 'silly' : false
+log.errorHandler.startCatching({ showDialog: false }) // uncaught main exceptions land in the log
 
 let mainWindow: BrowserWindow | null = null
 
@@ -67,9 +73,32 @@ if (!gotTheLock) {
       optimizer.watchWindowShortcuts(window)
     })
 
-    // Open + migrate the local database before the UI loads (ADR-004).
-    getDb()
-    console.log(`[ledger] database ready — ${dbHealthCheck()} campaigns`)
+    // Open + migrate the local database before the UI loads (ADR-004). A failure here used to crash
+    // silently before any window existed — now it explains itself and points at the backups (T1).
+    try {
+      getDb()
+      log.info(`database ready — ${dbHealthCheck()} campaigns`)
+    } catch (err) {
+      log.error('database failed to open or migrate', err)
+      const choice = dialog.showMessageBoxSync({
+        type: 'error',
+        title: 'Ledger cannot start',
+        message: 'Your notes database could not be opened or upgraded.',
+        detail:
+          'Automatic backups live in the "backups" folder inside your data folder — restore one by ' +
+          `replacing ledger.db. Details are in logs\\main.log.\n\n${String(err)}`,
+        buttons: ['Open data folder', 'Quit'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true
+      })
+      if (choice === 0) {
+        void shell.openPath(app.getPath('userData')).finally(() => app.quit())
+      } else {
+        app.quit()
+      }
+      return // no window, no IPC, no hotkey
+    }
 
     registerIpcHandlers(() => mainWindow)
     createWindow()
@@ -82,7 +111,7 @@ if (!gotTheLock) {
       mainWindow?.webContents.send(QUICK_ADD_FOCUS_CHANNEL)
     })
     if (!registered) {
-      console.warn(`[ledger] could not register global hotkey "${DEFAULT_HOTKEY}" (already in use?)`)
+      log.warn(`could not register global hotkey "${DEFAULT_HOTKEY}" (already in use?)`)
     }
 
     app.on('activate', () => {

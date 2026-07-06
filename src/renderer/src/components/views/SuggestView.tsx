@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import {
   AlertTriangle,
   BookOpen,
@@ -35,6 +35,13 @@ import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
+import {
+  Banner,
+  PaneHeader,
+  PaneShell,
+  ProgressBar,
+  SetupCard
+} from '@renderer/components/chrome'
 
 const CATEGORY_ICONS: Record<SuggestCategory, LucideIcon> = {
   quest: ScrollText,
@@ -94,29 +101,28 @@ export function SuggestView() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-semibold text-foreground">Suggest</h1>
-          <p className="text-sm text-muted-foreground">
-            In-character ideas for the table — how to react now, or where to take the story next.
-          </p>
-        </div>
-        {(situation.trim().length > 0 || suggest.status !== 'idle') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0 text-muted-foreground"
-            onClick={() => {
-              suggest.reset()
-              setSituation('')
-            }}
-          >
-            <RotateCcw className="size-3.5" />
-            Reset
-          </Button>
-        )}
-      </header>
+    <PaneShell size="reading">
+      <PaneHeader
+        title="Suggest"
+        size="lg"
+        description="In-character ideas for the table — how to react now, or where to take the story next."
+        action={
+          (situation.trim().length > 0 || suggest.status !== 'idle') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => {
+                suggest.reset()
+                setSituation('')
+              }}
+            >
+              <RotateCcw className="size-3.5" />
+              Reset
+            </Button>
+          )
+        }
+      />
 
       {!onb.modelReady ? (
         <SetupCard
@@ -228,7 +234,7 @@ export function SuggestView() {
           <DirectionsList suggestions={suggest.result.suggestions} />
         )}
       </div>
-    </div>
+    </PaneShell>
   )
 }
 
@@ -368,71 +374,3 @@ function FailureBanner({ reason }: { reason: SuggestFailureReason }) {
   }
 }
 
-function SetupCard({
-  icon,
-  title,
-  body,
-  action
-}: {
-  icon: ReactNode
-  title: string
-  body: string
-  action: ReactNode
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-      <span className="text-primary">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{body}</p>
-      </div>
-      {action && <div className="shrink-0">{action}</div>}
-    </div>
-  )
-}
-
-function ProgressBar({ progress }: { progress: { loaded?: number; total?: number } | null }) {
-  const pct =
-    progress?.total && progress.total > 0
-      ? Math.round(((progress.loaded ?? 0) / progress.total) * 100)
-      : null
-  return (
-    <div className="flex w-40 items-center gap-2">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full bg-primary transition-all"
-          style={{ width: pct != null ? `${pct}%` : '40%' }}
-        />
-      </div>
-      <span className="font-mono text-[10px] text-muted-foreground">
-        {pct != null ? `${pct}%` : '…'}
-      </span>
-    </div>
-  )
-}
-
-function Banner({
-  icon,
-  children,
-  tone = 'muted'
-}: {
-  icon: ReactNode
-  children: ReactNode
-  tone?: 'muted' | 'destructive'
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
-        tone === 'destructive'
-          ? 'border-destructive/40 bg-destructive/10 text-foreground'
-          : 'border-border bg-muted/40 text-muted-foreground'
-      )}
-    >
-      <span className={tone === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}>
-        {icon}
-      </span>
-      <span>{children}</span>
-    </div>
-  )
-}

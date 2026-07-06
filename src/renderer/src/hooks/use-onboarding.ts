@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import type { ModelDownloadProgress, OnboardingStatus } from '@shared/recall-types'
 import { ledger } from '@renderer/lib/ipc'
 
@@ -16,7 +17,12 @@ export function useOnboarding(): {
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
-    ledger.onboarding.status().then(setStatus)
+    ledger.onboarding
+      .status()
+      .then(setStatus)
+      .catch((e) =>
+        toast.error("Couldn't check setup status", { id: 'ipc-fetch', description: String(e) })
+      )
   }, [])
 
   useEffect(() => {

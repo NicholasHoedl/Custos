@@ -22,12 +22,15 @@ import { useUiStore } from '@renderer/store/ui-store'
 interface QuickAddBarProps {
   campaignId: string
   sessionId: string | null
+  /** True while the persisted session is still being restored — briefly gate capture so a note isn't
+   *  filed against a not-yet-known session (T3). */
+  restoring?: boolean
   onCreated: (entity: Entity) => void
 }
 
 // The fast keyboard path for live play: name → type → optional first note, Enter to save (<10s).
 // Refocuses itself after each add and on the global hotkey / Ctrl+K (via the quickAddNonce bump).
-export function QuickAddBar({ campaignId, sessionId, onCreated }: QuickAddBarProps) {
+export function QuickAddBar({ campaignId, sessionId, restoring = false, onCreated }: QuickAddBarProps) {
   const [name, setName] = useState('')
   const [type, setType] = useState<EntityType>('npc')
   const [note, setNote] = useState('')
@@ -41,7 +44,7 @@ export function QuickAddBar({ campaignId, sessionId, onCreated }: QuickAddBarPro
 
   async function submit() {
     const trimmed = name.trim()
-    if (!trimmed || busy) return
+    if (!trimmed || busy || restoring) return
     setBusy(true)
     try {
       const entity = await ledger.entity.create({ campaignId, type, name: trimmed })
@@ -71,13 +74,14 @@ export function QuickAddBar({ campaignId, sessionId, onCreated }: QuickAddBarPro
         ref={nameRef}
         value={name}
         onChange={(e) => setName(e.target.value)}
+        disabled={restoring}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
             submit()
           }
         }}
-        placeholder="Quick add — name a person, place, or thing…"
+        placeholder={restoring ? 'Restoring session…' : 'Quick add — name a person, place, or thing…'}
         className="flex-1"
       />
       <Select value={type} onValueChange={(v) => setType(v as EntityType)}>
@@ -104,7 +108,7 @@ export function QuickAddBar({ campaignId, sessionId, onCreated }: QuickAddBarPro
         placeholder="First note (optional)"
         className="flex-1"
       />
-      <Button onClick={submit} disabled={!name.trim() || busy} className="shrink-0">
+      <Button onClick={submit} disabled={!name.trim() || busy || restoring} className="shrink-0">
         <Plus className="size-4" />
         Add
       </Button>

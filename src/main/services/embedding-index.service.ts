@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
+import log from 'electron-log/main'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import type { VectorStore } from './vector-store.service'
@@ -17,9 +18,11 @@ function entityText(name: string, description: string | null): string {
   return description ? `${name}\n${description}` : name
 }
 
+const elog = log.scope('embedding-index')
+
 let chain: Promise<void> = Promise.resolve()
 function enqueue(task: () => Promise<void>): void {
-  chain = chain.then(task).catch((err) => console.error('[embedding-index]', err))
+  chain = chain.then(task).catch((err) => elog.error(err))
 }
 
 export function indexNote(ctx: DbContext, store: VectorStore, noteId: string): void {
@@ -71,7 +74,7 @@ export async function backfill(ctx: DbContext, store: VectorStore): Promise<numb
         store.upsertNote(n.id, await embed(n.content), h)
         count++
       } catch (err) {
-        console.error('[embedding-index] backfill note', n.id, err)
+        elog.error('backfill note', n.id, err)
       }
     }
   }
@@ -87,7 +90,7 @@ export async function backfill(ctx: DbContext, store: VectorStore): Promise<numb
         store.upsertEntity(e.id, await embed(text), h)
         count++
       } catch (err) {
-        console.error('[embedding-index] backfill entity', e.id, err)
+        elog.error('backfill entity', e.id, err)
       }
     }
   }

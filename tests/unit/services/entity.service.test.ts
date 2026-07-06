@@ -6,6 +6,7 @@ import {
   deleteEntity,
   getEntity,
   listEntities,
+  listEntitiesByIds,
   updateEntity
 } from '../../../src/main/services/entity.service'
 import { getEntityHistory } from '../../../src/main/services/chronology.service'
@@ -55,6 +56,16 @@ describe('entity.service', () => {
     createEntity(ctx, { campaignId, type: 'location', name: 'Copper Kettle' })
     expect(listEntities(ctx, campaignId).length).toBe(2)
     expect(listEntities(ctx, campaignId, 'npc').map((e) => e.name)).toEqual(['Aldric'])
+  })
+
+  it('batch-loads entities by id (missing ids absent; empty input → empty map)', () => {
+    const a = createEntity(ctx, { campaignId, type: 'npc', name: 'A' })
+    const b = createEntity(ctx, { campaignId, type: 'npc', name: 'B' })
+    const m = listEntitiesByIds(ctx, [a.id, b.id, 'does-not-exist'])
+    expect(m.size).toBe(2)
+    expect(m.get(a.id)?.name).toBe('A')
+    expect(m.get(b.id)?.name).toBe('B')
+    expect(listEntitiesByIds(ctx, []).size).toBe(0)
   })
 
   it('updates fields and re-stamps updatedAt', () => {

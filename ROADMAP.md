@@ -1,8 +1,14 @@
 # Ledger — Development Roadmap
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25
-**Status:** Draft — awaiting developer approval
+**Date:** 2026-06-25 · **Status updated:** 2026-07-02
+**Status:** ✅ **Shipped — all phases (P0–P3) complete.** This is now the *historical* MVP plan,
+kept in place because ADRs and SPEC reference its item codes (P0-01…P3-04). Current product scope
+lives in **`SPEC.md` §10 (Delivered beyond the MVP)** and **`docs/adr/`** — development continued
+past this plan with: current scene (ADR-015), many-to-many notes, the multi-tag Suggest overhaul
+(ADR-016, superseding the 4-of-7 model written below), session recap (ADR-013), paste-and-extract
+import (ADR-014), chronology / as-of reconstruction (ADR-017), and the backfill interview (ADR-018).
+The Phase 4+ section below remains the deferred-ideas backlog.
 
 ---
 
@@ -75,16 +81,16 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Decide the trigger behavior — focus main window vs. dedicated quick-capture popup window — and record it as ADR-010
 - Expected output: pressing the global hotkey while another app is focused brings Ledger to the foreground; only one instance can run
 
-### Done Criteria for Phase 0
+### Done Criteria for Phase 0 — ✅ all met
 
-- [ ] `npm run dev` launches the Electron app without errors or console warnings
-- [ ] The visual design system (fonts, colors, shadcn) is applied and visible — and reads as distinctive, not generic shadcn components recolored (per ARCHITECTURE §1 design language)
-- [ ] SQLite database is created and migrated on startup
-- [ ] Typed IPC bridge is verified end-to-end (renderer call → main handler → typed response)
-- [ ] Unit test suite runs (`vitest run` passes)
-- [ ] Playwright smoke test passes
-- [ ] Global quick-add hotkey brings the app to focus from another app; single-instance lock works
-- [ ] ADRs 001–010 are written and committed
+- [x] `npm run dev` launches the Electron app without errors or console warnings
+- [x] The visual design system (fonts, colors, shadcn) is applied and visible — and reads as distinctive, not generic shadcn components recolored (per ARCHITECTURE §1 design language)
+- [x] SQLite database is created and migrated on startup
+- [x] Typed IPC bridge is verified end-to-end (renderer call → main handler → typed response)
+- [x] Unit test suite runs (`vitest run` passes)
+- [x] Playwright smoke test passes
+- [x] Global quick-add hotkey brings the app to focus from another app; single-instance lock works
+- [x] ADRs 001–010 are written and committed
 
 ---
 
@@ -157,16 +163,16 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Playwright test: quick-add flow (keyboard shortcut → type → Enter → entity appears in list)
 - Expected output: All tests pass; coverage meaningful on service layer
 
-### Done Criteria for Phase 1
+### Done Criteria for Phase 1 — ✅ all met
 
-- [ ] Developer can complete the "Capture" user flow from SPEC.md (Flow A and Flow B) end-to-end
-- [ ] All entity types (NPC, Location, Faction, Quest, Item, PC, Event) can be created, read, and updated
-- [ ] Notes are saved, timestamped, and linked to the active session
-- [ ] Entity links are created and displayed
-- [ ] Quick-add bar works with keyboard; entry time under 10 seconds for a new NPC with a one-line note
-- [ ] Local text search returns relevant results
-- [ ] App closes and reopens with all data intact
-- [ ] Service-layer unit tests pass; integration test passes; Playwright Capture test passes
+- [x] Developer can complete the "Capture" user flow from SPEC.md (Flow A and Flow B) end-to-end
+- [x] All entity types (NPC, Location, Faction, Quest, Item, PC, Event) can be created, read, and updated
+- [x] Notes are saved, timestamped, and linked to the active session
+- [x] Entity links are created and displayed
+- [x] Quick-add bar works with keyboard; entry time under 10 seconds for a new NPC with a one-line note
+- [x] Local text search returns relevant results
+- [x] App closes and reopens with all data intact
+- [x] Service-layer unit tests pass; integration test passes; Playwright Capture test passes
 
 ---
 
@@ -227,23 +233,27 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Playwright test: Recall panel query with a mocked Claude response (use `nock` or Electron test utilities to intercept the Anthropic API call)
 - Expected output: All tests pass; mocked Recall test shows streamed answer and citation badges
 
-### Done Criteria for Phase 2
+### Done Criteria for Phase 2 — ✅ all met *(shipped with the brute-force JS vector store per ADR-012, not sqlite-vec as planned in P2-03)*
 
-- [ ] Developer can complete the "Recall" user flow from SPEC.md (Flow C) end-to-end
-- [ ] API key is saved securely and persists across restarts
-- [ ] Notes created in Phase 1 are automatically embedded on save
-- [ ] Natural-language query returns a streamed, cited answer referencing the correct source notes
-- [ ] Citations are clickable and link to the source entity
-- [ ] Offline: retrieval works; synthesis shows graceful degradation message
-- [ ] Unit tests for embedding, vector store, and recall (mocked Claude) pass
-- [ ] Integration RAG pipeline test passes
-- [ ] Playwright Recall test (mocked Claude) passes
+- [x] Developer can complete the "Recall" user flow from SPEC.md (Flow C) end-to-end
+- [x] API key is saved securely and persists across restarts
+- [x] Notes created in Phase 1 are automatically embedded on save
+- [x] Natural-language query returns a streamed, cited answer referencing the correct source notes
+- [x] Citations are clickable and link to the source entity
+- [x] Offline: retrieval works; synthesis shows graceful degradation message
+- [x] Unit tests for embedding, vector store, and recall (mocked Claude) pass
+- [x] Integration RAG pipeline test passes
+- [x] Playwright Recall test (mocked Claude) passes
 
 ---
 
 ## Phase 3: Suggest
 
 **Goal:** In-character action recommendations during live play. The developer describes the current situation and receives **4 distinct attitude-based recommendations** — the model selects the 4 attitudes the active PC is most likely to adopt and writes a unique in-character action for each — via a Claude Opus 4.8 structured-output call (adaptive thinking), grounded in the PC's traits and campaign history.
+
+> **As shipped:** the 4-of-7 fixed-attitude model below was later superseded by **ADR-016** — Suggest
+> now returns **8 options** from a ~62-tag vocabulary (1 primary + ≤2 secondary tags), plus an
+> open-ended "what's next" directions mode. The text below is the historical plan.
 
 ### Key Tasks
 
@@ -277,16 +287,16 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Playwright test: Suggest panel with a mocked structured response renders 4 attitude cards
 - Expected output: Tests pass; the 4-distinct-attitude contract is verified
 
-### Done Criteria for Phase 3
+### Done Criteria for Phase 3 — ✅ all met *(as 4-of-7 originally; later evolved to 8 multi-tag options, ADR-016)*
 
-- [ ] Developer can complete the "Suggest" user flow from SPEC.md (Flow D) end-to-end
-- [ ] Active PC context (traits, goals) is included in the Suggest prompt
-- [ ] Retrieved campaign history is included in the Suggest prompt
-- [ ] Suggest returns **exactly 4 distinct attitude-based recommendations**, each a unique in-character action, via Opus 4.8 structured output + adaptive thinking
-- [ ] Code validates the count and attitude-uniqueness (handles a malformed model response)
-- [ ] UI renders the 4 recommendations as distinct attitude cards
-- [ ] Offline: clear unavailability message shown
-- [ ] Unit and Playwright tests pass
+- [x] Developer can complete the "Suggest" user flow from SPEC.md (Flow D) end-to-end
+- [x] Active PC context (traits, goals) is included in the Suggest prompt
+- [x] Retrieved campaign history is included in the Suggest prompt
+- [x] Suggest returns **exactly 4 distinct attitude-based recommendations**, each a unique in-character action, via Opus 4.8 structured output + adaptive thinking
+- [x] Code validates the count and attitude-uniqueness (handles a malformed model response)
+- [x] UI renders the 4 recommendations as distinct attitude cards
+- [x] Offline: clear unavailability message shown
+- [x] Unit and Playwright tests pass
 
 ---
 
@@ -331,19 +341,19 @@ These are listed in approximate priority order for planning reference. None are 
 
 ## Milestone Summary
 
-| Milestone | Deliverable | Approximate Target |
+| Milestone | Deliverable | Status |
 |---|---|---|
-| M0 | Working Electron + React shell, DB connected, IPC bridge typed, design system in place, tests running | End of Phase 0 |
-| M1 | Full Capture workflow: all entity types, notes, links, quick-add, local search | End of Phase 1 |
-| M2 | Full Recall workflow: local embeddings, vector search, Claude-synthesized cited answers, offline degradation | End of Phase 2 |
-| M3 | Full Suggest workflow: 4 attitude-based in-character recommendations (structured output), context-grounded | End of Phase 3 |
-| MVP Complete | All three pillars working, testable, and usable at the table | End of Phase 3 |
+| M0 | Working Electron + React shell, DB connected, IPC bridge typed, design system in place, tests running | ✅ Shipped |
+| M1 | Full Capture workflow: all entity types, notes, links, quick-add, local search | ✅ Shipped |
+| M2 | Full Recall workflow: local embeddings, vector search, Claude-synthesized cited answers, offline degradation | ✅ Shipped |
+| M3 | Full Suggest workflow: attitude-based in-character recommendations (structured output), context-grounded | ✅ Shipped *(evolved to 8 multi-tag options, ADR-016)* |
+| MVP Complete | All three pillars working, testable, and usable at the table | ✅ Shipped — see SPEC §10 for what shipped beyond it |
 
 ---
 
 ## ADR List
 
-These are written as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md) — each records the decision, alternatives, and rationale. ADR-007 and ADR-010 are **Proposed** (to be confirmed during Phase 0); the rest are **Accepted**.
+These are written as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md) — each records the decision, alternatives, and rationale. *(Historical note: the table below lists the ten ADRs planned for the MVP. The ADR set has since grown to 001–018+, and statuses have moved — e.g. ADR-009 is superseded by ADR-016, ADR-003 refined by ADR-012. The authoritative index is [`docs/adr/README.md`](docs/adr/README.md).)*
 
 | ID | Title | When to write |
 |---|---|---|
@@ -372,5 +382,5 @@ These are written as full Architecture Decision Records in [`docs/adr/`](docs/ad
 - **Window layout** → **single-window with panel switching** (sidebar nav swaps a single main view; no persistent AI drawer).
 
 **Still open:**
-1. **Chunking strategy:** one chunk per note (assumed) vs. sentence/fixed-size chunks. Revisit if notes get long.
-2. **Embedding performance:** confirm CPU-only `all-MiniLM-L6-v2` inference is acceptable on the developer's machine.
+1. **Chunking strategy:** one chunk per note (assumed) vs. sentence/fixed-size chunks. Revisit if notes get long. *(Still open as of 2026-07-02 — large Import/Backfill pastes get a soft warning only; chunking remains a queued follow-up, ADR-014.)*
+2. ~~**Embedding performance:** confirm CPU-only `all-MiniLM-L6-v2` inference is acceptable on the developer's machine.~~ *(Resolved in practice — CPU inference is comfortably fast in live use.)*

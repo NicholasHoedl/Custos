@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, CalendarClock, KeyRound, Sparkles, WifiOff } from 'lucide-react'
+import { toast } from 'sonner'
 import type { EntityRef, ExtractFailureReason, MatchCandidate } from '@shared/import-types'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
@@ -24,6 +25,8 @@ import {
   RelationshipChangeRow,
   StatusChangeRow
 } from '@renderer/components/capture/import-rows'
+import { Banner, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
+import { plural } from '@renderer/lib/format'
 
 type Phase = 'roster' | 'beats'
 
@@ -78,6 +81,8 @@ export function BackfillView() {
         await ledger.session.create({ campaignId: activeCampaignId })
       }
       refreshSessions()
+    } catch (err) {
+      toast.error("Couldn't create sessions", { description: String(err) })
     } finally {
       setCreatingSessions(false)
     }
@@ -92,7 +97,7 @@ export function BackfillView() {
 
   if (!onb.keyReady) {
     return (
-      <Wrap>
+      <PaneShell size="form" scroll>
         <Header />
         <SetupCard
           title="Add your API key to backfill"
@@ -103,14 +108,14 @@ export function BackfillView() {
             </Button>
           }
         />
-      </Wrap>
+      </PaneShell>
     )
   }
 
   if (imp.status === 'done' && imp.result) {
     const r = imp.result
     return (
-      <Wrap>
+      <PaneShell size="form" scroll>
         <Header />
         <div className="rounded-lg border border-border bg-card/60 p-4">
           <p className="text-sm text-foreground">
@@ -150,7 +155,7 @@ export function BackfillView() {
             </Button>
           )}
         </div>
-      </Wrap>
+      </PaneShell>
     )
   }
 
@@ -163,7 +168,7 @@ export function BackfillView() {
       imp.relationshipChanges.filter((c) => c.include).length
     const applying = imp.status === 'applying'
     return (
-      <Wrap>
+      <PaneShell size="form" scroll>
         <Header />
         <p className="text-xs text-muted-foreground">
           {phase === 'roster'
@@ -252,7 +257,7 @@ export function BackfillView() {
             </Button>
           </div>
         </div>
-      </Wrap>
+      </PaneShell>
     )
   }
 
@@ -260,7 +265,7 @@ export function BackfillView() {
   const canExtract =
     Boolean(text.trim()) && !extracting && (phase === 'roster' ? Boolean(sessionOne) : Boolean(beatsSessionId))
   return (
-    <Wrap>
+    <PaneShell size="form" scroll>
       <Header />
 
       {/* Step 0 — the timeline: beats need sessions to attach to. */}
@@ -359,7 +364,7 @@ export function BackfillView() {
         </Banner>
       )}
       {imp.reason && <ReasonBanner reason={imp.reason} />}
-    </Wrap>
+    </PaneShell>
   )
 }
 
@@ -401,36 +406,10 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 
 function Header() {
   return (
-    <header>
-      <h1 className="font-display text-2xl font-semibold text-foreground">Backfill</h1>
-      <p className="text-sm text-muted-foreground">
-        Catch Ledger up on a campaign already in progress — the roster first, then each session&apos;s
-        key beats, stamped onto the timeline.
-      </p>
-    </header>
-  )
-}
-
-function Wrap({ children }: { children: ReactNode }) {
-  return <div className="mx-auto flex h-full max-w-2xl flex-col gap-4 overflow-y-auto p-6">{children}</div>
-}
-
-function plural(n: number, one: string, many: string): string {
-  return n === 1 ? one : many
-}
-
-function SetupCard({ title, body, action }: { title: string; body: string; action: ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-      <span className="text-primary">
-        <KeyRound className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{body}</p>
-      </div>
-      <div className="shrink-0">{action}</div>
-    </div>
+    <PaneHeader
+      title="Backfill"
+      description="Catch Ledger up on a campaign already in progress — the roster first, then each session's key beats, stamped onto the timeline."
+    />
   )
 }
 
@@ -453,31 +432,5 @@ function ReasonBanner({ reason }: { reason: ExtractFailureReason }) {
     <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
       Couldn&apos;t read that — try again or rephrase.
     </Banner>
-  )
-}
-
-function Banner({
-  icon,
-  children,
-  tone = 'muted'
-}: {
-  icon: ReactNode
-  children: ReactNode
-  tone?: 'muted' | 'destructive'
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
-        tone === 'destructive'
-          ? 'border-destructive/40 bg-destructive/10 text-foreground'
-          : 'border-border bg-muted/40 text-muted-foreground'
-      )}
-    >
-      <span className={tone === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}>
-        {icon}
-      </span>
-      <span>{children}</span>
-    </div>
   )
 }

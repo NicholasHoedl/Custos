@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BookOpen } from 'lucide-react'
-import { useEntities } from '@renderer/hooks/use-ledger'
+import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { QuickAddBar } from '@renderer/components/capture/QuickAddBar'
 import { EventFeed } from '@renderer/components/capture/EventFeed'
@@ -25,6 +25,10 @@ export function CaptureView() {
   const [filter, setFilter] = useState<EntityFilter>('all')
   const [capturePanel, setCapturePanel] = useState<CapturePanel>('session')
   const { entities, refresh } = useEntities(activeCampaignId)
+  // Distinguish "still restoring the persisted session" from "campaign has no sessions" (T3): the
+  // former is a brief loading state, the latter is a real zero-sessions campaign.
+  const { loading: sessionsLoading } = useSessions(activeCampaignId)
+  const restoringSession = sessionsLoading && activeSessionId === null
 
   if (!activeCampaignId) {
     return (
@@ -46,6 +50,7 @@ export function CaptureView() {
         <QuickAddBar
           campaignId={activeCampaignId}
           sessionId={activeSessionId}
+          restoring={restoringSession}
           onCreated={(entity) => {
             setFilter('all')
             refresh()
@@ -106,7 +111,7 @@ export function CaptureView() {
           ) : capturePanel === 'backfill' ? (
             <BackfillView key={activeCampaignId} />
           ) : (
-            <EventFeed sessionId={activeSessionId} />
+            <EventFeed sessionId={activeSessionId} restoring={restoringSession} />
           )}
         </div>
       </div>

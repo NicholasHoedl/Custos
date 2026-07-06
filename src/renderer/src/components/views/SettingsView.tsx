@@ -8,6 +8,7 @@ import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Separator } from '@renderer/components/ui/separator'
+import { PaneHeader, PaneShell, ProgressBar } from '@renderer/components/chrome'
 import {
   Select,
   SelectContent,
@@ -19,10 +20,6 @@ import {
 export function SettingsView() {
   const { settings, update } = useSettings()
   const { status: onb, progress, downloading, error: modelError, download } = useOnboarding()
-  const pct =
-    progress?.total && progress.total > 0
-      ? Math.round(((progress.loaded ?? 0) / progress.total) * 100)
-      : null
   const [keyInput, setKeyInput] = useState('')
   const [keyExists, setKeyExists] = useState(false)
   const [show, setShow] = useState(false)
@@ -30,7 +27,13 @@ export function SettingsView() {
   const [reindexing, setReindexing] = useState(false)
 
   useEffect(() => {
-    ledger.apikey.exists().then(setKeyExists)
+    ledger.apikey
+      .exists()
+      .then(setKeyExists)
+      .catch((e) => {
+        setKeyExists(false)
+        toast.error("Couldn't check for a saved key", { description: String(e) })
+      })
   }, [])
 
   async function saveKey() {
@@ -55,9 +58,13 @@ export function SettingsView() {
   }
 
   async function clearKey() {
-    await ledger.apikey.clear()
-    setKeyExists(false)
-    toast.success('API key removed')
+    try {
+      await ledger.apikey.clear()
+      setKeyExists(false)
+      toast.success('API key removed')
+    } catch (err) {
+      toast.error('Could not remove key', { description: String(err) })
+    }
   }
 
   async function reindexNotes() {
@@ -73,11 +80,8 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 p-8">
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">API key, model, and preferences.</p>
-      </div>
+    <PaneShell size="form" scroll className="gap-8">
+      <PaneHeader title="Settings" size="lg" description="API key, model, and preferences." />
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
@@ -212,17 +216,7 @@ export function SettingsView() {
             </Button>
           </div>
         ) : downloading || progress?.status === 'downloading' ? (
-          <div className="flex items-center gap-3">
-            <div className="h-1.5 w-48 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: pct != null ? `${pct}%` : '40%' }}
-              />
-            </div>
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {pct != null ? `${pct}%` : 'Downloading…'}
-            </span>
-          </div>
+          <ProgressBar progress={progress} />
         ) : (
           <div className="space-y-2">
             {modelError && <p className="text-xs text-destructive">{modelError}</p>}
@@ -233,6 +227,6 @@ export function SettingsView() {
           </div>
         )}
       </section>
-    </div>
+    </PaneShell>
   )
 }
