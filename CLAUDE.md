@@ -1,7 +1,7 @@
 # Ledger — project guide for coding agents
 
 Local-first desktop app for tracking a tabletop RPG campaign with a time-aware, AI-backed memory
-(Capture · Recall · Suggest, plus Chronology / Backfill / Import / Recap). This file is the fast
+(Capture · Recall · Suggest · Journal, plus Chronology / Import / Recap). This file is the fast
 orientation for an agent with fresh context — it complements, and does not repeat, the human docs:
 
 - [`README.md`](README.md) — stack, getting started, scripts, where your data lives.

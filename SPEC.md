@@ -275,7 +275,7 @@ subsystem lives in the linked ADR (older additions are captured in git history).
   (disposition tags + the PC's own race/class); each option carries 1 primary + up to 2 secondary
   tags, and the mode now returns **8** options with distinct primary tags.
 
-**Current scene** (ADR-015) — a sidebar-selected "present moment" (location, time of day, party present, the
+**Current scene** (ADR-015; picker relocated to the Suggest pane in ADR-023) — a "present moment" (location, time of day, party present, the
 NPCs/factions being faced, the embarked quest, and a scene *mode*: combat / social / exploration /
 stealth / downtime / travel). It is pinned into grounding and steers both Recall and Suggest.
 
@@ -283,23 +283,23 @@ stealth / downtime / travel). It is pinned into grounding and steers both Recall
 join table), authored and managed from a Notes pane inside Capture.
 
 **Session Recap** (ADR-013) — a Capture pane that streams a neutral "Previously on…" of a chosen
-session, grounded in that session's beats + notes, and saves it to the session summary. This
+session, grounded in that session's journal entries + notes, and saves it to the session summary. This
 supersedes the "automated session summarization" non-goal listed in §4.
 
-**Paste-and-Extract Import** (ADR-014) — a Capture pane that turns pasted raw text into reviewed,
-deduped entities + notes, applied in one transaction. (Distinct from the still-deferred campaign
-*file* export/import in §4 — this is text ingestion, not save-file portability.)
+**Paste-and-Extract Import** (ADR-014; extended in ADR-018/023) — a Capture pane that turns pasted text —
+session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes, and
+status/relationship changes**, applied in one transaction and **tied to a session you choose** (the
+current one, a specific past session, or undated). (Distinct from the still-deferred campaign *file*
+export/import in §4 — this is text ingestion, not save-file portability.)
 
 **Chronology** (ADR-017) — the AI reasons with time. Entity status + relationships are versioned as
 an append-only, session-stamped history (lifecycle flag, status trail, relationship validity
 intervals); Recall & Suggest can reconstruct the world **"as of session N"** with a hard
 no-future-leak clamp, and an inline "Changed over time" disclosure shows each entity's trail.
 
-**Backfill interview** (ADR-018) — a Capture pane for adopting Ledger mid-campaign: a
-roster-then-beats guided flow that turns freeform answers + partial notes into entities, third-person
-notes, and **dated status/relationship changes** stamped at their sessions — so the backfilled past
-feeds Chronology's as-of reconstruction. This also delivered Import's deferred relationship
-extraction (as `relationshipChanges`).
+**Backfill interview** (ADR-018) — **removed in ADR-023.** The roster-then-beats guided flow is gone; the
+changeset-v2 engine it introduced (status/relationship extraction with session-stamped apply) lives on in
+**Import** (above, now with a target-session setter) and the **Journal**.
 
 **Event entities re-scoped** (ADR-019) — the `event` entity type is now **world-scale history** (a
 city destroyed, a ruler assassinated), distinct from the party's session log; the extraction prompts
@@ -313,6 +313,24 @@ unconfirmed death or loss (the AI hedges instead of asserting it); per-note **co
 rumors and the party's own hypotheses; and **entity-less campaign lore** — a note is now a first-class
 campaign child (`note.campaignId`) that MAY tag **0..N** entities, so a world-fact owned by no single
 entity has a home (surfaced in Recall as a non-clickable "Campaign lore" source).
+
+**Main character & journal-driven capture** (ADR-022) — each campaign persists a **main character**
+(`campaign.main_character_id`), a chosen PC that is the durable default lens: opening a campaign seeds
+the active PC, so Recall & Suggest run in that character's voice without re-picking (set/cleared via a ★
+toggle by the character selector). "Session beats" are re-themed as the **Journal** — a top-level,
+default view and the primary at-the-table capture surface: you jot a plain sentence of what happened,
+the raw line is kept as your log, and (with an API key) Claude proposes the entities, notes, status
+changes, and relationship links it implies, reviewed inline and applied **stamped at the current
+session**. It reuses the Import changeset-v2 engine (ADR-014/018) verbatim; manual entity/note
+editing (in Capture) becomes the fallback. (A per-character *knowledge horizon* and field-level entity
+edits are noted as future work.)
+
+**Capture & UI refinements** (ADR-023) — a cleanup pass after the Journal landed: **Quick-add** (the
+name→type→note bar) is replaced by the full **Add entity** profile form (opened from the entity browser,
+and by the global hotkey); Recall's **in-character mode is retired from the UI** (its logic stays in
+`recall.service` for later); the **scene picker moved** from the sidebar into the Suggest pane; the
+**Backfill** interview was removed (its engine folded into Import, above); and the in-Capture session-log
+panel is gone (the Journal is a top-level view).
 
 **Operational hardening** (ADR-020) — the data-safety + resilience layer: rotating pre-migration DB
 backups (`VACUUM INTO`, keep 5, in `userData/backups`); a persistent main-process log

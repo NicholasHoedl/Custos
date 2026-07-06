@@ -1,6 +1,8 @@
 # Backfill Interview — Design
 
-**Status:** Accepted — implemented (B1–B4); see ADR-018 "Status" for as-built notes
+**Status:** Accepted — implemented (B1–B4), then **UI removed in ADR-023** (the roster-then-beats
+interview is gone; its changeset-v2 engine lives on in Import + the Journal). Retained as historical
+design context. See ADR-018 "Status" for as-built notes.
 **Date:** 2026-07-02
 **Owner:** Solo developer
 **ADR:** [ADR-018](../adr/018-backfill-interview.md)

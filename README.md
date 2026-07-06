@@ -9,16 +9,17 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 
 ## The three pillars
 
-- **Capture** — fast, keyboard-first entry of entities, notes, links, and session beats. A global
-  hotkey and `Ctrl+K` put quick-add one keystroke away at the table.
+- **Capture** — entry of entities (a full per-type profile form), notes, and links, organized per
+  campaign and session. A global hotkey / `Ctrl+K` opens the add-entity form from anywhere.
 - **Recall** — ask a natural-language question; get a cited, streamed answer synthesized from the
-  relevant notes (semantic search over local embeddings), factual or in-character.
+  relevant notes (semantic search over local embeddings).
 - **Suggest** — in-character ideas for the moment (eight tagged options in your PC's voice) or
   open-ended directions for where to take the story next.
 
-Built on top of these: **Chronology** (the AI reasons about *when* — reconstruct the world "as of
-session N" with no future-knowledge leak), a **Backfill interview** for adopting Ledger mid-campaign,
-paste-and-extract **Import**, and session **Recap**.
+Built on top of these: the **Journal** (jot a plain line of what happened; the AI proposes the entities,
+notes, and status/relationship changes to review), **Chronology** (the AI reasons about *when* —
+reconstruct the world "as of session N" with no future-knowledge leak), paste-and-extract **Import**
+(tie an import to any session), and session **Recap**.
 
 ## Stack
 
@@ -70,7 +71,7 @@ Everything is stored under the app's user-data directory (`%APPDATA%\Ledger` on 
 - [`ROADMAP.md`](ROADMAP.md) — the (shipped) MVP plan and the deferred backlog.
 - [`docs/adr/`](docs/adr/README.md) — Architecture Decision Records: the *why* behind the
   significant choices.
-- [`docs/design/`](docs/design) — design docs for the larger features (Chronology, Backfill).
+- [`docs/design/`](docs/design) — design docs for the larger features (e.g. Chronology).
 
 ## License
 

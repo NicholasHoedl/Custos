@@ -9,8 +9,10 @@ model, not 4-of-7 fixed attitudes (ADR-016); **notes are many-to-many** via `not
 retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); post-MVP features (current
 scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10; a
 **chronology** model (session-stamped history + "as of session N" reconstruction) shipped in
-ADR-017, with the **backfill interview** (ADR-018), **event re-scope to world history** (ADR-019),
-and an **operational-hardening** layer — DB backups, logging, crash recovery (ADR-020) — on top. The
+ADR-017, with **event re-scope to world history** (ADR-019) and an **operational-hardening** layer — DB
+backups, logging, crash recovery (ADR-020); then **journal-driven capture** (ADR-022) and **capture/UI
+refinements** (ADR-023, which retired the backfill interview — its changeset engine folded into Import) —
+on top. The
 data model and module sections below are reconciled to match; older narrative sections remain
 MVP-era where the ADRs supersede them.
 
@@ -481,12 +483,16 @@ All communication between renderer and main process goes through typed IPC chann
 ## 8. Folder / Module Structure
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
-> Notably: the renderer groups feature panes under `components/views/` (`RecallView`, `SuggestView`,
-> `RecapView`, `ImportView`, `BackfillView`, `SettingsView`, `NotesView`), with a shared
+> Notably: the renderer groups feature panes under `components/views/` (`JournalView`, `RecallView`,
+> `SuggestView`, `RecapView`, `ImportView`, `SettingsView`, `NotesView`), with a shared
 > `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
 > `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
 > `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, and `session`
-> services (backfill rides `import.service`); `db/` adds `backup.ts`. Packaging assets live in
+> services; `db/` adds `backup.ts`. The **Journal** (the reworked
+> `components/capture/EventFeed.tsx`, surfaced top-level as `JournalView`) is the primary capture
+> surface — entries feed the Import extract→review→apply engine through a shared `ChangesetReview`,
+> stamped at the current session — and each campaign persists a **main character**
+> (`campaign.main_character_id`) that defaults the Recall/Suggest lens (ADR-022). Packaging assets live in
 > `build/` (`icon.png`) with CI in `.github/workflows/`.
 
 ```
@@ -656,10 +662,11 @@ per-campaign session persistence. See ADR-020.
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
 
 > **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
-> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–021**, with status changes (e.g.
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–023**, with status changes (e.g.
 > ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
 > (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
-> 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes).
+> 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes),
+> 022 (main character + journal-driven capture), 023 (post-journal capture/UI refinements).
 
 | # | Decision | Status |
 |---|---|---|

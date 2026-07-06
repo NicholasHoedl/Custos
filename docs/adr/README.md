@@ -33,6 +33,8 @@ ADR that supersedes the old one (don't edit the old one).
 | [019](019-event-entity-rescope.md) | Event entities re-scoped: world history, not party beats | Accepted | 2026-07-02 |
 | [020](020-operational-hardening.md) | Operational hardening: DB backups, logging, startup recovery | Accepted | 2026-07-02 |
 | [021](021-creature-confidence-lore.md) | Creature type, `presumed_ended` lifecycle, note confidence, entity-less campaign lore | Accepted | 2026-07-06 |
+| [022](022-main-character-journal-capture.md) | Main character + journal-driven capture | Accepted | 2026-07-06 |
+| [023](023-post-journal-refinements.md) | Post-journal capture & UI refinements (removals + relocations) | Accepted | 2026-07-06 |
 
 ## Status legend
 
