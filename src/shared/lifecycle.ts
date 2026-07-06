@@ -4,7 +4,7 @@ import type { Lifecycle } from './entity-types'
 // the renderer (the merged Status control derives lifecycle for a free-text status). It MUST keep mirroring
 // the SQL `CASE` in migration 0005 so backfilled rows and runtime writes agree.
 
-export const ENDED_KEYWORDS = [
+const ENDED_KEYWORDS = [
   'dead',
   'deceased',
   'destroyed',

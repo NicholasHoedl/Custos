@@ -41,7 +41,7 @@ Ledger solves all three.
 Low-friction narrative note-taking during live play. The app must not slow down the session.
 
 **What it means:**
-- Fast entry of structured entities: NPCs, locations, factions, quests/plot threads, items, player characters (PCs), and timestamped session events/quotes
+- Fast entry of structured entities: NPCs, locations, factions, quests/plot threads, items, player characters (PCs), creatures (monsters/beasts), and timestamped session events/quotes
 - A campaign-and-session context is always active ("I am taking notes for Campaign X, Session Y")
 - Quick-add entry that does not require navigating deep menus or filling long forms
 - Entities are linked to each other (an NPC belongs to a location, a quest involves a faction, etc.)
@@ -119,7 +119,7 @@ The MVP delivers all three pillars at their simplest viable form. It is a single
 **Capture**
 - Campaign management: create, name, describe, and switch between campaigns
 - Session management: create sessions (numbered, dated, with a title/summary field) within a campaign
-- Entity CRUD for: NPCs, Locations, Factions, Quests/Plot Threads, Items, Player Characters (PCs), and Events (world-scale history — see ADR-019)
+- Entity CRUD for: NPCs, Locations, Factions, Quests/Plot Threads, Items, Player Characters (PCs), Creatures (monsters/beasts/hazards — see ADR-021), and Events (world-scale history — see ADR-019)
 - Freeform notes attached to any entity, timestamped, linked to the session in which they were created
 - Timestamped event/quote log per session (quick one-liner capture with optional entity tag)
 - Basic entity linking (NPC → Location, NPC → Faction, Quest → NPC, etc.)

@@ -105,8 +105,8 @@ export const note = sqliteTable(
 
 // One note ↔ many entities (M2M). After migration 0004 this is the SOLE source of truth for the
 // note↔entity association (the note table no longer has an entity_id column). Both FKs cascade:
-// deleting a note clears its links; deleting an entity clears its links — and the entity service then
-// removes any note left with zero links (orphan cleanup), since a note must always have ≥1 entity.
+// deleting a note clears its links; deleting an entity clears its links. A note MAY be left with zero
+// links — it survives as entity-less campaign lore, kept alive by its own note.campaign_id (ADR-021).
 export const noteEntity = sqliteTable(
   'note_entity',
   {
