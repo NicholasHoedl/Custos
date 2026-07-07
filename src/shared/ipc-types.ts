@@ -22,6 +22,7 @@ import type {
   RecallError,
   RecallRequest
 } from './recall-types'
+import type { ConverseRequest, ConverseResult } from './converse-types'
 import type { SuggestRequest, SuggestResult } from './suggest-types'
 import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
 import type { ApplyResult, ConfirmedChangeset, ExtractRequest, ExtractResult } from './import-types'
@@ -174,6 +175,9 @@ export interface LedgerApi {
   suggest: {
     query(input: SuggestRequest): Promise<SuggestResult>
   }
+  converse: {
+    query(input: ConverseRequest): Promise<ConverseResult>
+  }
   recap: {
     generate(input: RecapRequest): Promise<{ requestId: string }>
     cancel(requestId: string): Promise<void>
@@ -249,6 +253,7 @@ export const IPC = {
   recapGenerate: 'recap:generate',
   recapCancel: 'recap:cancel',
   suggestQuery: 'suggest:query',
+  converseQuery: 'converse:query',
   importExtract: 'import:extract',
   importApply: 'import:apply',
   personaGet: 'persona:get',

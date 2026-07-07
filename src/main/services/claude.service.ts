@@ -7,7 +7,13 @@ import {
   type StorySuggestion
 } from '@shared/suggest-types'
 import type { RelationshipView } from '@shared/graph-types'
-import { ENTITY_TYPES, LIFECYCLES, NOTE_CONFIDENCES, type Lifecycle } from '@shared/entity-types'
+import {
+  ENTITY_TYPES,
+  LIFECYCLES,
+  NOTE_CONFIDENCES,
+  type Lifecycle,
+  type NoteConfidence
+} from '@shared/entity-types'
 import { RELATIONS } from '@shared/relations'
 import type { RawExtraction } from '@shared/import-types'
 import type { RetrievedChunk } from './vector-store.service'
@@ -261,18 +267,18 @@ export function buildUserContent(
   return content
 }
 
-/** The citeable document title for a chunk, suffixed with an epistemic tag so the model HEDGES a rumor
- *  or a hunch rather than asserting it as fact (ADR-021). Entity chunks are always 'confirmed'. */
+/** The epistemic suffix for a note — a rumor or a hunch is marked so the model HEDGES it rather than
+ *  asserting it as fact (ADR-021). 'confirmed' (the default) gets no suffix. Shared by Recall/Suggest
+ *  (via `chunkTitle`) and Converse (its notes come straight off the target, not via retrieval). */
+export function confidenceTag(confidence: NoteConfidence): string {
+  return confidence === 'rumored' ? ' · (rumored)' : confidence === 'suspected' ? ' · (suspected)' : ''
+}
+
+/** The citeable document title for a chunk, suffixed with its epistemic tag. Entity chunks are 'confirmed'. */
 function chunkTitle(c: RetrievedChunk): string {
   const name = c.entityName ?? 'Campaign lore' // an entity-less lore note (ADR-021) has no entity name
   const base = c.sessionLabel ? `${name} — ${c.sessionLabel}` : name
-  const tag =
-    c.confidence === 'rumored'
-      ? ' · (rumored)'
-      : c.confidence === 'suspected'
-        ? ' · (suspected)'
-        : ''
-  return `${base}${tag}`
+  return `${base}${confidenceTag(c.confidence)}`
 }
 
 function mapSources(message: Anthropic.Message, chunks: RetrievedChunk[]): RecallSource[] {
@@ -1031,6 +1037,162 @@ export async function suggestDirections(params: SuggestDirectionsParams): Promis
       params.scene
     ),
     arrayKey: 'suggestions',
+    signal: params.signal
+  })
+}
+
+// ---- Converse prompt (in-character questions) ----
+
+const CONVERSE_INSTRUCTIONS = `You help a tabletop RPG player prepare to TALK to another character in a campaign — to draw out their backstory, goals, and secrets, IN CHARACTER. You'll be given a brief on how this player character (PC) thinks and what they value, then everything the party has discovered about the TARGET of the conversation: notes (some confirmed, some only rumored or suspected), the target's known connections, and how the PC relates to them.
+
+Produce TWO things: a short BRIEFING, then in-character QUESTIONS the PC could ask.
+
+DISCOVERED-ONLY. Everything you are given is what the party has learned in play. Treat CONFIRMED notes as solid. A note marked (rumored) is hearsay; (suspected) is the party's own hunch — these are UNCERTAIN leads, not facts. Invent nothing beyond what you're given. Thin or missing knowledge is normal and IMPORTANT: it is exactly what the questions should go after.
+
+BRIEFING — three short lists, one line per entry:
+- known: what is actually CONFIRMED about the target. If little is confirmed, keep this short — that's fine and expected.
+- openSuspected: the rumors, hunches, contradictions, and GAPS — what you don't yet know but want to. This is where the questions come from. Draw it from the (rumored)/(suspected) notes and from what's conspicuously absent (unknown goals, backstory, motives, loyalties).
+- connections: notable ties — the people, factions, places, quests, or items the target is linked to that a conversation could probe.
+
+QUESTIONS — four to six things the character could actually SAY to the target, phrased in THIS character's voice: honor the brief's diction, attitude, and the PC's relationship to the target (a question can be warm, blunt, guarded, or sly depending on who they are and how they feel). Aim each question at an OPEN thread or gap from the briefing — never at something already confirmed (you would be asking what you already know). For each: the question itself, the THREAD it means to open, and one line on WHY it's worth asking now.
+
+GROUND IT. Point every question at a real thread from the material. Respect the current state — if the target is marked [ended]/[presumed ended], or you're reconstructing an earlier session, phrase the briefing and questions accordingly.`
+
+/**
+ * The structured-output schema for Converse: a briefing (three string lists) + questions. JSON Schema
+ * can't bound array length, so `converse.service` validates (and tolerates an empty briefing — a target
+ * we know little about legitimately yields an all-questions result). Every object: additionalProperties:false.
+ */
+const CONVERSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    briefing: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        known: { type: 'array', items: { type: 'string' } },
+        openSuspected: { type: 'array', items: { type: 'string' } },
+        connections: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['known', 'openSuspected', 'connections']
+    },
+    questions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          question: { type: 'string' },
+          targetsThread: { type: 'string' },
+          why: { type: 'string' }
+        },
+        required: ['question', 'targetsThread', 'why']
+      }
+    }
+  },
+  required: ['briefing', 'questions']
+}
+
+/** System prompt for Converse — reuses the shared campaign + persona blocks (persona cached last). */
+export function buildConverseSystem(ctx: SuggestContext): Anthropic.TextBlockParam[] {
+  return suggestSystemBlocks(ctx, CONVERSE_INSTRUCTIONS)
+}
+
+/**
+ * The volatile user turn for Converse (PLAIN TEXT, no citations): who the PC is preparing to speak with
+ * (+ the session anchor), the party's confidence-tagged notes on them, their connections, the PC's own
+ * tie to them, an optional focus, then the ask. Each block only when it has content.
+ */
+export function buildConverseUserContent(p: {
+  target: { name: string; type: string; status: string | null; lifecycle: Lifecycle }
+  notes: { confidence: NoteConfidence; content: string }[]
+  connections: string | null
+  tie: string | null
+  focus?: string
+  anchorLabel: string | null
+  asOf: boolean
+  pcName: string
+}): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = []
+  const mark =
+    p.target.lifecycle === 'ended'
+      ? ' [ended]'
+      : p.target.lifecycle === 'presumed_ended'
+        ? ' [presumed ended — unconfirmed]'
+        : ''
+  const status = p.target.status ? ` — ${p.target.status}` : ''
+  const anchorLine = p.anchorLabel
+    ? p.asOf
+      ? `\nReconstruct only what ${p.pcName} could have known AS OF ${p.anchorLabel} — ignore anything later.`
+      : `\nThe present is ${p.anchorLabel}.`
+    : ''
+  content.push({
+    type: 'text',
+    text: `Who ${p.pcName} is preparing to speak with: ${p.target.name} (${p.target.type})${mark}${status}.${anchorLine}`
+  })
+  if (p.notes.length) {
+    const notes = p.notes
+      .map((n) => `## ${p.target.name}${confidenceTag(n.confidence)}\n${n.content}`)
+      .join('\n\n')
+    content.push({
+      type: 'text',
+      text: `What ${p.pcName}'s party has discovered about them — CONFIRMED unless tagged (rumored)/(suspected):\n\n${notes}`
+    })
+  }
+  if (p.connections) {
+    content.push({
+      type: 'text',
+      text: `Known connections — who and what they're tied to (treat as FACT):\n${p.connections}`
+    })
+  }
+  if (p.tie) {
+    content.push({ type: 'text', text: `How ${p.pcName} relates to them:\n${p.tie}` })
+  }
+  if (p.focus?.trim()) {
+    content.push({
+      type: 'text',
+      text: `Focus — steer the briefing and questions toward this: ${p.focus.trim()}`
+    })
+  }
+  content.push({
+    type: 'text',
+    text: `Write the briefing (known / suspected / connections) and the in-character questions ${p.pcName} could ask to draw ${p.target.name} out.`
+  })
+  return content
+}
+
+export interface ConverseParams {
+  target: { name: string; type: string; status: string | null; lifecycle: Lifecycle }
+  notes: { confidence: NoteConfidence; content: string }[]
+  connections: string | null
+  tie: string | null
+  focus?: string
+  anchorLabel: string | null
+  asOf: boolean
+  context: SuggestContext
+  model: string
+  effort: 'medium' | 'high'
+  signal?: AbortSignal
+}
+
+/** Converse call: a briefing + in-character questions. Returns the raw parsed object (caller validates). */
+export async function converse(params: ConverseParams): Promise<{ briefing: unknown; questions: unknown }> {
+  return structuredObjectCall<{ briefing: unknown; questions: unknown }>({
+    model: params.model,
+    effort: params.effort,
+    schema: CONVERSE_SCHEMA,
+    system: buildConverseSystem(params.context),
+    content: buildConverseUserContent({
+      target: params.target,
+      notes: params.notes,
+      connections: params.connections,
+      tie: params.tie,
+      focus: params.focus,
+      anchorLabel: params.anchorLabel,
+      asOf: params.asOf,
+      pcName: params.context.pcName ?? 'you'
+    }),
     signal: params.signal
   })
 }

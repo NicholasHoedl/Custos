@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen,
+  MessagesSquare,
   MoreHorizontal,
   NotebookPen,
   Pencil,
@@ -60,6 +61,7 @@ const NAV: { key: ViewKey; label: string; icon: typeof ScrollText }[] = [
   { key: 'capture', label: 'Codex', icon: ScrollText },
   { key: 'recall', label: 'Consult', icon: Search },
   { key: 'suggest', label: 'Counsel', icon: Sparkles },
+  { key: 'converse', label: 'Converse', icon: MessagesSquare },
   { key: 'settings', label: 'Settings', icon: Settings }
 ]
 

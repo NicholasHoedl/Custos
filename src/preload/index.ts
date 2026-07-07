@@ -90,6 +90,9 @@ const api: LedgerApi = {
   suggest: {
     query: (input) => ipcRenderer.invoke(IPC.suggestQuery, input)
   },
+  converse: {
+    query: (input) => ipcRenderer.invoke(IPC.converseQuery, input)
+  },
   import: {
     extract: (input) => ipcRenderer.invoke(IPC.importExtract, input),
     apply: (payload) => ipcRenderer.invoke(IPC.importApply, payload)

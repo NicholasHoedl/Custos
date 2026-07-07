@@ -16,6 +16,7 @@ import { registerOnboardingHandlers } from './onboarding'
 import { registerRecallHandlers } from './recall'
 import { registerRecapHandlers } from './recap'
 import { registerSuggestHandlers } from './suggest'
+import { registerConverseHandlers } from './converse'
 import { registerImportHandlers } from './import'
 import { registerPersonaHandlers } from './persona'
 
@@ -49,6 +50,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerRecallHandlers(ctx, store, send)
   registerRecapHandlers(ctx, send)
   registerSuggestHandlers(ctx, store)
+  registerConverseHandlers(ctx)
   registerImportHandlers(ctx, store)
   registerPersonaHandlers(ctx)
 
