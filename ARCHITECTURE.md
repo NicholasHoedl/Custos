@@ -53,7 +53,45 @@ Loaded via CSS `@font-face` or a bundled font package:
 
 All color tokens live in `src/renderer/src/styles/globals.css` as CSS custom properties. **Tailwind v4 is CSS-first** — the `@tailwindcss/vite` plugin plus an `@theme inline` block consume those variables, so there is **no `tailwind.config.ts`**. Fonts are self-hosted via `@fontsource` (bundled woff2, offline-ready). As built in Phase 0, the renderer app lives under `src/renderer/src/` (electron-vite layout) with cross-process code in `src/shared/`. No inline styles; no CSS modules.
 
-**Developer-provided palette (Tailwind format) — use verbatim:**
+> **Palette superseded (ADR-024).** The original cyan/slate palette shipped in Phase 0; the renderer was
+> later re-themed to the grim dark-fantasy **"Ash & Ember"** palette. The **source of truth for color is now
+> [`docs/design/theme.md`](docs/design/theme.md)**; the current tokens are summarized below, and the
+> historical cyan palette is kept (collapsed) at the end for provenance.
+
+**Current palette — *Ash & Ember* (ADR-024; full reference in `docs/design/theme.md`):**
+
+```
+--char           #141210   warm charcoal near-black — background
+--char-sidebar   #100D0B   sidebar
+--char-raised    #1E1A16   raised surface — card / muted
+--char-inset     #26201A   inset
+--iron           #34302A   default hairline / border
+--bone           #E8E2D6   bone-white — foreground text
+--bone-dim       #C7BFB2   body copy
+--ash            #8C8377   muted / warm ash grey
+--ember          #D2732E   accent — primary, active rules, focus, Recall citations
+--ember-deep     #7C3E1D   hover / active fills
+--blood          #B23A2E   dried blood — death, enmity, destructive
+--pewter         #9E9DA2   cool pewter — inscribed labels, wordmark
+```
+
+Named raw tokens → semantic role tokens (`--background` / `--foreground` / `--primary` / …) → Tailwind
+utilities, dark-only; every component resolves through the roles, so a palette swap is a single-file token
+change with no per-component edits. `--pewter` / `--blood` are exposed as `text-metal` / `text-blood` /
+`decoration-blood`. **Because ember (accent) and blood (death) share a warm hue, death cues rely on
+strike + skull + ghosting, not color** — see the death motif in `theme.md`.
+
+**Design-language guardrails (the governing rule — unchanged across re-themes):** Past attempts to make a UI
+"feel like a ledger" produced *generic shadcn components recolored beige*. Do **not** do that. The identity
+is a committed **grim, warm-charcoal canvas with a single dying-ember accent** — not parchment, not
+skeuomorphic paper, not beige. The "ledger" character comes from **typography, structure, and the death
+motif** (Fraunces display at large sizes with weight extremes; Bricolage Grotesque body; JetBrains Mono for
+IDs/timestamps; the `.inscribed` small-caps pewter labels; layered charcoal surfaces for depth; the
+lifecycle/confidence model rendered as strike/skull/ghost), not from coloring standard components. Make
+distinctive, intentional choices.
+
+<details>
+<summary>Original Phase-0 palette (superseded by ADR-024 — kept for provenance)</summary>
 
 ```js
 {
@@ -64,14 +102,9 @@ All color tokens live in `src/renderer/src/styles/globals.css` as CSS custom pro
   jet_black:  { DEFAULT: '#253237', 100: '#070a0b', 200: '#0f1416', 300: '#161e21', 400: '#1d282c', 500: '#253237', 600: '#465f69', 700: '#688c9b', 800: '#9bb3bc', 900: '#cdd9de' }
 }
 ```
-
-**Role mapping (dark-first):**
-- **Dominant canvas / surfaces:** `jet_black` (#253237) and `blue_slate` (#5c6b73) — a cool charcoal-teal base. Layer surfaces using the `jet_black`/`blue_slate` scales for depth (not flat cards).
-- **Primary text / borders:** `cool_steel` (#9db4c0) and the lighter `blue_slate` steps on dark; `light_cyan`/`light_blue` for high-emphasis text on dark.
-- **Single sharp accent:** vivid cyan **`#32e5eb`** (`light_cyan-300`), with **`#11a7ad`** (`light_cyan-200`) as a deeper accent variant. Reserve the accent for interactive affordances, focus rings, active states, and Recall citations — used sparingly so it stays sharp.
-- **Light tints:** `light_cyan` (#e0fbfc) / `light_blue` (#c2dfe3) for any light surfaces or inverse panels.
-
-**Design-language guardrails (explicit developer feedback):** Past attempts to make a UI "feel like a ledger" produced *generic shadcn components recolored beige*. Do **not** do that. The identity here is a committed **dark, cool, charcoal-teal canvas with one vivid cyan accent** — not parchment, not skeuomorphic paper, not beige. The "ledger" character must come from **typography and structure** (Fraunces display at large sizes with weight extremes, Bricolage Grotesque body, JetBrains Mono for IDs/timestamps; strong hierarchy and size jumps; layered slate surfaces for depth), not from coloring standard components. Make distinctive, intentional choices.
+The original dark cyan/slate role mapping (jet_black canvas, vivid cyan `#32e5eb` accent) is preserved here
+and in ROADMAP P0-02.
+</details>
 
 ---
 
@@ -138,7 +171,7 @@ Transformers.js with ONNX runs the same model family in the Node.js main process
 
 ### Window Layout (single-window)
 
-Ledger is a **single-window** app with **panel switching** (confirmed by the developer over a multi-panel layout). The window is a persistent left **Sidebar** (campaign selector + nav: Capture / Recall / Suggest / Settings / entity browser) plus a single **MainPanel** that renders exactly one feature view at a time; clicking a sidebar item swaps the active view. There is **no persistent secondary "AI drawer"** in the MVP — Recall and Suggest are their own full panels, not always-on side rails. View switching is client-side (a lightweight router / tab switcher in the renderer; the active view lives in renderer state — see ADR-007). The global quick-add hotkey (below) is the one path that surfaces capture without first switching panels.
+Ledger is a **single-window** app with **panel switching** (confirmed by the developer over a multi-panel layout). The window is a persistent left **Sidebar** (campaign selector + nav: Journal / Capture / Recall / Suggest / Converse / Settings / entity browser) plus a single **MainPanel** that renders exactly one feature view at a time; clicking a sidebar item swaps the active view. There is **no persistent secondary "AI drawer"** — Recall, Suggest, and Converse are their own full panels, not always-on side rails. View switching is client-side (a lightweight router / tab switcher in the renderer; the active view lives in renderer state — see ADR-007). The global quick-add hotkey (below) is the one path that surfaces capture without first switching panels.
 
 ### Security Boundary
 
@@ -361,6 +394,7 @@ Anthropic's `ephemeral` cache defaults to a **5-minute** TTL; pass `cache_contro
 |---|---|---|
 | Recall synthesis | `claude-sonnet-4-6` | Lower latency/cost; configurable to Opus |
 | Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 8-option "in the moment" + open-ended "directions" — ADR-016) |
+| Converse | `claude-opus-4-8` | Third AI lens; **reuses the Suggest model + effort setting**; single-shot structured, direct-fetch grounding (ADR-025) |
 | Auto-tagging (future) | `claude-haiku-4-5` | Background task, latency-insensitive |
 
 ### ClaudeService Interface (main process only)
@@ -370,6 +404,7 @@ Anthropic's `ephemeral` cache defaults to a **5-minute** TTL; pass `cache_contro
 interface ClaudeService {
   recall(params: RecallParams): AsyncIterable<RecallChunk>   // streamed
   suggest(params: SuggestParams): Promise<SuggestResult>     // single structured response
+  converse(params: ConverseParams): Promise<ConverseResult>  // single structured response (ADR-025)
   isAvailable(): Promise<boolean>  // network + key check
 }
 
@@ -435,6 +470,22 @@ Implementation notes:
 
 For Suggest with Opus 4.8, use adaptive thinking: `thinking: { type: "adaptive" }` together with `output_config: { effort: "high" }`. Opus 4.8 does **not** accept `thinking: { type: "enabled", budget_tokens: N }` — that returns a 400; a fixed thinking budget is replaced by adaptive thinking plus the `effort` parameter (`low` | `medium` | `high` | `max`). This improves reasoning quality for the "what would my character do?" question. Drop `effort` to `medium` if latency is too high at the table.
 
+### Converse Output Model (ADR-025)
+
+**Converse** helps a player prepare to *talk* to a character: given the active PC (the asker) and a chosen
+**target** entity, it returns a **briefing** (`known` / `openSuspected` / `connections`) plus in-character
+**`questions`** to draw the target out. It **mirrors Suggest's mechanism** — a single, non-streaming
+structured-output call (`structuredObjectCall` → a validated object; no citations) reusing the same
+`suggestModel` / `suggestEffort` settings — so there is **no new model, no schema, and no settings change**.
+
+Where it *differs* from Suggest: grounding is **direct fetch, not retrieval** (no embedding model). The
+target's notes come from `getEntityContext(target, 1)`; its **connections** and the asker↔target tie come
+from `listForEntity(…, asOf)`, which is as-of-correct via `isIntervalLiveAt` (ADR-017) — that split is the
+one real design call, because `getEntityContext` has no as-of support. Status resolves through
+`resolveEntityState(target, asOf)`, and the asker's voice through the PC persona. Since JSON Schema can't
+bound array length, the service **validates/coerces** the result and fails only when *everything* is empty
+(a sparse target legitimately yields a questions-only briefing). Full rationale in ADR-025.
+
 ---
 
 ## 7. IPC Architecture
@@ -464,7 +515,8 @@ All communication between renderer and main process goes through typed IPC chann
 
 // AI channels
 'recall:query'       → streamed tokens + final citations (streaming)
-'suggest:query'      → SuggestResult (single structured response: 4 attitude recommendations)
+'suggest:query'      → SuggestResult (single structured response; multi-tag 8-option + directions — ADR-016)
+'converse:query'     → ConverseResult (single structured response: briefing + in-character questions — ADR-025)
 
 // Settings channels
 'settings:get'       → AppSettings
@@ -484,7 +536,7 @@ All communication between renderer and main process goes through typed IPC chann
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
 > Notably: the renderer groups feature panes under `components/views/` (`JournalView`, `RecallView`,
-> `SuggestView`, `RecapView`, `ImportView`, `SettingsView`, `NotesView`), with a shared
+> `SuggestView`, `ConverseView`, `RecapView`, `ImportView`, `SettingsView`, `NotesView`), with a shared
 > `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
 > `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
 > `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, and `session`
@@ -492,8 +544,10 @@ All communication between renderer and main process goes through typed IPC chann
 > `components/capture/EventFeed.tsx`, surfaced top-level as `JournalView`) is the primary capture
 > surface — entries feed the Import extract→review→apply engine through a shared `ChangesetReview`,
 > stamped at the current session — and each campaign persists a **main character**
-> (`campaign.main_character_id`) that defaults the Recall/Suggest lens (ADR-022). Packaging assets live in
-> `build/` (`icon.png`) with CI in `.github/workflows/`.
+> (`campaign.main_character_id`) that defaults the Recall/Suggest lens (ADR-022). The third AI lens
+> **Converse** (ADR-025) adds `services/converse.service.ts`, `ipc/converse.ts`, `views/ConverseView.tsx`,
+> `hooks/use-converse.ts`, and `shared/converse-types.ts`. Packaging assets live in `build/`
+> (`icon.svg` → `icon.png`, ADR-024) with CI in `.github/workflows/`.
 
 ```
 ledger/
@@ -662,11 +716,12 @@ per-campaign session persistence. See ADR-020.
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
 
 > **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
-> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–023**, with status changes (e.g.
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–025**, with status changes (e.g.
 > ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
 > (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
 > 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes),
-> 022 (main character + journal-driven capture), 023 (post-journal capture/UI refinements).
+> 022 (main character + journal-driven capture), 023 (post-journal capture/UI refinements),
+> 024 (grim "Ash & Ember" re-theme), 025 (Converse — in-character question lens).
 
 | # | Decision | Status |
 |---|---|---|

@@ -35,6 +35,8 @@ ADR that supersedes the old one (don't edit the old one).
 | [021](021-creature-confidence-lore.md) | Creature type, `presumed_ended` lifecycle, note confidence, entity-less campaign lore | Accepted | 2026-07-06 |
 | [022](022-main-character-journal-capture.md) | Main character + journal-driven capture | Accepted | 2026-07-06 |
 | [023](023-post-journal-refinements.md) | Post-journal capture & UI refinements (removals + relocations) | Accepted | 2026-07-06 |
+| [024](024-grim-retheme.md) | Grim dark-fantasy re-theme ("Ash & Ember"): palette, glossary, death motif | Accepted | 2026-07-06 |
+| [025](025-converse-in-character-questions.md) | Converse: an in-character question lens (single-shot structured, direct-fetch grounding) | Accepted | 2026-07-07 |
 
 ## Status legend
 

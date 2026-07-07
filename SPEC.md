@@ -229,7 +229,7 @@ The MVP is successful when the developer can:
 - **Not a character sheet tool.** HP, spell slots, inventory stats — out of scope.
 - **Not a VTT (virtual tabletop).** No maps, tokens, dice, or initiative.
 - **Not a multi-user tool.** No sharing, collaboration, or cloud sync.
-- **Not a general AI assistant.** Claude is used only for Recall synthesis and Suggest; it does not have an open chat interface.
+- **Not a general AI assistant.** Claude powers the app's *specific* AI features — Recall, Suggest, Converse, the Journal/Import extraction, and Recap — not an open, free-form chat interface.
 - **Not a campaign creator.** Ledger tracks what has happened, not what could happen (no random tables, no generators).
 - **Not a web app.** Electron desktop only; no browser hosting.
 
@@ -274,6 +274,15 @@ subsystem lives in the linked ADR (older additions are captured in git history).
 - **In-the-moment overhaul** — the 7 fixed attitudes were replaced by a ~62-tag vocabulary
   (disposition tags + the PC's own race/class); each option carries 1 primary + up to 2 secondary
   tags, and the mode now returns **8** options with distinct primary tags.
+
+**Converse** (ADR-025) — a **third AI lens** beside Recall and Suggest (surfaced in the UI as Consult ·
+Counsel · Converse). Given the active PC (the asker) and a chosen **target** entity, one structured call
+returns a short **briefing** — what's *known*, what's *open / suspected*, and the target's *connections* —
+then **in-character questions** the PC could ask to draw them out, each tagged with the thread it opens and
+why. It mirrors Suggest's single-shot structured pipeline but grounds by **direct fetch** (the target's
+notes + as-of-correct ties + the asker's persona), so it needs no embedding model and reuses the Suggest
+model setting — **no migration, no new settings**. Discovered-only: gaps and Whispered/Hearsay notes
+*become* the questions; it never answers them or simulates the target's replies.
 
 **Current scene** (ADR-015; picker relocated to the Suggest pane in ADR-023) — a "present moment" (location, time of day, party present, the
 NPCs/factions being faced, the embarked quest, and a scene *mode*: combat / social / exploration /
@@ -338,6 +347,13 @@ backups (`VACUUM INTO`, keep 5, in `userData/backups`); a persistent main-proces
 migration-failure recovery dialog; a React error boundary + a renderer IPC error-toast audit; and
 per-campaign session persistence. Shipped alongside **CI** (GitHub Actions: typecheck + lint + tests
 on Windows) and a signed **NSIS installer** (`npm run dist`).
+
+**Grim visual identity** (ADR-024) — the renderer was re-themed from the original cool cyan/slate to a grim
+dark-fantasy **"Ash & Ember"** palette (warm charcoal, bone, a dying-ember accent, dried-blood death), with
+an evocative-but-clear glossary (the AI is *the Keeper*; Recall / Suggest / Capture / Journal / Import
+surface as *Consult / Counsel / Codex / Chronicle / Transcribe*) and a **death motif** that turns the
+lifecycle + note-confidence model into the visual language — a Fallen entity's name is struck through with a
+blood skull. Labels + tokens only, **no migration**; full as-built reference in `docs/design/theme.md`.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file

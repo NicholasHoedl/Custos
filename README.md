@@ -16,10 +16,11 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 - **Suggest** — in-character ideas for the moment (eight tagged options in your PC's voice) or
   open-ended directions for where to take the story next.
 
-Built on top of these: the **Journal** (jot a plain line of what happened; the AI proposes the entities,
-notes, and status/relationship changes to review), **Chronology** (the AI reasons about *when* —
-reconstruct the world "as of session N" with no future-knowledge leak), paste-and-extract **Import**
-(tie an import to any session), and session **Recap**.
+Built on top of these: **Converse** (pick another character and get a briefing on what your party knows
+and suspects about them, plus in-character questions your PC could ask to draw them out), the **Journal**
+(jot a plain line of what happened; the AI proposes the entities, notes, and status/relationship changes to
+review), **Chronology** (the AI reasons about *when* — reconstruct the world "as of session N" with no
+future-knowledge leak), paste-and-extract **Import** (tie an import to any session), and session **Recap**.
 
 ## Stack
 

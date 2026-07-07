@@ -1,7 +1,7 @@
 # Ledger — project guide for coding agents
 
 Local-first desktop app for tracking a tabletop RPG campaign with a time-aware, AI-backed memory
-(Capture · Recall · Suggest · Journal, plus Chronology / Import / Recap). This file is the fast
+(Capture · Recall · Suggest · Converse · Journal, plus Chronology / Import / Recap). This file is the fast
 orientation for an agent with fresh context — it complements, and does not repeat, the human docs:
 
 - [`README.md`](README.md) — stack, getting started, scripts, where your data lives.
@@ -33,7 +33,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **7 migrations (0000–0006)**.
+  `.sql`, keep `_journal.json` + the snapshot. Currently **8 migrations (0000–0007)**.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -47,10 +47,14 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   Recall "Sources" list handle null-entity chunks. But paste-and-extract **Import deliberately still
   requires ≥1 entity per note** (an untagged extracted note is noise); don't "relax" the extraction
   prompt to allow untagged notes.
-- **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` in
-  `claude.service.ts` are where entity state (lifecycle → `[ended]` / `[presumed ended — unconfirmed]`),
-  relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)` in the citeable title) get
-  injected. Change what the model is told *here*.
+- **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` /
+  `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
+  `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,
+  via the shared `confidenceTag`) get injected. Change what the model is told *here*.
+- **Three AI lenses, two shapes.** Recall (**Consult**) *streams* prose with citations; Suggest (**Counsel**)
+  and Converse (ADR-025) are *single-shot structured* — `structuredObjectCall` → a discriminated-union result,
+  no stream, no citations. Converse grounds by **direct fetch** (`getEntityContext` + `listForEntity(asOf)` +
+  persona), NOT retrieval, so it needs no embedding model. Add a structured lens by mirroring Suggest, not Recall.
 - **Live-DB safety:** SQLite runs in WAL. Never let a second process write `ledger.db` while the app is
   open — close it first. Real failures land in `%APPDATA%\Ledger\logs\main.log` (electron-log); Import
   maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`.
