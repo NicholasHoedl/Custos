@@ -55,6 +55,7 @@ export const entity = sqliteTable(
     description: text('description'),
     traits: text('traits'), // JSON string[] — promoted: Suggest (Phase 3) reads these by name
     goals: text('goals'), // JSON string[] — promoted
+    flaws: text('flaws'), // JSON string[] — promoted (ADR-026): a vice/fear/weakness; feeds persona + Counsel
     attributes: text('attributes'), // JSON object — open bag of type-specific fields (no migration needed)
     status: text('status'),
     // Chronology (ADR-017): coarse lifecycle the AI trusts for past-vs-present; free-text `status`

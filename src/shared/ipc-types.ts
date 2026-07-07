@@ -54,6 +54,7 @@ export interface CreateEntityInput {
   description?: string
   traits?: string[]
   goals?: string[]
+  flaws?: string[]
   attributes?: Record<string, unknown>
   status?: string
   lifecycle?: Lifecycle // chronology: defaults to the status heuristic when omitted
@@ -64,6 +65,7 @@ export interface UpdateEntityInput {
   description?: string | null
   traits?: string[]
   goals?: string[]
+  flaws?: string[]
   attributes?: Record<string, unknown>
   status?: string | null
   lifecycle?: Lifecycle

@@ -228,6 +228,7 @@ Entity
   description  TEXT
   traits       TEXT (JSON array of strings — used heavily for PC in Suggest)
   goals        TEXT (JSON array of strings — for NPC / PC)
+  flaws        TEXT (JSON array of strings — a vice/fear/weakness for PC/NPC/faction; feeds persona + Counsel, ADR-026)
   status       TEXT ('active' | 'inactive' | 'dead' | 'resolved' | ...) — free-text
   lifecycle    TEXT ('active' | 'ended' | 'presumed_ended' | 'unknown') NOT NULL — coarse in-play flag (ADR-017, ADR-021)
   createdAt    INTEGER (unix ms)

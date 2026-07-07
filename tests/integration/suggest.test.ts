@@ -54,6 +54,17 @@ function unit(i: number): Float32Array {
   return v
 }
 
+// A full MomentSuggestion the validator accepts (pillar + mechanic required; empty teamwork -> null).
+const m = (primaryTag: string, secondaryTags: string[] = []): Record<string, unknown> => ({
+  primaryTag,
+  secondaryTags,
+  pillar: 'social',
+  action: 'a',
+  mechanic: 'Insight (WIS)',
+  teamwork: '',
+  rationale: 'r'
+})
+
 describe('suggest RAG pipeline (mocked AI)', () => {
   it('attitudes: grounds the structured call with persona, notes, state, and relationships', async () => {
     const ctx = makeTestDb()
@@ -89,14 +100,14 @@ describe('suggest RAG pipeline (mocked AI)', () => {
 
     embedFn.mockResolvedValue(unit(0)) // the situation embeds toward the Glasstaff note
     claudeSuggest.mockResolvedValue([
-      { primaryTag: 'religious', secondaryTags: ['merciful'], action: 'a', rationale: 'r' },
-      { primaryTag: 'hostile', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'cunning', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'friendly', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'protective', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'merciful', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'honorable', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'bold', secondaryTags: [], action: 'a', rationale: 'r' }
+      m('religious', ['merciful']),
+      m('hostile'),
+      m('cunning'),
+      m('friendly'),
+      m('protective'),
+      m('merciful'),
+      m('honorable'),
+      m('bold')
     ])
 
     const res = await suggest(
@@ -201,14 +212,14 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     })
     embedFn.mockResolvedValue(unit(0))
     claudeSuggest.mockResolvedValue([
-      { primaryTag: 'religious', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'hostile', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'cunning', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'friendly', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'protective', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'merciful', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'honorable', secondaryTags: [], action: 'a', rationale: 'r' },
-      { primaryTag: 'bold', secondaryTags: [], action: 'a', rationale: 'r' }
+      m('religious'),
+      m('hostile'),
+      m('cunning'),
+      m('friendly'),
+      m('protective'),
+      m('merciful'),
+      m('honorable'),
+      m('bold')
     ])
 
     const res = await suggest(
@@ -223,8 +234,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
           embarkedQuestId: null,
           nearbyPcIds: [],
           presentEntityIds: [],
-          sceneMode: 'combat',
-          timeOfDay: 'night'
+          sceneMode: 'combat'
         }
       },
       new AbortController().signal

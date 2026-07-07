@@ -50,6 +50,11 @@ describe('suggest prompt assembly (in the moment)', () => {
     expect(text).toContain('religious')
     expect(text).toContain('investigative')
     expect(text).toContain('forceful') // an expansion tag is present in the vocabulary
+    // the v2 dimensions the overhaul added (ADR-026)
+    expect(text).toContain('MECHANIC')
+    expect(text).toContain('PILLAR')
+    expect(text).toContain('TEAMWORK')
+    expect(text).toContain('FLAW')
     // the PC's race/class are stated so the model knows which race/class tags are legal
     expect(text).toContain('elf wizard')
     // the cacheable breakpoint is on the last (persona) block
@@ -82,6 +87,13 @@ describe('suggest prompt assembly (in the moment)', () => {
     const content = buildSuggestUserContent('Go?', [])
     expect(content).toHaveLength(1)
     expect(content[0]).toEqual({ type: 'text', text: 'The situation right now:\nGo?' })
+  })
+
+  it('includes a goal block when a goal is given, still ending with the situation', () => {
+    const content = buildSuggestUserContent('Do it?', [], null, null, null, 'find Glasstaff')
+    const texts = content.map((b) => ('text' in b ? b.text : ''))
+    expect(texts.some((t) => t.includes('find Glasstaff'))).toBe(true)
+    expect(texts[texts.length - 1]).toContain('The situation right now:')
   })
 })
 

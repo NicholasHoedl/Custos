@@ -2,10 +2,12 @@ import { eq } from 'drizzle-orm'
 import {
   SUGGEST_TAGS,
   SUGGEST_CATEGORIES,
+  SUGGEST_PILLARS,
   type MomentSuggestion,
   type StorySuggestion,
   type SuggestCategory,
   type SuggestFailureReason,
+  type SuggestPillar,
   type SuggestRequest,
   type SuggestResult,
   type SuggestTag
@@ -36,6 +38,7 @@ import { classifyError, isOnline } from './ai-util'
 
 const TOP_K = 8
 const TAG_SET = new Set<string>(SUGGEST_TAGS)
+const PILLAR_SET = new Set<string>(SUGGEST_PILLARS)
 
 function fail(reason: SuggestFailureReason): SuggestResult {
   return { ok: false, reason }
@@ -52,7 +55,9 @@ function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
   const clean: MomentSuggestion[] = []
   for (const r of recs) {
     if (!r || typeof r.primaryTag !== 'string' || !TAG_SET.has(r.primaryTag)) continue
+    if (typeof r.pillar !== 'string' || !PILLAR_SET.has(r.pillar)) continue
     if (typeof r.action !== 'string' || !r.action.trim()) continue
+    if (typeof r.mechanic !== 'string' || !r.mechanic.trim()) continue
     if (typeof r.rationale !== 'string' || !r.rationale.trim()) continue
     if (seen.has(r.primaryTag)) continue
     const primary = r.primaryTag as SuggestTag
@@ -69,7 +74,10 @@ function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
     clean.push({
       primaryTag: primary,
       secondaryTags: secondary,
+      pillar: r.pillar as SuggestPillar,
       action: r.action.trim(),
+      mechanic: r.mechanic.trim(),
+      teamwork: typeof r.teamwork === 'string' && r.teamwork.trim() ? r.teamwork.trim() : null,
       rationale: r.rationale.trim()
     })
     if (clean.length === 8) break
@@ -264,6 +272,7 @@ export async function suggest(
         relationships,
         state,
         scene: scene.block,
+        goal: req.goal,
         context,
         model: suggestModel,
         effort: suggestEffort,

@@ -90,6 +90,7 @@ export interface Entity {
   description: string | null
   traits: string[] // promoted (Suggest reads these)
   goals: string[] // promoted
+  flaws: string[] // promoted (ADR-026): a vice/fear/weakness — the richest roleplay hook
   attributes: Record<string, unknown> // open bag of type-specific fields
   status: string | null
   lifecycle: Lifecycle // chronology: coarse state the AI trusts; free-text `status` stays for nuance

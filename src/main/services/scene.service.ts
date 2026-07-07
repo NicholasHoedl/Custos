@@ -1,4 +1,4 @@
-import { SCENE_MODE_LABELS, TIME_OF_DAY_LABELS, type SceneContext } from '@shared/scene-types'
+import { SCENE_MODE_LABELS, type SceneContext } from '@shared/scene-types'
 import type { Entity, Lifecycle } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
 import type { DbContext } from './db-context'
@@ -75,7 +75,6 @@ export function resolveScene(
     Boolean(quest) ||
     nearbyPcs.length > 0 ||
     facing.length > 0 ||
-    Boolean(scene.timeOfDay) ||
     Boolean(scene.sceneMode)
   if (!sceneSet) return { block: null, pinned: [], quest: null, nearbyPcs: [] }
 
@@ -125,7 +124,6 @@ export function resolveScene(
     nearbyPcNames: nearbyPcs.map((p) => p.name),
     facingNames: facing.map((e) => e.name),
     hereNames: hereEntities.map((e) => e.name),
-    timeOfDay: scene.timeOfDay ? TIME_OF_DAY_LABELS[scene.timeOfDay] : null,
     mode: scene.sceneMode ? SCENE_MODE_LABELS[scene.sceneMode] : null,
     sceneSet: true
   })

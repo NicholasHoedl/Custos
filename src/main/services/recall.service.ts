@@ -24,7 +24,6 @@ import {
   recall as claudeRecall,
   type RecallContext
 } from './claude.service'
-import { gatherPinned, resolveScene } from './scene.service'
 import { classifyError, isOnline } from './ai-util'
 
 type Send = (channel: string, payload: unknown) => void
@@ -140,13 +139,10 @@ export async function ask(
     // entity_link and never reach Claude via embeddings, and (b) its current status. Plus the latest
     // session as the "present" anchor. Without these the model invents facts ("the staff is mine") and
     // treats resolved threads (a defeated NPC, a completed quest) as if they were still open.
-    const scene = resolveScene(ctx, req.scene, pcId, asOf)
     const seen = new Set<string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
     const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
       []
-    // Pin the current-scene entities into grounding first so they're always present, even off-vector.
-    gatherPinned(ctx, scene.pinned, seen, relItems, stateItems, asOf)
     // One batched read for the retrieved entities (instead of a getEntity per chunk).
     const entitiesById = listEntitiesByIds(
       ctx,
@@ -186,7 +182,6 @@ export async function ask(
       chunks,
       relationships,
       state,
-      scene: scene.block,
       mode: effectiveMode,
       context,
       model: getSettings().recallModel,

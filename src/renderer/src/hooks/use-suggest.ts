@@ -19,7 +19,7 @@ const IDLE: SuggestState = { status: 'idle', result: null, error: null }
  * the campaign's open threads).
  */
 export function useSuggest(): SuggestState & {
-  ask: (situation: string, mode: SuggestMode, asOfSession?: number) => void
+  ask: (situation: string, mode: SuggestMode, asOfSession?: number, goal?: string) => void
   reset: () => void
 } {
   const [state, setState] = useState<SuggestState>(IDLE)
@@ -30,7 +30,7 @@ export function useSuggest(): SuggestState & {
   const reqRef = useRef(0)
 
   const ask = useCallback(
-    (situation: string, mode: SuggestMode, asOfSession?: number) => {
+    (situation: string, mode: SuggestMode, asOfSession?: number, goal?: string) => {
       if (!activeCampaignId || !activePcId) return
       if (mode === 'attitudes' && !situation.trim()) return
       const token = ++reqRef.current
@@ -40,6 +40,7 @@ export function useSuggest(): SuggestState & {
           campaignId: activeCampaignId,
           pcId: activePcId,
           situation: situation.trim(),
+          goal: goal?.trim() || undefined,
           mode,
           scene,
           asOfSession

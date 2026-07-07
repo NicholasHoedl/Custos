@@ -33,7 +33,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **8 migrations (0000–0007)**.
+  `.sql`, keep `_journal.json` + the snapshot. Currently **9 migrations (0000–0008)**.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -55,6 +55,12 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   and Converse (ADR-025) are *single-shot structured* — `structuredObjectCall` → a discriminated-union result,
   no stream, no citations. Converse grounds by **direct fetch** (`getEntityContext` + `listForEntity(asOf)` +
   persona), NOT retrieval, so it needs no embedding model. Add a structured lens by mirroring Suggest, not Recall.
+- **Counsel v2 (ADR-026):** each "in the moment" option carries a `pillar` / `mechanic` (5e check + ability,
+  no failure outcome — the DM's call) / `teamwork` field (all validated in `suggest.service` `validateMoment`);
+  an optional `goal` biases the spread. The **scene** (`SceneControls`) grounds **Counsel only** now
+  (ADR-027) — Recall is scene-free. **`flaws`** is a promoted entity field (like `traits`/`goals` — schema/serialize/entity.service)
+  that feeds the persona. **Entity embeddings now index `traits`/`goals`/`flaws` + salient attributes**
+  (`embedding-index.ts` `entityText`); editing that function re-embeds ALL entities on next launch.
 - **Live-DB safety:** SQLite runs in WAL. Never let a second process write `ledger.db` while the app is
   open — close it first. Real failures land in `%APPDATA%\Ledger\logs\main.log` (electron-log); Import
   maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`.

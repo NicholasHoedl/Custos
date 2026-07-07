@@ -275,6 +275,16 @@ subsystem lives in the linked ADR (older additions are captured in git history).
   (disposition tags + the PC's own race/class); each option carries 1 primary + up to 2 secondary
   tags, and the mode now returns **8** options with distinct primary tags.
 
+**Counsel v2** (ADR-026) — the "in the moment" lens now speaks the *game*, not just the fiction: each of the
+eight options carries a **pillar** (combat/social/exploration), a **mechanic** (the 5e check + ability + what
+it's opposed by — no DCs, and no failure outcome since the DM adjudicates failure), and an optional
+**teamwork** play naming a present ally; the prompt requires
+pillar spread, a **flaw-driven** option, capability-awareness, and scene-stakes calibration, and an optional
+**goal** input biases the spread. Backed by a new first-class **`flaws`** entity field (migration 0008) that
+feeds the persona, and by **surfacing** previously-invisible data to the AI — entity embeddings now index
+`traits`/`goals`/`flaws` + combat/social-salient attributes (a creature's weakness/tactics, a faction's
+alignment), so structured data reaches Recall/Suggest, not just the free-text description.
+
 **Converse** (ADR-025) — a **third AI lens** beside Recall and Suggest (surfaced in the UI as Consult ·
 Counsel · Converse). Given the active PC (the asker) and a chosen **target** entity, one structured call
 returns a short **briefing** — what's *known*, what's *open / suspected*, and the target's *connections* —
@@ -284,9 +294,9 @@ notes + as-of-correct ties + the asker's persona), so it needs no embedding mode
 model setting — **no migration, no new settings**. Discovered-only: gaps and Whispered/Hearsay notes
 *become* the questions; it never answers them or simulates the target's replies.
 
-**Current scene** (ADR-015; picker relocated to the Suggest pane in ADR-023) — a "present moment" (location, time of day, party present, the
+**Current scene** (ADR-015; picker relocated to the Suggest pane in ADR-023; **Counsel-only + Time-of-Day dropped in ADR-027**) — a "present moment" (location, party present, the
 NPCs/factions being faced, the embarked quest, and a scene *mode*: combat / social / exploration /
-stealth / downtime / travel). It is pinned into grounding and steers both Recall and Suggest.
+stealth / downtime / travel). It is pinned into grounding and steers **Suggest (Counsel) only** — Consult (Recall) is a scene-free out-of-character notes narrator.
 
 **Notes are many-to-many** — a note can be tagged to one OR many entities (via a `note_entity`
 join table), authored and managed from a Notes pane inside Capture.

@@ -23,7 +23,6 @@ export function useRecall(): RecallState & {
   const [state, setState] = useState<RecallState>(IDLE)
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
-  const scene = useAppStore((s) => s.scene)
   const reqId = useRef<string | null>(null)
   const buffer = useRef('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -82,14 +81,13 @@ export function useRecall(): RecallState & {
           campaignId: activeCampaignId,
           pcId: activePcId,
           mode,
-          scene,
           asOfSession
         })
         .catch((err) =>
           setState((s) => ({ ...s, status: 'error', error: { message: String(err), kind: 'unknown' } }))
         )
     },
-    [activeCampaignId, activePcId, scene]
+    [activeCampaignId, activePcId]
   )
 
   const cancel = useCallback(() => {

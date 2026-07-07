@@ -5,17 +5,62 @@ import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import type { VectorStore } from './vector-store.service'
 import { embed, isModelReady } from './embedding.service'
+import { parseArray, parseObject } from './serialize'
 
-// Keeps the vector store in sync with notes + entity descriptions. Embedding is CPU-bound, so it runs
-// off the capture hot path: handlers enqueue (fire-and-forget) and a serial queue embeds one at a time.
-// Deletions need no handling here — the embedding rows cascade via their foreign keys.
+// Keeps the vector store in sync with notes + entities. An entity embeds its name, description,
+// traits/goals/flaws, and the combat/social-salient type attributes (ADR-026) so that structured
+// character/creature/faction data — not just the free-text description — is retrievable. Embedding is
+// CPU-bound, so it runs off the capture hot path: handlers enqueue (fire-and-forget) and a serial queue
+// embeds one at a time. Deletions need no handling here — the embedding rows cascade via their FKs.
 
 function hash(text: string): string {
   return createHash('sha1').update(text).digest('hex')
 }
 
-function entityText(name: string, description: string | null): string {
-  return description ? `${name}\n${description}` : name
+interface IndexEntityRow {
+  type: string
+  name: string
+  description: string | null
+  traits: string | null
+  goals: string | null
+  flaws: string | null
+  attributes: string | null
+}
+
+// The type-specific attribute keys worth embedding — the ones that carry combat/social signal. Human-only
+// fields (player/level/rarity/value/date/reach/kind) are skipped to keep the vector tight and on-topic.
+const EMBED_ATTR_KEYS: Record<string, readonly string[]> = {
+  creature: ['tactics', 'weakness', 'abilities', 'habitat'],
+  faction: ['alignment'],
+  npc: ['role', 'race'],
+  quest: ['objective'],
+  location: ['atmosphere', 'features'],
+  item: ['properties'],
+  event: ['outcome', 'significance']
+}
+
+/** The text embedded for an entity: name + description + promoted lists + salient type attributes. */
+function entityText(e: IndexEntityRow): string {
+  const parts: string[] = [e.name]
+  if (e.description) parts.push(e.description)
+  const list = (label: string, raw: string | null): void => {
+    const vals = parseArray(raw)
+    if (vals.length) parts.push(`${label}: ${vals.join(', ')}`)
+  }
+  list('Traits', e.traits)
+  list('Goals', e.goals)
+  list('Flaws', e.flaws)
+  const attrs = parseObject(e.attributes)
+  for (const key of EMBED_ATTR_KEYS[e.type] ?? []) {
+    const v = attrs[key]
+    const text = Array.isArray(v)
+      ? v.filter(Boolean).join(', ')
+      : typeof v === 'string'
+        ? v.trim()
+        : ''
+    if (text) parts.push(`${key[0].toUpperCase()}${key.slice(1)}: ${text}`)
+  }
+  return parts.join('\n')
 }
 
 const elog = log.scope('embedding-index')
@@ -44,12 +89,20 @@ export function indexEntity(ctx: DbContext, store: VectorStore, entityId: string
   enqueue(async () => {
     if (!isModelReady()) return
     const entity = ctx.drizzle
-      .select({ name: schema.entity.name, description: schema.entity.description })
+      .select({
+        type: schema.entity.type,
+        name: schema.entity.name,
+        description: schema.entity.description,
+        traits: schema.entity.traits,
+        goals: schema.entity.goals,
+        flaws: schema.entity.flaws,
+        attributes: schema.entity.attributes
+      })
       .from(schema.entity)
       .where(eq(schema.entity.id, entityId))
       .get()
     if (!entity) return
-    const text = entityText(entity.name, entity.description)
+    const text = entityText(entity)
     const h = hash(text)
     if (store.entityHash(entityId) === h) return
     store.upsertEntity(entityId, await embed(text), h)
@@ -79,11 +132,20 @@ export async function backfill(ctx: DbContext, store: VectorStore): Promise<numb
     }
   }
   const entities = ctx.drizzle
-    .select({ id: schema.entity.id, name: schema.entity.name, description: schema.entity.description })
+    .select({
+      id: schema.entity.id,
+      type: schema.entity.type,
+      name: schema.entity.name,
+      description: schema.entity.description,
+      traits: schema.entity.traits,
+      goals: schema.entity.goals,
+      flaws: schema.entity.flaws,
+      attributes: schema.entity.attributes
+    })
     .from(schema.entity)
     .all()
   for (const e of entities) {
-    const text = entityText(e.name, e.description)
+    const text = entityText(e)
     const h = hash(text)
     if (store.entityHash(e.id) !== h) {
       try {

@@ -148,7 +148,10 @@ export async function converse(
           name: target.name,
           type: target.type,
           status: targetState.status,
-          lifecycle: targetState.lifecycle
+          lifecycle: targetState.lifecycle,
+          traits: target.traits,
+          goals: target.goals,
+          flaws: target.flaws
         },
         notes: targetCtx.notes,
         connections,

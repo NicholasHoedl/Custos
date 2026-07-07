@@ -81,6 +81,7 @@ export function EntityForm({
   const [description, setDescription] = useState('')
   const [traits, setTraits] = useState<string[]>([])
   const [goals, setGoals] = useState<string[]>([])
+  const [flaws, setFlaws] = useState<string[]>([])
   const [status, setStatus] = useState('')
   const [lifecycle, setLifecycle] = useState<Lifecycle>('active')
   const [attributes, setAttributes] = useState<Record<string, unknown>>({})
@@ -99,6 +100,7 @@ export function EntityForm({
     setDescription(e?.description ?? '')
     setTraits(e?.traits ?? [])
     setGoals(e?.goals ?? [])
+    setFlaws(e?.flaws ?? [])
     setStatus(e?.status ?? '')
     setLifecycle(e?.lifecycle ?? 'active')
     const attrs = e?.attributes ?? {}
@@ -168,12 +170,14 @@ export function EntityForm({
       const attrs = buildAttributes()
       const payloadTraits = prof.traits ? traits : []
       const payloadGoals = prof.goals ? goals : []
+      const payloadFlaws = prof.flaws ? flaws : []
       const saved = entity
         ? await ledger.entity.update(entity.id, {
             name: trimmed,
             description: description.trim() || null,
             traits: payloadTraits,
             goals: payloadGoals,
+            flaws: payloadFlaws,
             attributes: attrs,
             status: status.trim() || null,
             lifecycle
@@ -185,6 +189,7 @@ export function EntityForm({
             description: description.trim() || undefined,
             traits: payloadTraits,
             goals: payloadGoals,
+            flaws: payloadFlaws,
             attributes: attrs,
             status: status.trim() || undefined,
             lifecycle
@@ -349,6 +354,18 @@ export function EntityForm({
             value={goals}
             onChange={setGoals}
             placeholder="Add a goal — e.g. protect the town"
+          />
+        </div>
+      )}
+
+      {prof.flaws && (
+        <div className="space-y-1.5">
+          <Label htmlFor="ef-flaws">Flaws</Label>
+          <TagInput
+            id="ef-flaws"
+            value={flaws}
+            onChange={setFlaws}
+            placeholder="A vice, fear, or weakness — e.g. reckless when mocked"
           />
         </div>
       )}

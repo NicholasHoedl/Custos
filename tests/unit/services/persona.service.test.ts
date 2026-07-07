@@ -26,7 +26,8 @@ describe('persona.service', () => {
       type: 'pc',
       name: 'Vargas',
       traits: ['greedy'],
-      goals: ['get rich']
+      goals: ['get rich'],
+      flaws: ['never backs down from a bet']
     })
     completeFn.mockResolvedValue('THE BRIEF')
 
@@ -35,6 +36,8 @@ describe('persona.service', () => {
     expect(p.edited).toBe(false)
     expect(p.stale).toBe(false)
     expect(getPersona(ctx, pc.id)?.brief).toBe('THE BRIEF')
+    // The PC's flaw is mined into the persona-generation prompt (ADR-026).
+    expect(completeFn.mock.calls[0][1] as string).toContain('never backs down from a bet')
   })
 
   it('flags stale when the PC changes; editing sets the edited flag', async () => {

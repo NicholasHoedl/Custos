@@ -24,6 +24,7 @@ Use exactly this template:
 - VALUES: {what they protect or prize}
 - FEARS: {what they avoid or dread}
 - WANTS: {their active drives, tied to their goals}
+- FLAW: {the vice, fear, or weakness that trips them up — what an enemy could exploit to bring them to ruin}
 - INTERPRETS BY: {their default explanatory bias}
 
 ## Stakes (what they can't help bringing up)
@@ -37,7 +38,7 @@ Use exactly this template:
 - NOT: {the generic voice to avoid for this character — e.g. "never a neutral narrator or a quest log"}
 
 Rules:
-- Translate the character's traits, goals, and description into CONCRETE specifics — named people, real habits, exact diction — never vague adjectives.
+- Translate the character's traits, goals, flaws, and description into CONCRETE specifics — named people, real habits, exact diction — never vague adjectives.
 - If a Backstory is provided, mine it for the Stakes (named people, places, and grudges from the character's past) and let it shape the Voice — this is where a character's history makes them sound unlike anyone else.
 - Make the Voice section sharp enough that two different characters could never produce interchangeable text. This is the most important part of the brief.
 - Use only the provided data. Invent no biography or events beyond what is given.
@@ -58,6 +59,7 @@ function sourceText(e: Entity): string {
     attr(e, 'backstory') ?? '',
     e.traits.join(','),
     e.goals.join(','),
+    e.flaws.join(','),
     e.status ?? ''
   ].join('\n')
 }
@@ -78,6 +80,7 @@ function personaUserPrompt(e: Entity): string {
   if (backstory) lines.push(`Backstory: ${backstory}`)
   if (e.traits.length) lines.push(`Traits: ${e.traits.join(', ')}`)
   if (e.goals.length) lines.push(`Goals: ${e.goals.join(', ')}`)
+  if (e.flaws.length) lines.push(`Flaws: ${e.flaws.join(', ')}`)
   if (e.status) lines.push(`Status: ${e.status}`)
   return `Write the character brief for this player character:\n\n${lines.join('\n')}`
 }

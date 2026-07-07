@@ -94,14 +94,31 @@ export function tagLabel(tag: string): string {
     .join('-')
 }
 
+/** The three pillars of D&D play. Every "in the moment" option is tagged with the pillar it engages, so
+ *  the eight span combat / social / exploration instead of clustering in one (ADR-026). */
+export const SUGGEST_PILLARS = ['combat', 'social', 'exploration'] as const
+export type SuggestPillar = (typeof SUGGEST_PILLARS)[number]
+
+export const PILLAR_LABELS: Record<SuggestPillar, string> = {
+  combat: 'Combat',
+  social: 'Social',
+  exploration: 'Exploration'
+}
+
 /**
  * One "in the moment" suggestion: a concrete in-character action, its dominant PRIMARY tag, up to two
- * SECONDARY tags for nuance, and a one-line rationale tying it to the character.
+ * SECONDARY tags for nuance, the PILLAR it engages, how it resolves at the table (MECHANIC: the 5e check +
+ * ability + stakes), an optional TEAMWORK play with a present ally, and a one-line rationale.
  */
 export interface MomentSuggestion {
   primaryTag: SuggestTag
   secondaryTags: SuggestTag[]
+  pillar: SuggestPillar
   action: string
+  /** The 5e check + governing ability (+ what it's opposed by), no DCs or failure outcomes — e.g. "Deception (CHA) vs. their Insight". */
+  mechanic: string
+  /** A coordination play naming a PRESENT ally, or null when the move is solo. */
+  teamwork: string | null
   rationale: string
 }
 
@@ -148,6 +165,8 @@ export interface SuggestRequest {
   campaignId: string
   pcId: string
   situation: string
+  /** Optional player goal — biases the 'in the moment' spread toward it (ADR-026). */
+  goal?: string
   /** Defaults to 'attitudes' when omitted (back-compat). */
   mode?: SuggestMode
   /** The current scene (location/time/party/quest/combat), folded into grounding. */

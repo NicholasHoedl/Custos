@@ -190,12 +190,10 @@ describe('scene grounding', () => {
       nearbyPcNames: ['Elaria'],
       facingNames: ['Glasstaff'],
       hereNames: ['Toblen'],
-      timeOfDay: 'Evening',
       mode: 'Combat',
       sceneSet: true
     })
     expect(block).toContain('Where: Stonehill Inn (in Phandalin) — Safe')
-    expect(block).toContain('When: Evening')
     expect(block).toContain("What's happening: Combat")
     expect(block).toContain('Party present: Elaria')
     expect(block).toContain('In the scene: Glasstaff')
@@ -209,19 +207,10 @@ describe('scene grounding', () => {
         nearbyPcNames: [],
         facingNames: [],
         hereNames: [],
-        timeOfDay: null,
         mode: null,
         sceneSet: false
       })
     ).toBeNull()
   })
 
-  it('buildUserContent inserts the scene block after state, before relationships', () => {
-    const content = buildUserContent('Q?', [], '- A owns B', '- state line', 'SCENE-BLOCK')
-    const texts = content.map((b) => ('text' in b ? b.text : ''))
-    const sceneIdx = texts.findIndex((t) => t === 'SCENE-BLOCK')
-    expect(sceneIdx).toBeGreaterThan(texts.findIndex((t) => t.includes('state line')))
-    expect(sceneIdx).toBeLessThan(texts.findIndex((t) => t.includes('A owns B')))
-    expect(content[content.length - 1]).toEqual({ type: 'text', text: 'Q?' })
-  })
 })

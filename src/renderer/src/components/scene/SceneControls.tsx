@@ -1,14 +1,7 @@
 import { useState } from 'react'
 import { Check, ChevronDown, ChevronsUpDown, X } from 'lucide-react'
 import { ENTITY_TYPE_LABELS } from '@shared/entity-types'
-import {
-  SCENE_MODES,
-  SCENE_MODE_LABELS,
-  TIMES_OF_DAY,
-  TIME_OF_DAY_LABELS,
-  type SceneMode,
-  type TimeOfDay
-} from '@shared/scene-types'
+import { SCENE_MODES, SCENE_MODE_LABELS, type SceneMode } from '@shared/scene-types'
 import { cn } from '@renderer/lib/utils'
 import { useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
@@ -49,8 +42,7 @@ export function SceneControls({ campaignId }: { campaignId: string }) {
     Boolean(scene.embarkedQuestId) ||
     scene.nearbyPcIds.length > 0 ||
     scene.presentEntityIds.length > 0 ||
-    Boolean(scene.sceneMode) ||
-    Boolean(scene.timeOfDay)
+    Boolean(scene.sceneMode)
   return (
     <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-2">
       <button
@@ -81,7 +73,6 @@ export function SceneControls({ campaignId }: { campaignId: string }) {
           <EmbarkedQuestSelector campaignId={campaignId} />
           <NearbyPcsSelector campaignId={campaignId} />
           <PresentEntitiesSelector campaignId={campaignId} />
-          <TimeOfDaySelector />
         </div>
       )}
     </div>
@@ -139,29 +130,6 @@ function EmbarkedQuestSelector({ campaignId }: { campaignId: string }) {
         {options.map((q) => (
           <SelectItem key={q.id} value={q.id}>
             {q.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
-function TimeOfDaySelector() {
-  const timeOfDay = useAppStore((s) => s.scene.timeOfDay)
-  const setTimeOfDay = useAppStore((s) => s.setTimeOfDay)
-  return (
-    <Select
-      value={timeOfDay ?? SCENE_NONE}
-      onValueChange={(v) => setTimeOfDay(v === SCENE_NONE ? null : (v as TimeOfDay))}
-    >
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Time of day" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={SCENE_NONE}>Any time</SelectItem>
-        {TIMES_OF_DAY.map((t) => (
-          <SelectItem key={t} value={t}>
-            {TIME_OF_DAY_LABELS[t]}
           </SelectItem>
         ))}
       </SelectContent>

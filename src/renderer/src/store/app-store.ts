@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SceneContext, SceneMode, TimeOfDay } from '@shared/scene-types'
+import type { SceneContext, SceneMode } from '@shared/scene-types'
 
 const CAMPAIGN_KEY = 'ledger.activeCampaignId'
 const PC_KEY = 'ledger.activePcId'
@@ -22,15 +22,22 @@ const EMPTY_SCENE: SceneContext = {
   embarkedQuestId: null,
   nearbyPcIds: [],
   presentEntityIds: [],
-  sceneMode: null,
-  timeOfDay: null
+  sceneMode: null
 }
 
 function persistedScene(): SceneContext {
   const raw = persisted(SCENE_KEY)
   if (!raw) return { ...EMPTY_SCENE }
   try {
-    return { ...EMPTY_SCENE, ...(JSON.parse(raw) as Partial<SceneContext>) }
+    // Reconstruct only the known fields so a legacy persisted key (e.g. the removed timeOfDay) is dropped.
+    const p = JSON.parse(raw) as Partial<SceneContext>
+    return {
+      locationId: p.locationId ?? null,
+      embarkedQuestId: p.embarkedQuestId ?? null,
+      nearbyPcIds: p.nearbyPcIds ?? [],
+      presentEntityIds: p.presentEntityIds ?? [],
+      sceneMode: p.sceneMode ?? null
+    }
   } catch {
     return { ...EMPTY_SCENE }
   }
@@ -63,7 +70,6 @@ interface AppState {
   setNearbyPcs: (ids: string[]) => void
   setPresentEntities: (ids: string[]) => void
   setSceneMode: (mode: SceneMode | null) => void
-  setTimeOfDay: (t: TimeOfDay | null) => void
 }
 
 const initialCampaign = persisted(CAMPAIGN_KEY)
@@ -119,12 +125,6 @@ export const useAppStore = create<AppState>((set) => ({
   setNearbyPcs: (ids) =>
     set((s) => {
       const scene = { ...s.scene, nearbyPcIds: ids }
-      persistScene(scene)
-      return { scene }
-    }),
-  setTimeOfDay: (t) =>
-    set((s) => {
-      const scene = { ...s.scene, timeOfDay: t }
       persistScene(scene)
       return { scene }
     }),

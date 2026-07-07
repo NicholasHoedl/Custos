@@ -26,6 +26,7 @@ export interface StatusPreset {
 export interface EntityProfile {
   traits: boolean
   goals: boolean
+  flaws: boolean // ADR-026: a vice/fear/weakness (pc/npc/faction) — feeds persona + Counsel
   status: readonly StatusPreset[] | null // curated presets (custom text allowed); null = no status concept
   fields: readonly ProfileField[] // ordered type-specific fields -> attributes[key]
 }
@@ -34,6 +35,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   pc: {
     traits: true,
     goals: true,
+    flaws: true,
     status: [
       { label: 'Active', lifecycle: 'active' },
       { label: 'Inactive', lifecycle: 'active' },
@@ -55,6 +57,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   npc: {
     traits: true,
     goals: true,
+    flaws: true,
     status: [
       { label: 'Alive', lifecycle: 'active' },
       { label: 'Dead', lifecycle: 'ended' },
@@ -71,6 +74,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   creature: {
     traits: true,
     goals: false,
+    flaws: false,
     status: [
       { label: 'Active', lifecycle: 'active' },
       { label: 'Dormant', lifecycle: 'active' },
@@ -87,6 +91,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   location: {
     traits: false,
     goals: false,
+    flaws: false,
     status: [
       { label: 'Unexplored', lifecycle: 'unknown' },
       { label: 'Explored', lifecycle: 'active' },
@@ -108,6 +113,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   faction: {
     traits: false,
     goals: true,
+    flaws: true,
     status: [
       { label: 'Active', lifecycle: 'active' },
       { label: 'Disbanded', lifecycle: 'ended' },
@@ -122,6 +128,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   quest: {
     traits: false,
     goals: false,
+    flaws: false,
     status: [
       { label: 'Active', lifecycle: 'active' },
       { label: 'Completed', lifecycle: 'ended' },
@@ -137,6 +144,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   item: {
     traits: false,
     goals: false,
+    flaws: false,
     status: [
       { label: 'Owned', lifecycle: 'active' },
       { label: 'Stashed', lifecycle: 'active' },
@@ -165,6 +173,7 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
   event: {
     traits: false,
     goals: false,
+    flaws: false,
     status: [
       { label: 'Occurred', lifecycle: 'ended' },
       { label: 'Ongoing', lifecycle: 'active' },

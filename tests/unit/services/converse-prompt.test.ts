@@ -11,7 +11,15 @@ const { buildConverseSystem, buildConverseUserContent, confidenceTag } = await i
   '../../../src/main/services/claude.service'
 )
 
-const TARGET = { name: 'Glasstaff', type: 'npc', status: null, lifecycle: 'active' as const }
+const TARGET = {
+  name: 'Glasstaff',
+  type: 'npc',
+  status: null,
+  lifecycle: 'active' as const,
+  traits: [] as string[],
+  goals: [] as string[],
+  flaws: [] as string[]
+}
 
 describe('converse prompt assembly', () => {
   it('system carries the campaign + persona brief (cached at the end) and the Converse instructions', () => {
@@ -98,5 +106,26 @@ describe('converse prompt assembly', () => {
     expect(content).toHaveLength(2)
     expect((content[0] as { text: string }).text).toContain('Glasstaff')
     expect((content[1] as { text: string }).text).toContain('Write the briefing')
+  })
+
+  it("renders the target's recorded nature (traits / goals / flaws) as a fact block", () => {
+    const content = buildConverseUserContent({
+      target: {
+        ...TARGET,
+        traits: ['smooth-talker'],
+        goals: ['serve the Black Spider'],
+        flaws: ['vain']
+      },
+      notes: [],
+      connections: null,
+      tie: null,
+      anchorLabel: null,
+      asOf: false,
+      pcName: 'Vargas'
+    })
+    const all = content.map((b) => ('text' in b ? b.text : '')).join('\n')
+    expect(all).toContain('smooth-talker')
+    expect(all).toContain('serve the Black Spider')
+    expect(all).toContain('vain')
   })
 })

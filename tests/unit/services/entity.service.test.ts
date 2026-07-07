@@ -33,21 +33,24 @@ describe('entity.service', () => {
     campaignId = createCampaign(ctx, { name: 'Test Campaign' }).id
   })
 
-  it('creates an entity and round-trips traits/goals/attributes JSON', () => {
+  it('creates an entity and round-trips traits/goals/flaws/attributes JSON', () => {
     const e = createEntity(ctx, {
       campaignId,
       type: 'npc',
       name: 'Aldric Vane',
       traits: ['gruff', 'loyal'],
       goals: ['protect the inn'],
+      flaws: ['drinks too much'],
       attributes: { race: 'human', occupation: 'innkeeper' }
     })
     expect(e.traits).toEqual(['gruff', 'loyal'])
     expect(e.goals).toEqual(['protect the inn'])
+    expect(e.flaws).toEqual(['drinks too much'])
     expect(e.attributes).toEqual({ race: 'human', occupation: 'innkeeper' })
 
     const got = getEntity(ctx, e.id)
     expect(got?.name).toBe('Aldric Vane')
+    expect(got?.flaws).toEqual(['drinks too much'])
     expect(got?.attributes).toEqual({ race: 'human', occupation: 'innkeeper' })
   })
 

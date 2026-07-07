@@ -72,8 +72,7 @@ describe('scene.service resolveScene', () => {
         embarkedQuestId: quest.id,
         nearbyPcIds: [elaria.id],
         presentEntityIds: [glasstaff.id],
-        sceneMode: 'combat',
-        timeOfDay: 'evening'
+        sceneMode: 'combat'
       },
       pc.id
     )
@@ -94,7 +93,6 @@ describe('scene.service resolveScene', () => {
 
     const block = r.block ?? ''
     expect(block).toContain('Where: Stonehill Inn (in Phandalin) — Safe')
-    expect(block).toContain('When: Evening')
     expect(block).toContain("What's happening: Combat")
     expect(block).toContain('Party present: Elaria')
     expect(block).toContain('In the scene: Glasstaff')
@@ -112,8 +110,7 @@ describe('scene.service resolveScene', () => {
         embarkedQuestId: null,
         nearbyPcIds: ['ghost'],
         presentEntityIds: ['phantom'],
-        sceneMode: 'combat',
-        timeOfDay: null
+        sceneMode: 'combat'
       },
       null
     )

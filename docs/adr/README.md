@@ -37,6 +37,8 @@ ADR that supersedes the old one (don't edit the old one).
 | [023](023-post-journal-refinements.md) | Post-journal capture & UI refinements (removals + relocations) | Accepted | 2026-07-06 |
 | [024](024-grim-retheme.md) | Grim dark-fantasy re-theme ("Ash & Ember"): palette, glossary, death motif | Accepted | 2026-07-06 |
 | [025](025-converse-in-character-questions.md) | Converse: an in-character question lens (single-shot structured, direct-fetch grounding) | Accepted | 2026-07-07 |
+| [026](026-counsel-v2-mechanics-flaws.md) | Counsel v2: mechanical layer, pillar/teamwork diversity, flaws, and surfacing entity data | Accepted | 2026-07-07 |
+| [027](027-scene-counsel-only.md) | Scene is Counsel-only; Consult is a scene-free out-of-character notes narrator (drops Time of Day) | Accepted | 2026-07-07 |
 
 ## Status legend
 

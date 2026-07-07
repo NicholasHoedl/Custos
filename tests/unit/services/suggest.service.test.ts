@@ -75,7 +75,10 @@ function rec(
   return {
     primaryTag: primaryTag as MomentSuggestion['primaryTag'],
     secondaryTags: secondaryTags as MomentSuggestion['secondaryTags'],
+    pillar: 'social',
     action,
+    mechanic: 'Persuasion (CHA)',
+    teamwork: null,
     rationale
   }
 }
@@ -205,6 +208,30 @@ describe('suggest.service — in-the-moment mode', () => {
       expect(first.primaryTag).toBe('religious')
       // deduped, 'bogus' dropped, primary ('religious') dropped, capped at 2
       expect(first.secondaryTags).toEqual(['merciful', 'honorable'])
+    }
+  })
+
+  it('validates the new fields: drops invalid pillar / blank mechanic, coerces empty teamwork to null', async () => {
+    const { ctx, store, campaignId, pc } = setup()
+    claudeSuggestFn.mockResolvedValue([
+      { ...rec('religious'), teamwork: '   ' }, // empty teamwork → coerced to null (kept)
+      { ...rec('hostile'), pillar: 'bogus' }, // invalid pillar → dropped
+      { ...rec('cunning'), mechanic: '   ' }, // blank mechanic → dropped
+      rec('friendly'),
+      rec('protective'),
+      rec('merciful'),
+      rec('honorable'),
+      rec('bold'),
+      rec('selfish'),
+      rec('diplomatic')
+    ])
+    const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
+    expect(res.ok).toBe(true)
+    if (res.ok && res.mode === 'attitudes') {
+      expect(res.recommendations).toHaveLength(8)
+      expect(res.recommendations.some((r) => r.primaryTag === 'hostile')).toBe(false)
+      expect(res.recommendations.some((r) => r.primaryTag === 'cunning')).toBe(false)
+      expect(res.recommendations.find((r) => r.primaryTag === 'religious')?.teamwork).toBeNull()
     }
   })
 })

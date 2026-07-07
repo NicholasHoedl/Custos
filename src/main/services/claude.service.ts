@@ -3,6 +3,7 @@ import type { RecallMode, RecallSource } from '@shared/recall-types'
 import {
   SUGGEST_TAGS,
   SUGGEST_CATEGORIES,
+  SUGGEST_PILLARS,
   type MomentSuggestion,
   type StorySuggestion
 } from '@shared/suggest-types'
@@ -199,7 +200,6 @@ export interface SceneFacts {
   nearbyPcNames: string[]
   facingNames: string[] // non-party actors present — the NPCs/factions being faced/dealt with
   hereNames: string[]
-  timeOfDay: string | null
   mode: string | null // the scene's kind (Combat / Social / …), or null when unset
   sceneSet: boolean
 }
@@ -219,7 +219,6 @@ export function formatScene(facts: SceneFacts): string | null {
     const status = facts.location.status ? ` — ${facts.location.status}` : ''
     lines.push(`- Where: ${where}${status}`)
   }
-  if (facts.timeOfDay) lines.push(`- When: ${facts.timeOfDay}`)
   if (facts.mode) lines.push(`- What's happening: ${facts.mode}`)
   if (facts.nearbyPcNames.length) lines.push(`- Party present: ${facts.nearbyPcNames.join(', ')}`)
   if (facts.facingNames.length) lines.push(`- In the scene: ${facts.facingNames.join(', ')}`)
@@ -239,8 +238,7 @@ export function buildUserContent(
   query: string,
   chunks: RetrievedChunk[],
   relationships?: string | null,
-  state?: string | null,
-  scene?: string | null
+  state?: string | null
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = chunks.map((c) => ({
     type: 'document',
@@ -253,9 +251,6 @@ export function buildUserContent(
       type: 'text',
       text: `Current state — this is the present moment; treat as FACT. Anything resolved here is DONE:\n${state}`
     })
-  }
-  if (scene) {
-    content.push({ type: 'text', text: scene })
   }
   if (relationships) {
     content.push({
@@ -318,7 +313,6 @@ export interface RecallParams {
   chunks: RetrievedChunk[]
   relationships?: string | null
   state?: string | null
-  scene?: string | null
   mode: RecallMode
   context: RecallContext
   model: string
@@ -342,8 +336,7 @@ export async function recall(params: RecallParams): Promise<RecallSource[]> {
             params.query,
             params.chunks,
             params.relationships,
-            params.state,
-            params.scene
+            params.state
           )
         }
       ]
@@ -467,9 +460,15 @@ export async function recap(params: RecapParams): Promise<void> {
 
 // ---- Suggest prompt (Phase 3) ----
 
-const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks and what they value, the character's race and class, a set of retrieved campaign notes, a snapshot of the current state, the known relationships among the people and things involved, and the situation facing the party right now.
+const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks, values, and FAILS (their flaws), the character's race and class, retrieved campaign notes, a snapshot of the current state, the known relationships, the present scene (including which party members are present), maybe a GOAL the player is chasing, and the situation facing the party right now.
 
-Your job: give EIGHT different ways THIS character might play THIS moment. Each option is one concrete in-character ACTION, tagged with ONE primary tag (its dominant flavor) plus up to TWO secondary tags, and a one-line RATIONALE. The eight PRIMARY tags must all be different, so the eight options feel genuinely distinct — not eight shades of the same move.
+Your job: give EIGHT different ways THIS character might play THIS moment. The eight must feel genuinely distinct — not eight shades of the same move. Each option carries:
+- ONE primary tag (its dominant flavor) + up to TWO secondary tags (nuance). The eight PRIMARY tags must all differ.
+- A PILLAR — which of D&D's three pillars it engages: "combat", "social", or "exploration".
+- The ACTION — one concrete thing the player could do or say at the table this turn.
+- The MECHANIC — how it resolves at the table (below).
+- TEAMWORK — a coordination play naming a PRESENT ally, or "" (empty) when the move is solo.
+- A one-line RATIONALE.
 
 TAGS NAME THE KIND OF MOVE. Choose from this vocabulary:
 - Social stance: friendly, hostile, diplomatic, defiant, intimidating, suspicious, forthright, inspiring
@@ -480,15 +479,23 @@ TAGS NAME THE KIND OF MOVE. Choose from this vocabulary:
 - Values: religious, primal, honorable, merciful, vengeful, protective, loyal, sacrificial
 - Self-interest: selfish, greedy
 - Other: playful, survival
-You MAY also tag a move with the character's OWN race or class when it leans into who they are (a cleric calling on faith → "cleric"; a dwarf's stonecraft → "dwarf"). Use ONLY this character's race and class — never another race or class. The primary tag is the move's main flavor; secondary tags add nuance — include 0, 1, or 2 only when they genuinely apply, and never repeat the primary tag.
+You MAY also tag a move with the character's OWN race or class when it leans into who they are (a cleric calling on faith → "cleric"; a dwarf's stonecraft → "dwarf"). Use ONLY this character's race and class — never another. Secondary tags: include 0, 1, or 2 only when they genuinely apply, and never repeat the primary tag.
 
-PICK WHAT FITS THIS CHARACTER. Choose the eight moves this PC would realistically weigh here — let the brief's values, fears, wants, and stakes drive them. A blunt zealot and a greedy rogue facing the same scene should not get the same eight. Lean on the tags that suit who they are; not every option needs a race or class tag.
+MECHANIC — SPEAK D&D 5e. Name the ability check the action calls for and its governing ability, and — when it's contested — what it's rolled against. Use the real skills (Athletics, Acrobatics, Sleight of Hand, Stealth, Arcana, History, Investigation, Nature, Religion, Animal Handling, Insight, Medicine, Perception, Survival, Deception, Intimidation, Performance, Persuasion) — or an attack / a saving throw when it's a fight. Do NOT invent DCs or numbers, and do NOT state what happens on a failure — a failed roll's consequences are the DM's to adjudicate, never yours. E.g. "Deception (CHA), opposed by their Insight" or "Athletics (STR) to vault the bar." A move that needs no roll (just talking, just moving) should say so.
 
-WRITE A REAL ACTION, NOT A LABEL. Each action is something the player could actually do or say at the table this turn — concrete and specific to this situation and this character. "Demand the mayor explain the missing shipments in front of the council" — not "be aggressive." Keep each action to a sentence or two, in this character's register (honor the brief's diction and attitude). The action embodies the tags; don't just restate them.
+SPAN THE PILLARS — DON'T CLUSTER. Across the eight, cover more than one pillar and BOTH cooperative and adversarial approaches — not eight variations on "watch them warily" or "get ready to fight." Calibrate to the scene's ACTUAL stakes: a friendly tavern dice game is not a combat scene; don't treat every moment as violence about to break out. Include lower-key options — build rapport, satisfy curiosity, show restraint, even walk away — when they fit.
+
+TEAMWORK — THIS IS A PARTY GAME. When party members are present in the scene, AT LEAST ONE option must coordinate with a NAMED one of them: the Help action (grant them advantage), setting up their strength, or splitting roles ("while Balasar keeps the table talking, I…"). Name only party members the scene says are present. For solo moves, leave TEAMWORK empty.
+
+PLAY THE WHOLE CHARACTER. Let the brief's values, fears, wants, flaws, and stakes drive the eight — a blunt zealot and a greedy rogue facing the same scene should not get the same eight. AT LEAST ONE option should follow the character's FLAW, fear, or a bond even when it's not the smart play — the move they'd make because of who they are, not despite it. And favor moves this character could actually pull off: lean on their class and level; don't hand a delicate con to someone with no gift for it, or a feat of strength to the frail. Not every option needs a race or class tag.
+
+GOAL. If the player states a goal, bias the eight toward achieving it — but keep them distinct (different pillars, tags, and risk levels), not eight ways to do the one thing.
+
+WRITE A REAL ACTION, NOT A LABEL. Each action is concrete and specific to THIS situation and THIS character, in their register (honor the brief's diction and attitude). "Buy the table a round and ask which of them rode with Glasstaff" — not "be friendly." The action embodies the tags; don't just restate them.
 
 GROUND IT. Everything you treat as a world-fact — who's who, who holds or controls what, what's resolved, what's still open — must come from the notes, the current state, or the relationships. Don't invent events, possessions, alliances, or outcomes. The character may suspect, hope, or intend (that's theirs), but never assert an arrangement the notes don't establish. Read the current state as the present: don't propose acting on a quest already completed or confronting someone already dead or defeated.
 
-RATIONALE. One short line per option: why THIS move fits THIS character here — point to a value, fear, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
+RATIONALE. One short line per option: why THIS move fits THIS character here — point to a value, fear, flaw, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
 
 PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them (party) and who they're facing (NPCs/factions), the quest in progress, and the scene's MODE. Let the mode steer the kind of action — Combat: immediate, physical, tactical; Social: persuasion, leverage, reading people; Stealth: avoid notice, scout, misdirect; Exploration: investigate, search, press deeper; Downtime: rest, personal threads, prepare; Travel: on the road, plan ahead — and aim the options at whoever the character is facing.`
 
@@ -510,10 +517,13 @@ const SUGGEST_SCHEMA = {
         properties: {
           primaryTag: { type: 'string', enum: [...SUGGEST_TAGS] },
           secondaryTags: { type: 'array', items: { type: 'string', enum: [...SUGGEST_TAGS] } },
+          pillar: { type: 'string', enum: [...SUGGEST_PILLARS] },
           action: { type: 'string' },
+          mechanic: { type: 'string' },
+          teamwork: { type: 'string' },
           rationale: { type: 'string' }
         },
-        required: ['primaryTag', 'secondaryTags', 'action', 'rationale']
+        required: ['primaryTag', 'secondaryTags', 'pillar', 'action', 'mechanic', 'teamwork', 'rationale']
       }
     }
   },
@@ -577,7 +587,8 @@ export function buildSuggestUserContent(
   chunks: RetrievedChunk[],
   relationships?: string | null,
   state?: string | null,
-  scene?: string | null
+  scene?: string | null,
+  goal?: string | null
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (chunks.length) {
@@ -606,6 +617,12 @@ export function buildSuggestUserContent(
       text: `Known relationships among the people and things above — treat as FACT (who owns/controls/is connected to what):\n${relationships}`
     })
   }
+  if (goal?.trim()) {
+    content.push({
+      type: 'text',
+      text: `What the player is trying to achieve — bias the options toward this goal (without collapsing their variety):\n${goal.trim()}`
+    })
+  }
   content.push({ type: 'text', text: `The situation right now:\n${situation}` })
   return content
 }
@@ -616,6 +633,7 @@ export interface SuggestParams {
   relationships?: string | null
   state?: string | null
   scene?: string | null
+  goal?: string | null
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
@@ -870,7 +888,8 @@ export async function suggest(params: SuggestParams): Promise<MomentSuggestion[]
       params.chunks,
       params.relationships,
       params.state,
-      params.scene
+      params.scene,
+      params.goal
     ),
     arrayKey: 'recommendations',
     signal: params.signal
@@ -1105,7 +1124,15 @@ export function buildConverseSystem(ctx: SuggestContext): Anthropic.TextBlockPar
  * tie to them, an optional focus, then the ask. Each block only when it has content.
  */
 export function buildConverseUserContent(p: {
-  target: { name: string; type: string; status: string | null; lifecycle: Lifecycle }
+  target: {
+    name: string
+    type: string
+    status: string | null
+    lifecycle: Lifecycle
+    traits: string[]
+    goals: string[]
+    flaws: string[]
+  }
   notes: { confidence: NoteConfidence; content: string }[]
   connections: string | null
   tie: string | null
@@ -1131,6 +1158,18 @@ export function buildConverseUserContent(p: {
     type: 'text',
     text: `Who ${p.pcName} is preparing to speak with: ${p.target.name} (${p.target.type})${mark}${status}.${anchorLine}`
   })
+  const nature: string[] = []
+  if (p.target.traits.length) nature.push(`Traits: ${p.target.traits.join(', ')}`)
+  if (p.target.goals.length) nature.push(`Goals: ${p.target.goals.join(', ')}`)
+  if (p.target.flaws.length) nature.push(`Flaws: ${p.target.flaws.join(', ')}`)
+  if (nature.length) {
+    content.push({
+      type: 'text',
+      text: `What's recorded of ${p.target.name}'s nature (treat as FACT):\n${nature
+        .map((l) => `- ${l}`)
+        .join('\n')}`
+    })
+  }
   if (p.notes.length) {
     const notes = p.notes
       .map((n) => `## ${p.target.name}${confidenceTag(n.confidence)}\n${n.content}`)
@@ -1163,7 +1202,15 @@ export function buildConverseUserContent(p: {
 }
 
 export interface ConverseParams {
-  target: { name: string; type: string; status: string | null; lifecycle: Lifecycle }
+  target: {
+    name: string
+    type: string
+    status: string | null
+    lifecycle: Lifecycle
+    traits: string[]
+    goals: string[]
+    flaws: string[]
+  }
   notes: { confidence: NoteConfidence; content: string }[]
   connections: string | null
   tie: string | null
