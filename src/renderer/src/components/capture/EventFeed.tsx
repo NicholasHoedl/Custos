@@ -50,7 +50,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   // When an apply finishes, summarize it, refresh the log, and clear the review for the next entry.
   useEffect(() => {
     if (imp.status !== 'done') return
-    if (imp.result) toast.success('Journal entry processed', { description: applySummary(imp.result) })
+    if (imp.result) toast.success('Chronicle entry recorded', { description: applySummary(imp.result) })
     imp.reset()
     refresh()
   }, [imp.status, imp.result, imp.reset, refresh])
@@ -67,7 +67,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
       // Then, if a key is configured, let Claude propose entities/notes/changes for inline review.
       if (onb.keyReady) imp.extract(content)
     } catch (err) {
-      toast.error('Could not save journal entry', { description: String(err) })
+      toast.error('Could not save chronicle entry', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -78,21 +78,21 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border p-4">
-        <h2 className="font-display text-xl font-semibold text-foreground">Journal</h2>
+        <h2 className="font-display text-xl font-semibold text-foreground">Chronicle</h2>
         <p className="text-xs text-muted-foreground">
           {restoring
             ? 'Restoring session…'
             : !sessionId
-              ? 'Start a session to begin your journal.'
+              ? 'Start a session to begin your chronicle.'
               : onb.keyReady
-                ? 'Jot what happened — Ledger proposes the entities, notes, and updates it implies.'
+                ? 'Jot what happened — the Keeper proposes the entities, notes, and updates it implies.'
                 : 'Jot what happened. Add an API key in Settings to auto-extract entities and notes.'}
         </p>
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto p-4">
         {ordered.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No journal entries yet.</p>
+          <p className="text-sm text-muted-foreground">No chronicle entries yet.</p>
         ) : (
           ordered.map((ev) => (
             <div key={ev.id} className="flex gap-3 border-l-2 border-border pl-3">

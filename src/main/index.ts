@@ -7,6 +7,7 @@ import { QUICK_ADD_FOCUS_CHANNEL } from '@shared/ipc-types'
 import { getDb, dbHealthCheck, closeDb } from './db'
 import { registerIpcHandlers } from './ipc/handlers'
 import { warm } from './services/embedding.service'
+import icon from '../../resources/icon.png?asset'
 
 app.setName(APP_NAME)
 // Persistent main-process log (T2): userData/logs/main.log (1 MiB rotation). Main-only — no
@@ -25,8 +26,10 @@ function createWindow(): void {
     minHeight: 640,
     show: false,
     title: APP_NAME,
-    backgroundColor: '#253237',
+    backgroundColor: '#141210', // charcoal background — matches the theme so there's no flash before paint
     autoHideMenuBar: true,
+    // Window/taskbar icon (dev + Linux/Windows runtime). macOS uses the packaged .icns instead.
+    ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,

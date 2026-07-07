@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { BookText, FileInput, Plus, Search, StickyNote } from 'lucide-react'
+import { useState } from 'react'
+import { BookText, FileInput, Plus, Search, Skull, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -7,28 +7,24 @@ import {
   type EntityType
 } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
-import { useUiStore } from '@renderer/store/ui-store'
-import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
-import { EntityForm } from '@renderer/components/entities/EntityForm'
 
 export type EntityFilter = EntityType | 'all'
 /** Which non-entity pane the capture detail area shows when no entity is selected. */
-export type CapturePanel = 'notes' | 'recap' | 'import'
+export type CapturePanel = 'add' | 'notes' | 'recap' | 'import'
 
 const FILTERS: EntityFilter[] = ['all', ...ENTITY_TYPES]
 
 interface EntityBrowserProps {
   entities: Entity[]
-  campaignId: string
   selectedId: string | null
   filter: EntityFilter
   onFilterChange: (filter: EntityFilter) => void
   onSelect: (id: string) => void
-  /** Called after the "Add entity" form creates one, so the parent can select it. */
-  onCreated: (entity: Entity) => void
   /** The active non-entity pane (drives the header highlight when nothing is selected). */
   panel: CapturePanel
+  /** Clear the selection and show the Add-entity form pane. */
+  onShowAddEntity: () => void
   /** Clear the selection and show the notes pane in the detail pane. */
   onShowNotes: () => void
   /** Clear the selection and show the recap pane in the detail pane. */
@@ -42,31 +38,17 @@ interface EntityBrowserProps {
 // Selecting opens the entity in the detail panel.
 export function EntityBrowser({
   entities,
-  campaignId,
   selectedId,
   filter,
   onFilterChange,
   onSelect,
-  onCreated,
   panel,
+  onShowAddEntity,
   onShowNotes,
   onShowRecap,
   onShowImport
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
-  const [addOpen, setAddOpen] = useState(false)
-
-  // The global quick-add hotkey / Ctrl+K (ADR-010) now opens the full Add-entity form. Skip the initial
-  // mount so it only fires on an actual bump, not on first render.
-  const quickAddNonce = useUiStore((s) => s.quickAddNonce)
-  const firstNonce = useRef(true)
-  useEffect(() => {
-    if (firstNonce.current) {
-      firstNonce.current = false
-      return
-    }
-    setAddOpen(true)
-  }, [quickAddNonce])
 
   const byType = filter === 'all' ? entities : entities.filter((e) => e.type === filter)
   const q = query.trim().toLowerCase()
@@ -79,19 +61,19 @@ export function EntityBrowser({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border p-2">
-        <Button className="w-full" onClick={() => setAddOpen(true)}>
-          <Plus className="size-4" />
-          Add entity
-        </Button>
-      </div>
-      <EntityForm
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        campaignId={campaignId}
-        onSaved={onCreated}
-      />
       <div className="space-y-1 border-b border-border p-2">
+        <button
+          onClick={onShowAddEntity}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+            !selectedId && panel === 'add'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+          )}
+        >
+          <Plus className="size-4" />
+          Inscribe
+        </button>
         <button
           onClick={onShowNotes}
           className={cn(
@@ -102,7 +84,7 @@ export function EntityBrowser({
           )}
         >
           <StickyNote className="size-4" />
-          Notes
+          Annals
         </button>
         <button
           onClick={onShowRecap}
@@ -114,7 +96,7 @@ export function EntityBrowser({
           )}
         >
           <BookText className="size-4" />
-          Recap
+          Previously…
         </button>
         <button
           onClick={onShowImport}
@@ -126,7 +108,7 @@ export function EntityBrowser({
           )}
         >
           <FileInput className="size-4" />
-          Import
+          Transcribe
         </button>
       </div>
       <div className="border-b border-border">
@@ -172,7 +154,7 @@ export function EntityBrowser({
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {visible.length === 0 ? (
           <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-            {entities.length === 0 ? 'Nothing here yet. Use quick-add above.' : 'No matches.'}
+            {entities.length === 0 ? 'Nothing inscribed yet — use Inscribe above.' : 'No matches.'}
           </p>
         ) : (
           visible.map((entity) => (
@@ -198,6 +180,8 @@ function EntityCard({
   selected: boolean
   onClick: () => void
 }) {
+  const fallen = entity.lifecycle === 'ended'
+  const presumed = entity.lifecycle === 'presumed_ended'
   return (
     <button
       onClick={onClick}
@@ -209,7 +193,16 @@ function EntityCard({
       )}
     >
       <div className="flex w-full items-center gap-2">
-        <span className="truncate text-sm font-medium text-foreground">{entity.name}</span>
+        <span
+          className={cn(
+            'truncate text-sm font-medium',
+            fallen ? 'text-foreground/60 line-through decoration-blood/70' : 'text-foreground'
+          )}
+        >
+          {entity.name}
+        </span>
+        {fallen && <Skull className="size-3 shrink-0 text-blood" aria-label="Fallen" />}
+        {presumed && <Skull className="size-3 shrink-0 text-blood/50" aria-label="Presumed lost" />}
         <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
           {ENTITY_TYPE_LABELS[entity.type]}
         </span>

@@ -81,7 +81,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Relationships</h3>
+        <h3 className="inscribed text-xs">Ties</h3>
         <Button
           variant="outline"
           size="sm"
@@ -94,7 +94,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
       </div>
 
       {relationships.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No relationships yet.</p>
+        <p className="text-xs text-muted-foreground">No ties yet.</p>
       ) : (
         <ul className="space-y-1.5">
           {relationships.map((rel) => (
@@ -217,7 +217,7 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-lg">Link {entity.name}</DialogTitle>
-          <DialogDescription>Connect this entity to another in the campaign.</DialogDescription>
+          <DialogDescription>Connect this entity to another in the saga.</DialogDescription>
         </DialogHeader>
 
         {!other ? (

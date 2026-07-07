@@ -15,25 +15,24 @@ test.afterAll(async () => {
   cleanup(userDataDir)
 })
 
-// Open the full "Add entity" form (top of the entity browser; defaults to NPC), fill it, and create.
+// Open the full "Inscribe" form (top of the entity browser; defaults to NPC), fill it, and create.
 async function addEntity(name: string, description?: string): Promise<void> {
-  await page.getByRole('button', { name: 'Add entity' }).click()
-  const dialog = page.getByRole('dialog')
-  await dialog.getByLabel('Name').fill(name)
-  if (description) await dialog.getByLabel('Description').fill(description)
-  await dialog.getByRole('button', { name: 'Create' }).click()
+  await page.getByRole('button', { name: 'Inscribe' }).click() // opens the Inscribe pane (not a popup)
+  await page.getByLabel('Name').fill(name)
+  if (description) await page.getByLabel('Description').fill(description)
+  await page.getByRole('button', { name: 'Create' }).click()
 }
 
 // Drives the real UI through the preload bridge — proves SPEC Flows A + B end-to-end at runtime:
 // campaign → session → add entities (full profile form) → typed relationship → local search → delete.
 test('capture flow: campaign, session, entities, link, search, delete', async () => {
   // Flow A — create and activate a campaign.
-  await page.getByRole('button', { name: 'New campaign' }).click()
+  await page.getByRole('button', { name: 'New saga' }).click()
   await page.getByLabel('Name').fill('Phandalin')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // The Journal is the default view; entity capture lives on the Capture view — navigate there.
-  await page.getByRole('button', { name: 'Capture' }).click()
+  // The Chronicle is the default view; entity capture lives on the Codex view — navigate there.
+  await page.getByRole('button', { name: 'Codex' }).click()
 
   // Start a session (auto-numbered).
   await page.getByRole('button', { name: 'New session' }).click()

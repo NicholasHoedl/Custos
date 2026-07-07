@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import type { Entity, Session } from '@shared/entity-types'
+import type { Entity, Lifecycle, Session } from '@shared/entity-types'
 import type { EntityRef, MatchCandidate } from '@shared/import-types'
 import type { useImport } from '@renderer/hooks/use-import'
 import { plural } from '@renderer/lib/format'
@@ -15,8 +15,8 @@ type Imp = ReturnType<typeof useImport>
 
 // The shared review surface for an extraction changeset — entities, status/relationship changes, and
 // notes, each include-gated, with a summary + Apply/Discard footer. Driven by a `useImport()` instance
-// so any caller (the Journal today) reuses one reviewer over the same row components. Import and Backfill
-// keep their own copies for now; they can adopt this later.
+// so both callers — the Journal (Chronicle) and Import (Transcribe) — reuse one reviewer over the same
+// row components.
 export function ChangesetReview({
   imp,
   campaignEntities,
@@ -45,6 +45,12 @@ export function ChangesetReview({
     r.kind === 'existing'
       ? existingName(r.entityId)
       : (imp.entities.find((e) => e.index === r.index)?.name ?? 'new entity')
+  // The entity's CURRENT lifecycle (existing entities only) — lets a status change render as a
+  // before→after diff. A newly-created entity has no prior state, so it shows only the new one.
+  const fromLifecycle = (r: EntityRef): Lifecycle | null =>
+    r.kind === 'existing'
+      ? (campaignEntities.find((e) => e.id === r.entityId)?.lifecycle ?? null)
+      : null
 
   const creating = imp.entities.filter((e) => e.action === 'create').length
   const linking = imp.entities.filter((e) => e.action === 'link').length
@@ -80,6 +86,7 @@ export function ChangesetReview({
               <StatusChangeRow
                 key={i}
                 change={c}
+                fromLifecycle={fromLifecycle(c.entityRef)}
                 refName={refName}
                 onToggle={() =>
                   imp.setStatusChanges((cs) =>
@@ -107,7 +114,7 @@ export function ChangesetReview({
           </Section>
         )}
         {imp.notes.length > 0 && (
-          <Section label="Notes">
+          <Section label="Annals">
             {imp.notes.map((n, i) => (
               <NoteRow
                 key={i}

@@ -46,8 +46,8 @@ export const LIFECYCLES: readonly Lifecycle[] = ['active', 'ended', 'presumed_en
 
 export const LIFECYCLE_LABELS: Record<Lifecycle, string> = {
   active: 'Active',
-  ended: 'Ended',
-  presumed_ended: 'Presumed ended',
+  ended: 'Fallen',
+  presumed_ended: 'Presumed lost',
   unknown: 'Unknown'
 }
 
@@ -58,9 +58,9 @@ export type NoteConfidence = 'confirmed' | 'rumored' | 'suspected'
 export const NOTE_CONFIDENCES: readonly NoteConfidence[] = ['confirmed', 'rumored', 'suspected']
 
 export const NOTE_CONFIDENCE_LABELS: Record<NoteConfidence, string> = {
-  confirmed: 'Confirmed',
-  rumored: 'Rumored',
-  suspected: 'Suspected'
+  confirmed: 'Known',
+  rumored: 'Hearsay',
+  suspected: 'Whispered'
 }
 
 export interface Campaign {

@@ -1,0 +1,45 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="78%">
+      <stop offset="0%" stop-color="#1e1a17"/>
+      <stop offset="100%" stop-color="#0d0b09"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="42%">
+      <stop offset="0%" stop-color="#d2732e" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#d2732e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vig" cx="50%" cy="50%" r="72%">
+      <stop offset="52%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+    <linearGradient id="pewter" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c6c5cb"/>
+      <stop offset="46%" stop-color="#9e9da2"/>
+      <stop offset="100%" stop-color="#5c5b60"/>
+    </linearGradient>
+    <clipPath id="round"><rect x="16" y="16" width="480" height="480" rx="114"/></clipPath>
+  </defs>
+
+  <!-- plate -->
+  <g clip-path="url(#round)">
+    <rect x="16" y="16" width="480" height="480" fill="url(#bg)"/>
+    <rect x="16" y="16" width="480" height="480" fill="url(#glow)"/>
+    <rect x="16" y="16" width="480" height="480" fill="url(#vig)"/>
+  </g>
+
+  <!-- iron-bound cover: double rule (pewter) -->
+  <rect x="82" y="82" width="348" height="348" rx="56" fill="none" stroke="url(#pewter)" stroke-width="13"/>
+  <rect x="104" y="104" width="304" height="304" rx="38" fill="none" stroke="#9e9da2" stroke-opacity="0.4" stroke-width="3"/>
+
+  <!-- entries -->
+  <circle cx="176" cy="196" r="15" fill="#d2732e"/>
+  <rect x="204" y="183" width="152" height="26" rx="13" fill="#e8e2d6"/>
+
+  <circle cx="176" cy="256" r="15" fill="#d2732e"/>
+  <rect x="204" y="243" width="152" height="26" rx="13" fill="#e8e2d6"/>
+
+  <!-- fallen entry: ghosted + struck in blood -->
+  <circle cx="176" cy="316" r="15" fill="#6e655b"/>
+  <rect x="204" y="303" width="120" height="26" rx="13" fill="#e8e2d6" fill-opacity="0.32"/>
+  <line x1="158" y1="316" x2="340" y2="316" stroke="#b23a2e" stroke-width="10" stroke-linecap="round"/>
+</svg>

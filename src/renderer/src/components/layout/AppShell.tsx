@@ -32,11 +32,20 @@ export function AppShell() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <div className="relative flex h-screen overflow-hidden bg-background text-foreground">
         <Sidebar />
         <main className="flex-1 overflow-hidden">
           <MainPanel />
         </main>
+        {/* Grim candle-vignette — non-interactive, darkens the edges (portalled dialogs sit above it). */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-50"
+          style={{
+            background:
+              'radial-gradient(ellipse 110% 80% at 50% 42%, transparent 58%, rgba(0,0,0,0.42) 100%)'
+          }}
+        />
       </div>
       <Toaster theme="dark" richColors position="bottom-right" />
     </TooltipProvider>

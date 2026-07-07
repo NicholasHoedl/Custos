@@ -1,92 +1,56 @@
 @import 'tailwindcss';
 
 /*
- * Ledger design system.
- * Dark-first cool palette — NOT a generic recolor. See ARCHITECTURE.md §1.
- * The accent (vivid cyan) is reserved for focus, active state, and affordances.
+ * Ledger design system — "Ash & Ember" (grim dark-fantasy, torchlit).
+ * Dark-only. Warm charcoal stone, bone-white ink, a single dying-ember accent,
+ * dried-blood for death/enmity, cool pewter for inscriptions. See docs/design/theme.md.
+ * The accent (ember) is reserved for focus, active state, and affordances.
  */
 
 :root {
-  /* ---- Palette (verbatim from the developer's Tailwind config) ---- */
-  --light-cyan: #e0fbfc;
-  --light-cyan-100: #095456;
-  --light-cyan-200: #11a7ad;
-  --light-cyan-300: #32e5eb;
-  --light-cyan-400: #88f0f3;
-  --light-cyan-500: #e0fbfc;
-  --light-cyan-600: #e5fcfc;
-  --light-cyan-700: #ecfcfd;
-  --light-cyan-800: #f2fdfe;
-  --light-cyan-900: #f9fefe;
+  /* ---- Ash & Ember raw tokens ---- */
+  --char: #141210; /* warm charcoal near-black — the canvas */
+  --char-sidebar: #100d0b; /* a half-step darker than the canvas */
+  --char-raised: #1e1a16; /* raised surface (card / popover / muted) */
+  --char-inset: #26201a; /* active / inset / secondary */
+  --iron: #34302a; /* borders / inputs */
+  --iron-soft: #26221c; /* faint hairline */
 
-  --light-blue: #c2dfe3;
-  --light-blue-100: #1b363a;
-  --light-blue-200: #356d74;
-  --light-blue-300: #50a3ae;
-  --light-blue-400: #8ac2c9;
-  --light-blue-500: #c2dfe3;
-  --light-blue-600: #cfe6e9;
-  --light-blue-700: #dbecef;
-  --light-blue-800: #e7f3f4;
-  --light-blue-900: #f3f9fa;
+  --bone: #e8e2d6; /* warm off-white — primary ink */
+  --bone-dim: #c7bfb2; /* body copy */
+  --ash: #8c8377; /* muted / secondary ink */
 
-  --cool-steel: #9db4c0;
-  --cool-steel-100: #1b252a;
-  --cool-steel-200: #364a55;
-  --cool-steel-300: #516f7f;
-  --cool-steel-400: #7192a4;
-  --cool-steel-500: #9db4c0;
-  --cool-steel-600: #afc2cc;
-  --cool-steel-700: #c3d1d9;
-  --cool-steel-800: #d7e1e6;
-  --cool-steel-900: #ebf0f2;
+  --ember: #d2732e; /* dying-ember orange — THE accent */
+  --ember-deep: #7c3e1d; /* hover / active fills */
+  --ember-bright: #ee9a54; /* brighter accent ink on dark */
 
-  --blue-slate: #5c6b73;
-  --blue-slate-100: #131617;
-  --blue-slate-200: #252b2e;
-  --blue-slate-300: #384146;
-  --blue-slate-400: #4a565d;
-  --blue-slate-500: #5c6b73;
-  --blue-slate-600: #798b94;
-  --blue-slate-700: #9ba8af;
-  --blue-slate-800: #bcc5c9;
-  --blue-slate-900: #dee2e4;
+  --blood: #b23a2e; /* dried blood — death, enmity, destructive */
+  --pewter: #9e9da2; /* cool pewter — labels, wordmark, inscriptions */
 
-  --jet-black: #253237;
-  --jet-black-100: #070a0b;
-  --jet-black-200: #0f1416;
-  --jet-black-300: #161e21;
-  --jet-black-400: #1d282c;
-  --jet-black-500: #253237;
-  --jet-black-600: #465f69;
-  --jet-black-700: #688c9b;
-  --jet-black-800: #9bb3bc;
-  --jet-black-900: #cdd9de;
-
-  /* ---- Semantic roles (dark-first) ---- */
-  --background: var(--jet-black-500);
-  --foreground: var(--blue-slate-900);
-  --surface: #2a373e; /* subtle in-family lift above the canvas */
-  --surface-raised: var(--blue-slate-300);
-  --card: #2a373e;
-  --card-foreground: var(--blue-slate-900);
-  --popover: #2a373e;
-  --popover-foreground: var(--blue-slate-900);
-  --primary: var(--light-cyan-300); /* THE accent — vivid cyan */
-  --primary-foreground: var(--jet-black-100);
-  --secondary: var(--blue-slate-300);
-  --secondary-foreground: var(--blue-slate-900);
-  --muted: var(--jet-black-400);
-  --muted-foreground: var(--cool-steel-500);
-  --accent: var(--light-cyan-200); /* deep accent for hover/active fills */
-  --accent-foreground: var(--light-cyan-500);
-  --destructive: #c2554a;
-  --destructive-foreground: #fbeae8;
-  --border: var(--blue-slate-300);
-  --input: var(--blue-slate-300);
-  --ring: var(--light-cyan-300);
-  --sidebar: var(--jet-black-400); /* a half-step darker than the canvas */
-  --sidebar-foreground: var(--cool-steel-500);
+  /* ---- Semantic roles (dark-only) ---- */
+  --background: var(--char);
+  --foreground: var(--bone);
+  --surface: var(--char-raised); /* subtle lift above the canvas */
+  --surface-raised: var(--char-inset);
+  --card: var(--char-raised);
+  --card-foreground: var(--bone);
+  --popover: var(--char-raised);
+  --popover-foreground: var(--bone);
+  --primary: var(--ember); /* THE accent */
+  --primary-foreground: var(--char); /* ink on an ember fill */
+  --secondary: var(--char-inset);
+  --secondary-foreground: var(--bone);
+  --muted: var(--char-raised);
+  --muted-foreground: var(--ash);
+  --accent: var(--ember-deep); /* deep accent for hover/active fills */
+  --accent-foreground: var(--bone);
+  --destructive: var(--blood);
+  --destructive-foreground: #f4e8e3;
+  --border: var(--iron);
+  --input: var(--iron);
+  --ring: var(--ember);
+  --sidebar: var(--char-sidebar);
+  --sidebar-foreground: var(--ash);
 
   --radius: 0.5rem;
 
@@ -121,6 +85,10 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
 
+  /* Grim extras — for inscriptions (pewter) and blood accents. */
+  --color-metal: var(--pewter);
+  --color-blood: var(--blood);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -139,5 +107,12 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Inscription label — small-caps, letter-spaced, cool pewter. Use on section eyebrows. */
+  .inscribed {
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.14em;
+    color: var(--pewter);
   }
 }

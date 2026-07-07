@@ -1,7 +1,13 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { CircleDashed, Pencil, Skull, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
+import {
+  ENTITY_TYPE_LABELS,
+  LIFECYCLE_LABELS,
+  NOTE_CONFIDENCE_LABELS,
+  type Entity
+} from '@shared/entity-types'
+import { cn } from '@renderer/lib/utils'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import type { HierarchyView } from '@shared/graph-types'
 import { ledger } from '@renderer/lib/ipc'
@@ -85,12 +91,15 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
     }
   }
 
+  const fallen = entity.lifecycle === 'ended'
+  const presumed = entity.lifecycle === 'presumed_ended'
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-3 border-b border-border p-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-primary">
+            <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
               {ENTITY_TYPE_LABELS[entity.type]}
             </span>
             {entity.status && (
@@ -98,18 +107,23 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
                 {entity.status}
               </span>
             )}
-            {entity.lifecycle === 'ended' && (
-              <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-                Ended
-              </span>
-            )}
-            {entity.lifecycle === 'presumed_ended' && (
-              <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive/70">
-                Presumed ended
-              </span>
-            )}
           </div>
-          <h2 className="font-display text-2xl font-semibold text-foreground">{entity.name}</h2>
+          <h2
+            className={cn(
+              'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
+              fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
+              presumed && 'italic text-foreground/60'
+            )}
+          >
+            {entity.name}
+            {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
+            {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
+          </h2>
+          {(fallen || presumed) && (
+            <div className="inscribed mt-0.5 text-[11px] text-blood">
+              {LIFECYCLE_LABELS[entity.lifecycle]}
+            </div>
+          )}
           {hierarchy && hierarchy.ancestors.length > 0 && (
             <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
               {hierarchy.ancestors.map((a) => (
@@ -174,9 +188,9 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
         <Separator />
 
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">Notes</h3>
+          <h3 className="inscribed text-xs">Annals</h3>
           {notes.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No notes yet.</p>
+            <p className="text-xs text-muted-foreground">No annals recorded.</p>
           ) : (
             <ul className="space-y-2">
               {notes.map((n) => (
@@ -185,9 +199,15 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
                   className="group relative rounded-md border border-border bg-card/40 p-3 pr-9"
                 >
                   <p className="whitespace-pre-wrap text-sm text-foreground/90">{n.content}</p>
-                  <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
-                    {formatTimestamp(n.createdAt)}
-                  </span>
+                  <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                    <span>{formatTimestamp(n.createdAt)}</span>
+                    {n.confidence !== 'confirmed' && (
+                      <span className="inline-flex items-center gap-1 text-metal">
+                        <CircleDashed className="size-3" />
+                        {NOTE_CONFIDENCE_LABELS[n.confidence]}
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={() => removeNote(n.id)}
                     className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
@@ -200,6 +220,12 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
             </ul>
           )}
         </div>
+
+        {fallen && (
+          <p className="border-t border-border/60 pt-3 font-display text-[13px] italic text-muted-foreground">
+            “Another name for the Ledger of the Fallen.” — the Keeper
+          </p>
+        )}
       </div>
 
       <EntityForm

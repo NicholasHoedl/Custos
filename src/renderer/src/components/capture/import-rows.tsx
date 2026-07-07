@@ -1,5 +1,15 @@
-import { Check } from 'lucide-react'
-import { ENTITY_TYPES, ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type EntityType, type Session } from '@shared/entity-types'
+import { ArrowRight, Check, CircleDashed, Link2, Skull, Unlink } from 'lucide-react'
+import {
+  ENTITY_TYPES,
+  ENTITY_TYPE_LABELS,
+  LIFECYCLE_LABELS,
+  NOTE_CONFIDENCES,
+  NOTE_CONFIDENCE_LABELS,
+  type EntityType,
+  type Lifecycle,
+  type NoteConfidence,
+  type Session
+} from '@shared/entity-types'
 import type {
   ConfirmedEntity,
   ConfirmedNote,
@@ -20,9 +30,10 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 
-// The reviewable rows of an extraction proposal, shared by the Import pane (entities + notes) and the
-// Backfill pane (entities + notes + status/relationship changes, ADR-018). Every row is include-gated:
-// the model proposes, the user disposes.
+// The reviewable rows of an extraction changeset, shared by the Journal (Chronicle) and Import
+// (Transcribe) via ChangesetReview. Each type is styled to its meaning — a note is a testimony, a
+// status change a before→after diff, a relationship a bond. Every row is include-gated: the model
+// proposes, the user disposes.
 
 const BATCH_DEFAULT = '__batch__'
 
@@ -194,6 +205,8 @@ export function EntityRow({
   )
 }
 
+// A new note, styled as a testimony: a quote-ruled, italic serif blockquote with the entities it
+// touches and its epistemic weight (Known / Hearsay / Whispered), which the reviewer can adjust.
 export function NoteRow({
   note,
   refName,
@@ -210,17 +223,17 @@ export function NoteRow({
         note.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-3">
         <Toggle on={note.include} onClick={() => onPatch({ include: !note.include })} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 border-l-2 border-metal/40 pl-3">
           <Textarea
             value={note.content}
             onChange={(e) => onPatch({ content: e.target.value })}
             rows={2}
             disabled={!note.include}
-            className="text-sm"
+            className="min-h-0 resize-none border-0 bg-transparent px-0 py-0 font-display text-[15px] italic leading-relaxed text-foreground shadow-none focus-visible:ring-0"
           />
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {note.entityRefs.map((r, i) => (
               <span key={i} className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
                 {refName(r)}
@@ -234,6 +247,28 @@ export function NoteRow({
                 #{t}
               </span>
             ))}
+            <div className="ml-auto flex items-center gap-1 text-metal">
+              {note.confidence !== 'confirmed' && <CircleDashed className="size-3" />}
+              <Select
+                value={note.confidence}
+                onValueChange={(v) => onPatch({ confidence: v as NoteConfidence })}
+                disabled={!note.include}
+              >
+                <SelectTrigger
+                  className="h-6 w-auto gap-1 border-0 bg-transparent px-1 text-[11px] text-metal focus:ring-0"
+                  aria-label="Confidence"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {NOTE_CONFIDENCES.map((c) => (
+                    <SelectItem key={c} value={c} className="text-xs">
+                      {NOTE_CONFIDENCE_LABELS[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -241,40 +276,60 @@ export function NoteRow({
   )
 }
 
-/** A dated state change: "<name> → Ended — Slain", stamped at the batch's session on apply. */
+// A dated state change, shown as a before→after diff ("Active → Fallen — Slain"), stamped at the
+// batch's session on apply. Death (ended / presumed_ended) carries a blood skull.
 export function StatusChangeRow({
   change,
+  fromLifecycle,
   refName,
   onToggle
 }: {
   change: ConfirmedStatusChange
+  /** The entity's current lifecycle (existing entities only) — drives the before→after diff. */
+  fromLifecycle?: Lifecycle | null
   refName: (r: EntityRef) => string
   onToggle: () => void
 }) {
+  const isDeath = change.lifecycle === 'ended' || change.lifecycle === 'presumed_ended'
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-lg border p-3 text-sm',
+        'rounded-lg border p-3',
         change.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
       )}
     >
-      <Toggle on={change.include} onClick={onToggle} />
-      <span className="font-medium text-foreground">{refName(change.entityRef)}</span>
-      <span className="text-muted-foreground">→</span>
-      <span
-        className={cn(
-          'rounded px-1.5 py-0.5 text-xs font-medium',
-          change.lifecycle === 'ended' ? 'bg-destructive/15 text-destructive' : 'bg-primary/10 text-primary'
-        )}
-      >
-        {LIFECYCLE_LABELS[change.lifecycle]}
-      </span>
-      {change.status && <span className="truncate text-foreground/90">{change.status}</span>}
+      <div className="flex items-start gap-3">
+        <Toggle on={change.include} onClick={onToggle} />
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-[15px] text-foreground">{refName(change.entityRef)}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {fromLifecycle != null && fromLifecycle !== change.lifecycle && (
+              <>
+                <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground line-through">
+                  {LIFECYCLE_LABELS[fromLifecycle]}
+                </span>
+                <ArrowRight className="size-4 text-muted-foreground" />
+              </>
+            )}
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+                isDeath ? 'bg-destructive/15 text-destructive' : 'bg-primary/15 text-primary'
+              )}
+            >
+              {isDeath && <Skull className="size-3.5" />}
+              {LIFECYCLE_LABELS[change.lifecycle]}
+            </span>
+            {change.status && <span className="text-sm text-muted-foreground">{change.status}</span>}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-/** A relationship forming or ending at the batch's session (an interval opening or closing). */
+// A relationship forming or ending, shown as a bond between two entities: form joins them with a
+// solid ember rule + link; sever cuts them with a dashed blood rule + broken link.
 export function RelationshipChangeRow({
   change,
   refName,
@@ -284,26 +339,47 @@ export function RelationshipChangeRow({
   refName: (r: EntityRef) => string
   onToggle: () => void
 }) {
+  const isForm = change.action === 'form'
   const label = RELATIONS[change.relation]?.forward ?? change.relation
+  const lineCls = isForm ? 'h-px bg-primary' : 'h-0 border-t border-dashed border-destructive/70'
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-3 text-sm',
+        'rounded-lg border p-3',
         change.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
       )}
     >
-      <Toggle on={change.include} onClick={onToggle} />
-      <span
-        className={cn(
-          'rounded px-1.5 py-0.5 text-xs font-medium',
-          change.action === 'form' ? 'bg-primary/10 text-primary' : 'bg-destructive/15 text-destructive'
-        )}
-      >
-        {change.action === 'form' ? 'Now' : 'No longer'}
-      </span>
-      <span className="font-medium text-foreground">{refName(change.fromRef)}</span>
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-foreground">{refName(change.toRef)}</span>
+      <div className="flex items-start gap-3">
+        <Toggle on={change.include} onClick={onToggle} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              title={refName(change.fromRef)}
+              className="min-w-0 truncate rounded-md border border-border bg-secondary/60 px-2.5 py-1 font-display text-sm text-foreground"
+            >
+              {refName(change.fromRef)}
+            </span>
+            <span className={cn('flex-1', lineCls)} />
+            {isForm ? (
+              <Link2 className="size-4 shrink-0 text-primary" />
+            ) : (
+              <Unlink className="size-4 shrink-0 text-destructive" />
+            )}
+            <span className={cn('flex-1', lineCls)} />
+            <span
+              title={refName(change.toRef)}
+              className="min-w-0 truncate rounded-md border border-border bg-secondary/60 px-2.5 py-1 font-display text-sm text-foreground"
+            >
+              {refName(change.toRef)}
+            </span>
+          </div>
+          <div className="mt-1.5 text-center text-xs">
+            <span className={isForm ? 'text-primary' : 'text-destructive'}>
+              {isForm ? label : `no longer ${label}`}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

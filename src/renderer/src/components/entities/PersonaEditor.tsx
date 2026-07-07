@@ -69,9 +69,9 @@ export function PersonaEditor({ entityId }: { entityId: string }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-foreground">Persona</h3>
+          <h3 className="inscribed text-xs">Persona</h3>
           {persona?.stale && (
-            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500">
+            <span className="rounded bg-metal/15 px-1.5 py-0.5 text-[10px] text-metal">
               May be out of date
             </span>
           )}
@@ -92,7 +92,7 @@ export function PersonaEditor({ entityId }: { entityId: string }) {
       {!persona ? (
         <div className="rounded-md border border-dashed border-border p-3 text-center">
           <p className="text-xs text-muted-foreground">
-            Generate an in-character voice for Recall, from this character&apos;s traits and goals.
+            Generate an in-character voice for Consult, from this character&apos;s traits and goals.
           </p>
           <Button size="sm" className="mt-2" onClick={generate} disabled={busy}>
             <Sparkles className="size-3.5" />

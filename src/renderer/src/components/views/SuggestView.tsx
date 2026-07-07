@@ -77,9 +77,9 @@ export function SuggestView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <Sparkles className="size-10 text-muted-foreground/50" />
         <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
+          <p className="font-display text-lg font-medium text-foreground">No saga selected</p>
           <p className="text-sm text-muted-foreground">
-            Pick a campaign in the sidebar to get suggestions.
+            Choose a saga in the sidebar to seek counsel.
           </p>
         </div>
       </div>
@@ -104,7 +104,7 @@ export function SuggestView() {
   return (
     <PaneShell size="reading">
       <PaneHeader
-        title="Suggest"
+        title="Counsel"
         size="lg"
         description="In-character ideas for the table — how to react now, or where to take the story next."
         action={
@@ -146,7 +146,7 @@ export function SuggestView() {
         <SetupCard
           icon={<KeyRound className="size-4" />}
           title="Add your API key to get suggestions"
-          body="Suggest uses Claude to reason in character — add a key to enable it."
+          body="Counsel uses Claude to reason in character — add a key to enable it."
           action={
             <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
               Open Settings
@@ -157,7 +157,7 @@ export function SuggestView() {
         <SetupCard
           icon={<Users className="size-4" />}
           title="Select your character"
-          body="Suggest reasons as a specific PC. Pick an active character in the sidebar."
+          body="Counsel reasons as a specific PC. Pick an active character in the sidebar."
           action={null}
         />
       ) : null}
@@ -188,7 +188,7 @@ export function SuggestView() {
             <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
           </div>
           <Button size="sm" onClick={submit} disabled={!canSubmit}>
-            {thinking ? 'Thinking…' : 'Suggest'}
+            {thinking ? 'Thinking…' : 'Counsel'}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -342,13 +342,13 @@ function FailureBanner({ reason }: { reason: SuggestFailureReason }) {
     case 'offline':
       return (
         <Banner icon={<WifiOff className="size-4" />}>
-          You&apos;re offline — Suggest needs an internet connection to reason in character.
+          You&apos;re offline — Counsel needs an internet connection to reason in character.
         </Banner>
       )
     case 'no_key':
       return (
         <Banner icon={<KeyRound className="size-4" />}>
-          No API key — add one in Settings to enable Suggest.
+          No API key — add one in Settings to enable Counsel.
         </Banner>
       )
     case 'no_model':

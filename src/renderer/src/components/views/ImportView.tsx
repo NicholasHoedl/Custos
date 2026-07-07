@@ -187,7 +187,7 @@ function SessionPicker({
 function Header() {
   return (
     <PaneHeader
-      title="Import"
+      title="Transcribe"
       description="Paste notes from anywhere — Claude proposes the entities, notes, and status/relationship changes to add, tied to a session you choose."
     />
   )

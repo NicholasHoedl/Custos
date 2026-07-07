@@ -56,10 +56,10 @@ import {
 } from '@renderer/components/ui/dropdown-menu'
 
 const NAV: { key: ViewKey; label: string; icon: typeof ScrollText }[] = [
-  { key: 'journal', label: 'Journal', icon: NotebookPen },
-  { key: 'capture', label: 'Capture', icon: ScrollText },
-  { key: 'recall', label: 'Recall', icon: Search },
-  { key: 'suggest', label: 'Suggest', icon: Sparkles },
+  { key: 'journal', label: 'Chronicle', icon: NotebookPen },
+  { key: 'capture', label: 'Codex', icon: ScrollText },
+  { key: 'recall', label: 'Consult', icon: Search },
+  { key: 'suggest', label: 'Counsel', icon: Sparkles },
   { key: 'settings', label: 'Settings', icon: Settings }
 ]
 
@@ -71,8 +71,8 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <BookOpen className="size-5 text-primary" />
-        <span className="font-display text-2xl font-semibold tracking-tight text-foreground">
+        <BookOpen className="size-5 text-metal" />
+        <span className="font-display text-2xl font-semibold uppercase tracking-[0.18em] text-metal">
           Ledger
         </span>
       </div>
@@ -104,12 +104,6 @@ export function Sidebar() {
           )
         })}
       </nav>
-
-      <div className="px-5 py-4">
-        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          Phase 1 · capture
-        </span>
-      </div>
     </aside>
   )
 }
@@ -139,7 +133,7 @@ function CampaignSelector() {
     <div className="flex items-center gap-1.5">
       <Select value={activeCampaignId ?? ''} onValueChange={(v) => setActiveCampaign(v)}>
         <SelectTrigger className="min-w-0 flex-1">
-          <SelectValue placeholder="Select campaign" />
+          <SelectValue placeholder="Select a saga" />
         </SelectTrigger>
         <SelectContent>
           {campaigns.map((c) => (
@@ -152,7 +146,7 @@ function CampaignSelector() {
       {activeCampaign && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" aria-label="Campaign actions">
+            <Button variant="outline" size="icon" aria-label="Saga actions">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -172,7 +166,7 @@ function CampaignSelector() {
         variant="outline"
         size="icon"
         onClick={() => setCreateOpen(true)}
-        aria-label="New campaign"
+        aria-label="New saga"
       >
         <Plus className="size-4" />
       </Button>
@@ -237,11 +231,11 @@ function CreateCampaignDialog({
         description: description.trim() || undefined
       })
       useUiStore.getState().bumpCampaigns()
-      toast.success('Campaign created', { description: trimmed })
+      toast.success('Saga created', { description: trimmed })
       onCreated(campaign)
       onOpenChange(false)
     } catch (err) {
-      toast.error('Could not create campaign', { description: String(err) })
+      toast.error('Could not create saga', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -251,8 +245,8 @@ function CreateCampaignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">New campaign</DialogTitle>
-          <DialogDescription>Start a new campaign to track its story.</DialogDescription>
+          <DialogTitle className="font-display text-xl">New saga</DialogTitle>
+          <DialogDescription>Start a new saga to track its story.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -325,11 +319,11 @@ function EditCampaignDialog({
         name: trimmed,
         description: description.trim() || null
       })
-      toast.success('Campaign updated', { description: trimmed })
+      toast.success('Saga updated', { description: trimmed })
       onSaved()
       onOpenChange(false)
     } catch (err) {
-      toast.error('Could not update campaign', { description: String(err) })
+      toast.error('Could not update saga', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -339,8 +333,8 @@ function EditCampaignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Edit campaign</DialogTitle>
-          <DialogDescription>Rename this campaign or update its description.</DialogDescription>
+          <DialogTitle className="font-display text-xl">Edit saga</DialogTitle>
+          <DialogDescription>Rename this saga or update its description.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -422,11 +416,11 @@ function DeleteCampaignDialog({
     try {
       await ledger.campaign.delete(campaign.id)
       useUiStore.getState().bumpCampaigns()
-      toast.success('Campaign deleted', { description: campaign.name })
+      toast.success('Saga deleted', { description: campaign.name })
       onOpenChange(false)
       onDeleted()
     } catch (err) {
-      toast.error('Could not delete campaign', { description: String(err) })
+      toast.error('Could not delete saga', { description: String(err) })
       setBusy(false) // keep the dialog open so the typed confirmation isn't lost
     }
   }
@@ -437,7 +431,7 @@ function DeleteCampaignDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="font-display">Delete {campaign.name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the entire campaign
+            This permanently deletes the entire saga
             {counts
               ? ` — all ${counts.entities} ${counts.entities === 1 ? 'entity' : 'entities'}, ${counts.sessions} ${counts.sessions === 1 ? 'session' : 'sessions'}, and every note, relationship, and AI persona within it`
               : ', including all its entities, notes, relationships, sessions, and AI personas'}
@@ -465,7 +459,7 @@ function DeleteCampaignDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <Button variant="destructive" onClick={doDelete} disabled={!match || busy}>
-            Delete campaign
+            Delete saga
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, ChevronsUpDown, Pencil, StickyNote, Trash2, X } from 'lucide-react'
+import { Check, ChevronsUpDown, CircleDashed, Pencil, StickyNote, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPES,
@@ -47,8 +47,8 @@ export function NotesView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <StickyNote className="size-10 text-muted-foreground/50" />
         <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">Pick a campaign in the sidebar to take notes.</p>
+          <p className="font-display text-lg font-medium text-foreground">No saga selected</p>
+          <p className="text-sm text-muted-foreground">Choose a saga in the sidebar to keep its annals.</p>
         </div>
       </div>
     )
@@ -132,7 +132,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
   return (
     <PaneShell size="reading">
       <PaneHeader
-        title="Notes"
+        title="Annals"
         size="lg"
         description="Write once, file it under everyone it touches."
       />
@@ -188,7 +188,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
             {editingId
               ? 'Editing a note'
               : selectedIds.length === 0
-                ? 'No entities tagged — saves as campaign lore'
+                ? 'No entities tagged — saves as saga lore'
                 : ' '}
           </span>
           <div className="flex items-center gap-2">
@@ -204,7 +204,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
         </div>
         {entities.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            No entities yet — notes save as campaign lore. Add people, places, and things in Capture to
+            No entities yet — notes save as saga lore. Add people, places, and things in the Codex to
             tag them.
           </p>
         )}
@@ -213,7 +213,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
       <div className="flex-1 space-y-2 overflow-y-auto">
         {notes.length === 0 ? (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            No notes yet. Write one above and file it under the people, places, and things it touches.
+            No annals yet. Write one above and file it under the people, places, and things it touches.
           </p>
         ) : (
           notes.map((n) => (
@@ -276,7 +276,8 @@ function NoteCard({
       </div>
       <div className="mt-1.5 flex items-center gap-2">
         {note.confidence !== 'confirmed' && (
-          <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400/90">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-metal">
+            <CircleDashed className="size-3" />
             {NOTE_CONFIDENCE_LABELS[note.confidence]}
           </span>
         )}

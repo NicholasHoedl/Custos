@@ -49,9 +49,9 @@ export function OnboardingChecklist() {
       setActiveCampaign(c.id)
       useUiStore.getState().bumpCampaigns()
       setName('')
-      toast.success('Campaign created', { description: n })
+      toast.success('Saga created', { description: n })
     } catch (err) {
-      toast.error('Could not create campaign', { description: String(err) })
+      toast.error('Could not create saga', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -97,7 +97,7 @@ export function OnboardingChecklist() {
       </p>
 
       <ol className="mt-3 space-y-2.5">
-        <Step done={hasCampaign} label="Create a campaign">
+        <Step done={hasCampaign} label="Create a saga">
           {!hasCampaign && (
             <div className="flex gap-2">
               <Input
@@ -109,7 +109,7 @@ export function OnboardingChecklist() {
                     createCampaign()
                   }
                 }}
-                placeholder="Campaign name…"
+                placeholder="Saga name…"
                 autoFocus
                 className="h-8 flex-1"
               />
@@ -127,7 +127,7 @@ export function OnboardingChecklist() {
             </Button>
           )}
           {!hasCampaign && (
-            <span className="text-xs text-muted-foreground">Create a campaign first.</span>
+            <span className="text-xs text-muted-foreground">Create a saga first.</span>
           )}
         </Step>
 

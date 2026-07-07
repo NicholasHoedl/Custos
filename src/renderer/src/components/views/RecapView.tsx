@@ -98,7 +98,7 @@ export function RecapView() {
   return (
     <PaneShell size="form">
       <PaneHeader
-        title="Recap"
+        title="Previously…"
         description="A “previously on…” of a session, saved to its summary."
         action={
           (recap.recap || recap.status !== 'idle') && (

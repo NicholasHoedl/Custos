@@ -31,8 +31,8 @@ export function RecallView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <Search className="size-10 text-muted-foreground/50" />
         <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">Pick a campaign in the sidebar to recall from.</p>
+          <p className="font-display text-lg font-medium text-foreground">No saga selected</p>
+          <p className="text-sm text-muted-foreground">Choose a saga in the sidebar to consult it.</p>
         </div>
       </div>
     )
@@ -50,9 +50,9 @@ export function RecallView() {
   return (
     <PaneShell size="reading">
       <PaneHeader
-        title="Recall"
+        title="Consult"
         size="lg"
-        description="Ask in plain language — answered from your notes."
+        description="Ask in plain language — answered from your annals."
         action={
           (query.trim().length > 0 || recall.status !== 'idle') && (
             <Button
@@ -131,7 +131,7 @@ export function RecallView() {
       <div className="flex-1 space-y-4 overflow-y-auto">
         {recall.status === 'idle' && (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            Your answer will appear here, drawn from this campaign&apos;s notes.
+            The Keeper’s answer appears here, drawn from your annals.
           </p>
         )}
 

@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { PaneHeader, PaneShell } from '@renderer/components/chrome'
 import { TagInput } from './TagInput'
 import { StatusCombobox } from './StatusCombobox'
 
@@ -40,12 +41,17 @@ interface AttrRow {
 }
 
 interface EntityFormProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
   campaignId: string
   entity?: Entity | null
   defaultType?: EntityType
   onSaved: (entity: Entity) => void
+  /** 'dialog' (default popup — the Edit flow) or 'page' (an inline Capture pane — the Add-entity flow). */
+  variant?: 'dialog' | 'page'
+  /** Dialog variant: controls the popup's open state. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Cancel — page variant only (dialog cancel uses onOpenChange). Omit to hide the Cancel button. */
+  onCancel?: () => void
 }
 
 function toRows(attributes: Record<string, unknown>, known: Set<string>): AttrRow[] {
@@ -56,15 +62,19 @@ function toRows(attributes: Record<string, unknown>, known: Set<string>): AttrRo
 
 // The entity editor (create + edit). The visible fields are driven by the type's profile
 // (@shared/entity-profiles): promoted traits/goals/status plus type-specific fields stored in the
-// `attributes` JSON bag, with a collapsible escape hatch for ad-hoc / legacy attributes.
+// `attributes` JSON bag, with a collapsible escape hatch for ad-hoc / legacy attributes. Renders as a
+// popup (variant='dialog', for Edit) or an inline Capture pane (variant='page', for "Add entity").
 export function EntityForm({
-  open,
-  onOpenChange,
   campaignId,
   entity,
   defaultType = 'npc',
-  onSaved
+  onSaved,
+  variant = 'dialog',
+  open = false,
+  onOpenChange,
+  onCancel
 }: EntityFormProps) {
+  const isPage = variant === 'page'
   const editing = Boolean(entity)
   const [name, setName] = useState('')
   const [type, setType] = useState<EntityType>(defaultType)
@@ -78,8 +88,10 @@ export function EntityForm({
   const [moreOpen, setMoreOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  // Seed the fields from the entity (edit) or empty (create). The dialog seeds each time it opens; the
+  // page mounts fresh whenever it's shown, so it seeds on mount.
   useEffect(() => {
-    if (!open) return
+    if (!isPage && !open) return
     const e = entity
     const t = e?.type ?? defaultType
     setName(e?.name ?? '')
@@ -94,7 +106,7 @@ export function EntityForm({
     const extras = toRows(attrs, profileKeys(t))
     setExtraRows(extras)
     setMoreOpen(extras.length > 0)
-  }, [open, entity, defaultType])
+  }, [isPage, open, entity, defaultType])
 
   const prof = profileFor(type)
   const setAttr = (key: string, val: unknown): void =>
@@ -179,8 +191,8 @@ export function EntityForm({
           })
       useUiStore.getState().bumpEntities() // refresh every entity list (e.g. scene selectors) now
       toast.success(editing ? 'Saved' : `Added ${ENTITY_TYPE_LABELS[type]}`, { description: trimmed })
-      onSaved(saved)
-      onOpenChange(false)
+      onSaved(saved) // dialog: caller closes; page: caller navigates (e.g. selects the new entity)
+      onOpenChange?.(false)
     } catch (err) {
       toast.error('Could not save', { description: String(err) })
     } finally {
@@ -281,6 +293,180 @@ export function EntityForm({
     )
   }
 
+  // The shared field body — identical in the dialog and the page; only the surrounding chrome differs.
+  const fields = (
+    <>
+      <div className="grid grid-cols-[1fr_160px] gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="ef-name">Name</Label>
+          <Input id="ef-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ef-type">Type</Label>
+          <Select value={type} onValueChange={(v) => onTypeChange(v as EntityType)} disabled={editing}>
+            <SelectTrigger id="ef-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ENTITY_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {ENTITY_TYPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="ef-desc">Description</Label>
+        <Textarea
+          id="ef-desc"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          placeholder="Who or what is this?"
+        />
+      </div>
+
+      {prof.traits && (
+        <div className="space-y-1.5">
+          <Label htmlFor="ef-traits">Traits</Label>
+          <TagInput
+            id="ef-traits"
+            value={traits}
+            onChange={setTraits}
+            placeholder="Add a trait — e.g. gruff"
+          />
+        </div>
+      )}
+
+      {prof.goals && (
+        <div className="space-y-1.5">
+          <Label htmlFor="ef-goals">Goals</Label>
+          <TagInput
+            id="ef-goals"
+            value={goals}
+            onChange={setGoals}
+            placeholder="Add a goal — e.g. protect the town"
+          />
+        </div>
+      )}
+
+      {prof.status && (
+        <div className="space-y-1.5">
+          <Label htmlFor="ef-status">Status</Label>
+          <StatusCombobox
+            id="ef-status"
+            value={status}
+            onChange={(v, lc) => {
+              setStatus(v)
+              setLifecycle(lc ?? lifecycleHeuristic(v.trim() || null))
+            }}
+            options={prof.status}
+          />
+          {(lifecycle === 'ended' || lifecycle === 'presumed_ended') && (
+            <label className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-primary"
+                checked={lifecycle === 'presumed_ended'}
+                onChange={(e) => setLifecycle(e.target.checked ? 'presumed_ended' : 'ended')}
+              />
+              Presumed / unconfirmed — believed over, but the party hasn’t confirmed it.
+            </label>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            Where this stands now — the AI trusts it for “now vs. then.”
+          </p>
+        </div>
+      )}
+
+      {prof.fields.map(renderField)}
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ml-2"
+          onClick={() => setMoreOpen((o) => !o)}
+        >
+          {moreOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          More fields{extraRows.length > 0 ? ` (${extraRows.length})` : ''}
+        </Button>
+        {moreOpen && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Custom attributes outside the {ENTITY_TYPE_LABELS[type]} profile.
+            </p>
+            {extraRows.map((row, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  value={row.key}
+                  onChange={(e) =>
+                    setExtraRows((rs) => rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)))
+                  }
+                  placeholder="field"
+                  className="w-1/3"
+                />
+                <Input
+                  value={row.value}
+                  onChange={(e) =>
+                    setExtraRows((rs) => rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))
+                  }
+                  placeholder="value"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setExtraRows((rs) => rs.filter((_, j) => j !== i))}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setExtraRows((r) => [...r, { key: '', value: '' }])}
+            >
+              <Plus className="size-3.5" />
+              Add field
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+
+  // Page variant — an inline Capture pane (like Notes / Recap / Import).
+  if (isPage) {
+    return (
+      <PaneShell size="form">
+        <PaneHeader
+          title={editing ? 'Edit entity' : 'New entity'}
+          description="Create a person, place, faction, quest, item, or character — the whole profile."
+        />
+        <div className="flex-1 space-y-4 overflow-y-auto pr-1">{fields}</div>
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button onClick={submit} disabled={!name.trim() || busy}>
+            {editing ? 'Save' : 'Create'}
+          </Button>
+        </div>
+      </PaneShell>
+    )
+  }
+
+  // Dialog variant — the popup used for editing an existing entity.
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -295,168 +481,10 @@ export function EntityForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-          <div className="grid grid-cols-[1fr_160px] gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="ef-name">Name</Label>
-              <Input
-                id="ef-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ef-type">Type</Label>
-              <Select
-                value={type}
-                onValueChange={(v) => onTypeChange(v as EntityType)}
-                disabled={editing}
-              >
-                <SelectTrigger id="ef-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ENTITY_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {ENTITY_TYPE_LABELS[t]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ef-desc">Description</Label>
-            <Textarea
-              id="ef-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="Who or what is this?"
-            />
-          </div>
-
-          {prof.traits && (
-            <div className="space-y-1.5">
-              <Label htmlFor="ef-traits">Traits</Label>
-              <TagInput
-                id="ef-traits"
-                value={traits}
-                onChange={setTraits}
-                placeholder="Add a trait — e.g. gruff"
-              />
-            </div>
-          )}
-
-          {prof.goals && (
-            <div className="space-y-1.5">
-              <Label htmlFor="ef-goals">Goals</Label>
-              <TagInput
-                id="ef-goals"
-                value={goals}
-                onChange={setGoals}
-                placeholder="Add a goal — e.g. protect the town"
-              />
-            </div>
-          )}
-
-          {prof.status && (
-            <div className="space-y-1.5">
-              <Label htmlFor="ef-status">Status</Label>
-              <StatusCombobox
-                id="ef-status"
-                value={status}
-                onChange={(v, lc) => {
-                  setStatus(v)
-                  setLifecycle(lc ?? lifecycleHeuristic(v.trim() || null))
-                }}
-                options={prof.status}
-              />
-              {(lifecycle === 'ended' || lifecycle === 'presumed_ended') && (
-                <label className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    className="size-3.5 accent-primary"
-                    checked={lifecycle === 'presumed_ended'}
-                    onChange={(e) => setLifecycle(e.target.checked ? 'presumed_ended' : 'ended')}
-                  />
-                  Presumed / unconfirmed — believed over, but the party hasn’t confirmed it.
-                </label>
-              )}
-              <p className="text-[11px] text-muted-foreground">
-                Where this stands now — the AI trusts it for “now vs. then.”
-              </p>
-            </div>
-          )}
-
-          {prof.fields.map(renderField)}
-
-          <div className="space-y-2 border-t border-border pt-3">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="-ml-2"
-              onClick={() => setMoreOpen((o) => !o)}
-            >
-              {moreOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-              More fields{extraRows.length > 0 ? ` (${extraRows.length})` : ''}
-            </Button>
-            {moreOpen && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  Custom attributes outside the {ENTITY_TYPE_LABELS[type]} profile.
-                </p>
-                {extraRows.map((row, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Input
-                      value={row.key}
-                      onChange={(e) =>
-                        setExtraRows((rs) =>
-                          rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r))
-                        )
-                      }
-                      placeholder="field"
-                      className="w-1/3"
-                    />
-                    <Input
-                      value={row.value}
-                      onChange={(e) =>
-                        setExtraRows((rs) =>
-                          rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
-                        )
-                      }
-                      placeholder="value"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setExtraRows((rs) => rs.filter((_, j) => j !== i))}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setExtraRows((r) => [...r, { key: '', value: '' }])}
-                >
-                  <Plus className="size-3.5" />
-                  Add field
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">{fields}</div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange?.(false)}>
             Cancel
           </Button>
           <Button onClick={submit} disabled={!name.trim() || busy}>
