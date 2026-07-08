@@ -12,7 +12,7 @@ import {
 } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
-import { useAllNotes, useEntities } from '@renderer/hooks/use-ledger'
+import { useAllNotes, useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
@@ -56,7 +56,11 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const { entities } = useEntities(campaignId)
   const { notes, refresh } = useAllNotes(campaignId)
+  const { sessions } = useSessions(campaignId)
   const entityById = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities])
+  // The session this note will file under (note.sessionId = the ACTIVE session, whose control now lives
+  // on the Chronicle header — ADR-036); surfaced read-only so filing is never silent.
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
   const [content, setContent] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -183,9 +187,9 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
           <span className="text-xs text-muted-foreground">
             {editingId
               ? 'Editing a note'
-              : selectedIds.length === 0
-                ? 'No entities tagged — saves as campaign lore'
-                : ' '}
+              : `${activeSession ? `Filing under Session ${activeSession.number}` : 'Undated'}${
+                  selectedIds.length === 0 ? ' · no entities tagged — saves as campaign lore' : ''
+                }`}
           </span>
           <div className="flex items-center gap-2">
             {editingId && (

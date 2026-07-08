@@ -19,6 +19,7 @@ import { registerSuggestHandlers } from './suggest'
 import { registerConverseHandlers } from './converse'
 import { registerDeriveProfileHandlers } from './derive-profile'
 import { registerImportHandlers } from './import'
+import { registerEnrichHandlers } from './enrich'
 import { registerPersonaHandlers } from './persona'
 
 /** Send a one-way event to the renderer (streaming: recall chunks, model-download progress). */
@@ -54,6 +55,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerConverseHandlers(ctx)
   registerDeriveProfileHandlers(ctx)
   registerImportHandlers(ctx, store)
+  registerEnrichHandlers(ctx) // no vector store — enrich creates no notes/entities (ADR-035)
   registerPersonaHandlers(ctx)
 
   void reindex() // embed anything unindexed (no-ops until the model is downloaded)

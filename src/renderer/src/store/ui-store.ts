@@ -8,7 +8,6 @@ export type ViewKey =
   | 'recall'
   | 'suggest'
   | 'converse'
-  | 'import'
   | 'settings'
 
 interface UiState {

@@ -19,8 +19,10 @@ test.afterAll(async () => {
 // add/remove chips, the dropdown+custom status, and a type-specific field — all round-tripping into
 // the detail view on create.
 test('per-type profile editor: chips, custom status, type-specific field', async () => {
+  // Create the campaign (with its mandatory main character, ADR-029).
   await page.getByRole('button', { name: 'New campaign' }).click()
-  await page.getByLabel('Name').fill('Phandalin')
+  await page.getByLabel('Name', { exact: true }).fill('Phandalin')
+  await page.getByLabel('Main character').fill('Vargas')
   await page.getByRole('button', { name: 'Create' }).click()
 
   // The Chronicle is the default view now; entity capture lives on the Codex view — navigate there.

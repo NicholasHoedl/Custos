@@ -547,15 +547,22 @@ All communication between renderer and main process goes through typed IPC chann
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
 > Notably: the renderer groups feature panes under `components/views/` (`CharacterView`, `JournalView`,
-> `SessionsView`, `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`, `ImportView` [Transcribe],
-> `SettingsView`, `NotesView` — all top-level per ADR-032; Codex slimmed to Inscribe + Annals), with a shared
+> `SessionsView`, `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`,
+> `SettingsView`, `NotesView` — top-level per ADR-032; Codex slimmed to Inscribe + Annals;
+> **Transcribe is no longer a view** — ADR-036 moved it into `components/capture/TranscribeDialog.tsx`,
+> opened from the Chronicle header, which also hosts the relocated active-session switcher
+> `components/sessions/SessionControl.tsx`), with a shared
 > `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
 > `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
-> `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, and `session`
+> `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, `session`, and
+> `enrich` (the per-entity **Illuminate** tier-2 pass, ADR-035 — `ipc/enrich.ts`, channels
+> `enrich:touched`/`enrich:entity`, reviewed via `components/sessions/EnrichDialog.tsx`)
 > services; `db/` adds `backup.ts`. The **Journal** (the reworked
 > `components/capture/EventFeed.tsx`, surfaced top-level as `JournalView`) is the primary capture
-> surface — entries feed the Import extract→review→apply engine through a shared `ChangesetReview`
-> (entities, notes, status/relationship changes, and field edits to existing entities — ADR-028),
+> surface — entries save as PLAIN log lines; the header's **"Close out session"** wizard
+> (`capture/CloseOutDialog.tsx`, ADR-035) runs the extract→review→apply engine over the whole session's
+> log through a shared `ChangesetReview` (tier-1 'capture': entities, notes, and status changes; ties +
+> field edits come from the chained Illuminate step, ADR-028/035),
 > stamped at the current session — and each campaign persists a **mandatory main character**
 > (`campaign.main_character_id`, created with the campaign) — the **sole** in-character lens (ADR-029; the
 > active-PC switcher is gone). Backstory, the PC persona, and a promoted `voice_examples` field are
@@ -738,7 +745,7 @@ per-campaign session persistence. See ADR-020.
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
 
 > **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
-> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–029**, with status changes (e.g.
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–036**, with status changes (e.g.
 > ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
 > (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
 > 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes),

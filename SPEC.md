@@ -285,14 +285,16 @@ feeds the persona, and by **surfacing** previously-invisible data to the AI — 
 `traits`/`goals`/`flaws` + combat/social-salient attributes (a creature's weakness/tactics, a faction's
 alignment), so structured data reaches Recall/Suggest, not just the free-text description.
 
-**Converse** (ADR-025) — a **third AI lens** beside Recall and Suggest (surfaced in the UI as Lore ·
-Counsel · Converse; Recall→Lore per ADR-032). Given the active PC (the asker) and a chosen **target** entity, one structured call
-returns a short **briefing** — what's *known*, what's *open / suspected*, and the target's *connections* —
-then **in-character questions** the PC could ask to draw them out, each tagged with the thread it opens and
-why. It mirrors Suggest's single-shot structured pipeline but grounds by **direct fetch** (the target's
-notes + as-of-correct ties + the asker's persona), so it needs no embedding model and reuses the Suggest
-model setting — **no migration, no new settings**. Discovered-only: gaps and Whispered/Hearsay notes
-*become* the questions; it never answers them or simulates the target's replies.
+**Converse** (ADR-025; **reshaped questions-only in ADR-034**) — a **third AI lens** beside Recall and
+Suggest (surfaced in the UI as Lore · Counsel · Converse; Recall→Lore per ADR-032). You pick a character
+to talk **with** (an NPC or fellow PC — never yourself); one structured call returns a **spread of 4–6
+tagged, in-character questions** to draw them out — each `{ question, tag, read }` over a 14-tag
+taxonomy (open-probe → secret-seeking), funnel-ordered in the UI from trust-building openers to
+high-cost probes via static per-tag aim/cost metadata. An optional **thread** steers what to dig into.
+It mirrors Suggest's single-shot structured pipeline but grounds by **direct fetch** (the target's
+notes — now as-of-clamped — + ties + the asker's persona), so it needs no embedding model and reuses the
+Suggest model setting — **no migration, no new settings**. Discovered-only: gaps and rumored/suspected
+notes *become* the questions; it never answers them or simulates the target's replies.
 
 **Current scene** (ADR-015; picker relocated to the Suggest pane in ADR-023; **Counsel-only + Time-of-Day dropped in ADR-027**) — a "present moment" (location, party present, the
 NPCs/factions being faced, the embarked quest, and a scene *mode*: combat / social / exploration /
@@ -306,13 +308,28 @@ streams a neutral "Previously on…" of a chosen session, grounded in that sessi
 notes, and saves it to the session summary. This supersedes the "automated session summarization" non-goal
 listed in §4.
 
-**Paste-and-Extract Import** (ADR-014; extended in ADR-018/023; **a top-level Transcribe view since
-ADR-032**) — turns pasted text —
-session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes,
-status/relationship changes, and field changes** (add/cut/alter to an existing entity's
-traits/goals/flaws & attributes, ADR-028), applied in one transaction and **tied to a session you choose** (the
-current one, a specific past session, or undated). (Distinct from the still-deferred campaign *file*
-export/import in §4 — this is text ingestion, not save-file portability.)
+**Paste-and-Extract Import** (ADR-014; extended in ADR-018/023; **now a Transcribe dialog on the
+Chronicle header, ADR-036**) — turns pasted text —
+session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes, and
+status changes** (tier-1 'capture' extraction, ADR-035), applied in one transaction and **tied to a
+session you choose** (the current one, a specific past session, or undated). (Distinct from the
+still-deferred campaign *file* export/import in §4 — this is text ingestion, not save-file portability.)
+
+**Two-tier extraction, "Close out session" & "Illuminate"** (ADR-035/036) — the AI note-taker was split
+to stop one overloaded call doing five jobs, and extraction became a deliberate ritual. **Chronicle
+entries save as plain log lines** (no per-entry AI). **Closing out a session** opens one locked wizard
+(exit only by approving or rejecting; hard failures always offer Close) that runs **tier 1** — a single
+'capture' extraction over the whole session's log, proposing entities + notes + status changes — then
+chains into **tier 2, Illuminate**: ONE focused call per touched entity (full note history + current
+profile + live ties) proposing the **relationship ties and profile edits** (traits/goals/flaws/
+description/attributes — ADR-028's field changes, now incl. the real description column) the notes
+support. The wizard's review is built for volume: bulk tri-state per-section toggles + a compact
+density pass. Illuminate also remains a standalone per-session action on the Sessions view (the
+surgical re-run); both paths are checklist-gated, applied stamped at the session, and safe to re-run
+(the ADR-031 dedup rules make a second pass near-empty). Backstory step 2 keeps the full five-array
+extraction (its undated MC-anchored ties have no session for a later pass). The **active-session
+selector also moved from the sidebar into the Chronicle header** (its true footprint is capture-only),
+and Annals shows a "Filing under Session N" hint.
 
 **Chronology** (ADR-017) — the AI reasons with time. Entity status + relationships are versioned as
 an append-only, session-stamped history (lifecycle flag, status trail, relationship validity
@@ -345,7 +362,8 @@ the raw line is kept as your log, and (with an API key) Claude proposes the enti
 changes, and relationship links it implies, reviewed inline and applied **stamped at the current
 session**. It reuses the Import changeset-v2 engine (ADR-014/018) verbatim — which now also proposes
 **field changes** to existing entities (ADR-028); manual entity/note editing (in Capture) becomes the
-fallback. (A per-character *knowledge horizon* is noted as future work.)
+fallback. (A per-character *knowledge horizon* is noted as future work.) *(Per-entry inline extraction
+was later replaced by the "Close out session" ritual — ADR-035, above.)*
 
 **Capture & UI refinements** (ADR-023) — a cleanup pass after the Journal landed: **Quick-add** (the
 name→type→note bar) is replaced by the full **Add entity** profile form (opened from the entity browser,

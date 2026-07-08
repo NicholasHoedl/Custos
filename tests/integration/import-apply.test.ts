@@ -370,3 +370,77 @@ describe('import.service — applyChangeset field changes (ADR-028)', () => {
     expect(n.attributes.abilities).toEqual(['Reality Warp']) // Rotting Gaze cut after Reality Warp added
   })
 })
+
+describe('import.service — applyChangeset (Illuminate payload, ADR-035)', () => {
+  it('applies a rel+field-only changeset stamped at session N: ties open at N, description hits the real column', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    createSession(ctx, { campaignId }) // Session 1
+    const s2 = createSession(ctx, { campaignId }) // Session 2 — the enriched session
+    const glasstaff = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Glasstaff',
+      description: 'A wizard.',
+      traits: ['Cautious']
+    })
+    const redbrands = createEntity(ctx, { campaignId, type: 'faction', name: 'The Redbrands' })
+    const ex = (entityId: string) => ({ kind: 'existing' as const, entityId })
+
+    const payload: ConfirmedChangeset = {
+      campaignId,
+      sessionId: s2.id,
+      entities: [],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [
+        {
+          fromRef: ex(glasstaff.id),
+          toRef: ex(redbrands.id),
+          relation: 'member_of',
+          action: 'form',
+          include: true,
+          description: 'secretly leads them',
+          fromDisposition: 'possessive',
+          toDisposition: 'loyal',
+          confidence: 'confirmed'
+        }
+      ],
+      fieldChanges: [
+        {
+          entityRef: ex(glasstaff.id),
+          field: 'description',
+          op: 'alter',
+          value: 'Iarno Albrek in disguise, leading the Redbrands.',
+          oldValue: null,
+          include: true
+        },
+        { entityRef: ex(glasstaff.id), field: 'traits', op: 'add', value: 'Duplicitous', oldValue: null, include: true }
+      ]
+    }
+
+    const result = applyChangeset(ctx, store, payload)
+    expect(result.relationshipChangesApplied).toBe(1)
+    expect(result.fieldChangesApplied).toBe(2)
+    expect(result.createdEntityIds).toHaveLength(0)
+    expect(result.createdNoteIds).toHaveLength(0)
+
+    // The tie opens its interval AT the enriched session (decision #6): live at 2, absent at 1.
+    const at2 = listForEntity(ctx, glasstaff.id, 2)
+    expect(at2).toHaveLength(1)
+    expect(at2[0].link.startSessionNumber).toBe(2)
+    expect(at2[0].link.description).toBe('secretly leads them')
+    expect(listForEntity(ctx, glasstaff.id, 1)).toHaveLength(0)
+
+    // F1 regression: description writes the REAL column, never the attributes bag.
+    const g = getEntity(ctx, glasstaff.id)!
+    expect(g.description).toBe('Iarno Albrek in disguise, leading the Redbrands.')
+    expect(g.attributes.description).toBeUndefined()
+    expect(g.traits).toEqual(['Cautious', 'Duplicitous'])
+
+    // Re-apply is idempotent for the tie (createLink returns the live edge; no duplicate interval).
+    applyChangeset(ctx, store, payload)
+    expect(listForEntity(ctx, glasstaff.id)).toHaveLength(1)
+  })
+})

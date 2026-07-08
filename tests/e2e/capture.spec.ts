@@ -26,22 +26,25 @@ async function addEntity(name: string, description?: string): Promise<void> {
 // Drives the real UI through the preload bridge — proves SPEC Flows A + B end-to-end at runtime:
 // campaign → session → add entities (full profile form) → typed relationship → local search → delete.
 test('capture flow: campaign, session, entities, link, search, delete', async () => {
-  // Flow A — create and activate a campaign.
+  // Flow A — create and activate a campaign (with its mandatory main character, ADR-029).
   await page.getByRole('button', { name: 'New campaign' }).click()
-  await page.getByLabel('Name').fill('Phandalin')
+  await page.getByLabel('Name', { exact: true }).fill('Phandalin')
+  await page.getByLabel('Main character').fill('Vargas')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // The Chronicle is the default view; entity capture lives on the Codex view — navigate there.
-  await page.getByRole('button', { name: 'Codex' }).click()
-
-  // Start a session (auto-numbered).
+  // Start a session (auto-numbered) from the Chronicle header — the session control moved there
+  // (ADR-036), so this must happen BEFORE navigating away (the default view is Chronicle).
   await page.getByRole('button', { name: 'New session' }).click()
   await expect(page.getByText(/Session 1/).first()).toBeVisible()
 
+  // Entity capture lives on the Codex view — navigate there.
+  await page.getByRole('button', { name: 'Codex' }).click()
+
   // Flow B — add an NPC via the full "Add entity" form; on create it opens in the detail panel.
+  // (.first(): the description also renders as the browser row's line-clamped snippet.)
   await addEntity('Aldric Vane', 'Owes the party a favor.')
   await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
-  await expect(page.getByText('Owes the party a favor.')).toBeVisible()
+  await expect(page.getByText('Owes the party a favor.').first()).toBeVisible()
 
   // A second NPC, so we have something to link to.
   await addEntity('Mirna Dendrar')

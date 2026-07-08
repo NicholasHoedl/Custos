@@ -21,10 +21,14 @@ play and the voice the Keeper speaks in; a dashboard manages their profile, pers
 a **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties your
 backstory implies — all review-gated), **Converse** (pick a character to talk *with* — an NPC or a fellow
 party member — and get a spread of tagged, in-character questions to draw them out, from safe openers to
-pointed probes; name a thread to steer them), the **Chronicle** (jot a plain line of what happened; the Keeper proposes the entities, notes, and
-status/relationship/field changes to review), **Sessions** (browse each session with its summary and a
-"previously on…" recap), chronology throughout (the world reconstructed "as of session N" with no
-future-knowledge leak), and paste-and-extract **Transcribe** (tie an import to any session, or none).
+pointed probes; name a thread to steer them), the **Chronicle** (jot plain lines of what happened; when
+the night is over, **Close out session** runs the Keeper over the whole log — entities, notes, and
+status changes, then straight into Illuminate — in one review wizard built for volume; the header also
+hosts the session switcher and the paste-and-extract **Transcribe** dialog, which can tie an import to
+any session or none), **Sessions** (browse each session with its summary, a "previously on…" recap, and
+**Illuminate** — a review-gated pass where the Keeper re-reads everything known about each entity the
+session touched and fills in the profile details and relationship ties the notes support), and
+chronology throughout (the world reconstructed "as of session N" with no future-knowledge leak).
 
 ## Stack
 

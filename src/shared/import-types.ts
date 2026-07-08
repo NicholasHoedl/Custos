@@ -6,15 +6,20 @@ import type { RelationKey } from './relations'
 // item; we apply in one transaction. Proposed (not-yet-created) entities are referenced by LOCAL INDEX:
 // in the model's JSON a NEW entity is "#0","#1",… (its position in `entities`), and an EXISTING entity
 // is its real id (the prompt lists candidate ids). The validator normalizes those strings to EntityRef.
-// Changeset v2 (ADR-018, backfill): extraction can ALSO emit status/relationship CHANGES — gated by
-// `withChanges` so the plain Import pane is unchanged — which apply stamps at the batch's session so
-// the backfilled past feeds Chronology's as-of reconstruction (ADR-017).
+// Two-tier split (ADR-035): extraction runs in one of two MODES — 'capture' (the automatic note-taker:
+// entities + notes + statusChanges; Chronicle + Transcribe) or 'full' (all five arrays including
+// relationship/field changes; the backstory wizard ONLY). Applied changes stamp at the batch's session
+// so the captured past feeds Chronology's as-of reconstruction (ADR-017).
+
+/** Tier split (ADR-035): 'capture' = entities + notes + statusChanges (the automatic note-taker);
+ *  'full' = all five arrays (ties + field changes too — backstory step 2 only). */
+export type ExtractionMode = 'capture' | 'full'
 
 export interface ExtractRequest {
   campaignId: string
   text: string
-  /** Changeset v2: also extract status/relationship changes (backfill interview). Default false. */
-  withChanges?: boolean
+  /** Extraction tier (ADR-035). Defaults to 'capture'. */
+  mode?: ExtractionMode
   /** ADR-030 v3: the existing entity whose personal BACKSTORY `text` is (the main character) — the
    *  extractor is told, so the standing ties it proposes anchor to that character. */
   backstorySubjectId?: string
@@ -33,9 +38,10 @@ export interface RawExtraction {
     attributes?: { key: string; value: string }[]
   }[]
   notes: { content: string; entityRefs: string[]; tags?: string[]; confidence?: string }[]
-  /** Changeset v2 (withChanges only): state changes the text narrates, e.g. a death or a completion. */
+  /** Both modes: state changes the text narrates, e.g. a death or a completion (ADR-035 keeps status in
+   *  tier 1 — it drives as-of chronology). */
   statusChanges?: { entityRef: string; lifecycle?: string; status?: string }[]
-  /** Changeset v2 (withChanges only): relationships that formed or ended during the described events. */
+  /** 'full' mode only: relationships that formed or ended during the described events. */
   relationshipChanges?: {
     fromRef: string
     toRef: string
@@ -46,7 +52,7 @@ export interface RawExtraction {
     toDisposition?: string
     confidence?: string
   }[]
-  /** Changeset v2+ (withChanges only): edits to an EXISTING entity's fields (traits/goals/flaws/attributes). */
+  /** 'full' mode only: edits to an EXISTING entity's fields (traits/goals/flaws/attributes/description). */
   fieldChanges?: { entityRef: string; field?: string; op?: string; value?: string; oldValue?: string }[]
 }
 
@@ -101,11 +107,12 @@ export interface ProposedRelationshipChange {
 
 export type FieldChangeOp = 'add' | 'cut' | 'alter'
 
-/** A validated FIELD change: add/cut/alter a promoted list (traits/goals/flaws) or a type attribute on an
- *  EXISTING entity. For a list cut/alter, `oldValue` is the exact current item (else null). */
+/** A validated FIELD change: add/cut/alter a promoted list (traits/goals/flaws), the description, or a
+ *  type attribute on an EXISTING entity. For a list cut/alter, `oldValue` is the exact current item
+ *  (else null). */
 export interface ProposedFieldChange {
   entityRef: EntityRef
-  field: string // 'traits' | 'goals' | 'flaws' | an attribute key
+  field: string // 'traits' | 'goals' | 'flaws' | 'description' | an attribute key
   op: FieldChangeOp
   value: string | null
   oldValue: string | null
@@ -189,7 +196,8 @@ export interface ConfirmedChangeset {
   sessionId: string | null
   entities: ConfirmedEntity[]
   notes: ConfirmedNote[]
-  /** Changeset v2 (backfill) — absent for the plain Import pane. */
+  /** Optional per-tier: capture emits statusChanges only; full adds ties + fields; Illuminate (ADR-035)
+   *  sends ONLY relationship/field changes with everything else empty. */
   statusChanges?: ConfirmedStatusChange[]
   relationshipChanges?: ConfirmedRelationshipChange[]
   fieldChanges?: ConfirmedFieldChange[]

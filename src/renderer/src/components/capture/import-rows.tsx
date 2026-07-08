@@ -34,16 +34,27 @@ import {
 // The reviewable rows of an extraction changeset, shared by the Journal (Chronicle) and Import
 // (Transcribe) via ChangesetReview. Each type is styled to its meaning — a note is a testimony, a
 // status change a before→after diff, a relationship a bond. Every row is include-gated: the model
-// proposes, the user disposes.
+// proposes, the user disposes. Every row takes an optional `compact` (the close-out wizard's density
+// pass, ADR-035): tighter padding + type so a whole session's changeset fits on screen.
 
 const BATCH_DEFAULT = '__batch__'
+
+/** The row container: solid when included, ghosted when excluded; compact tightens the padding. */
+function rowCls(included: boolean, compact?: boolean): string {
+  return cn(
+    'rounded-lg border',
+    compact ? 'p-2' : 'p-3',
+    included ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
+  )
+}
 
 export function EntityRow({
   entity,
   matches,
   existingName,
   onPatch,
-  sessions
+  sessions,
+  compact
 }: {
   entity: ConfirmedEntity
   matches: MatchCandidate[]
@@ -51,16 +62,12 @@ export function EntityRow({
   onPatch: (patch: Partial<ConfirmedEntity>) => void
   /** Backfill: when provided, a created entity gets a "first appeared" session selector (baseline). */
   sessions?: Session[]
+  compact?: boolean
 }) {
   const included = entity.action !== 'skip'
   const top = matches[0]
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        included ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
+    <div className={rowCls(included, compact)}>
       <div className="flex items-center gap-2">
         <Toggle
           on={included}
@@ -72,14 +79,14 @@ export function EntityRow({
           value={entity.name}
           onChange={(e) => onPatch({ name: e.target.value })}
           disabled={!included}
-          className="h-8 min-w-0 flex-1"
+          className={cn('min-w-0 flex-1', compact ? 'h-7 text-sm' : 'h-8')}
         />
         <Select
           value={entity.type}
           onValueChange={(v) => onPatch({ type: v as EntityType })}
           disabled={!included}
         >
-          <SelectTrigger className="h-8 w-32">
+          <SelectTrigger className={compact ? 'h-7 w-28 text-xs' : 'h-8 w-32'}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -211,19 +218,16 @@ export function EntityRow({
 export function NoteRow({
   note,
   refName,
-  onPatch
+  onPatch,
+  compact
 }: {
   note: ConfirmedNote
   refName: (r: EntityRef) => string
   onPatch: (patch: Partial<ConfirmedNote>) => void
+  compact?: boolean
 }) {
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        note.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
+    <div className={rowCls(note.include, compact)}>
       <div className="flex items-start gap-3">
         <Toggle on={note.include} onClick={() => onPatch({ include: !note.include })} />
         <div className="min-w-0 flex-1 border-l-2 border-metal/40 pl-3">
@@ -232,7 +236,10 @@ export function NoteRow({
             onChange={(e) => onPatch({ content: e.target.value })}
             rows={2}
             disabled={!note.include}
-            className="min-h-0 resize-none border-0 bg-transparent px-0 py-0 font-display text-[15px] italic leading-relaxed text-foreground shadow-none focus-visible:ring-0"
+            className={cn(
+              'min-h-0 resize-none border-0 bg-transparent px-0 py-0 font-display italic text-foreground shadow-none focus-visible:ring-0',
+              compact ? 'text-sm leading-snug' : 'text-[15px] leading-relaxed'
+            )}
           />
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {note.entityRefs.map((r, i) => (
@@ -291,30 +298,34 @@ export function StatusChangeRow({
   change,
   fromLifecycle,
   refName,
-  onToggle
+  onToggle,
+  compact
 }: {
   change: ConfirmedStatusChange
   /** The entity's current lifecycle (existing entities only) — drives the before→after diff. */
   fromLifecycle?: Lifecycle | null
   refName: (r: EntityRef) => string
   onToggle: () => void
+  compact?: boolean
 }) {
   const isDeath = change.lifecycle === 'ended' || change.lifecycle === 'presumed_ended'
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        change.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
+    <div className={rowCls(change.include, compact)}>
       <div className="flex items-start gap-3">
         <Toggle on={change.include} onClick={onToggle} />
         <div className="min-w-0 flex-1">
-          <div className="font-display text-[15px] text-foreground">{refName(change.entityRef)}</div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className={cn('font-display text-foreground', compact ? 'text-sm' : 'text-[15px]')}>
+            {refName(change.entityRef)}
+          </div>
+          <div className={cn('flex flex-wrap items-center gap-2', compact ? 'mt-1' : 'mt-2')}>
             {fromLifecycle != null && fromLifecycle !== change.lifecycle && (
               <>
-                <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground line-through">
+                <span
+                  className={cn(
+                    'rounded-md bg-muted text-xs text-muted-foreground line-through',
+                    compact ? 'px-1.5 py-0.5' : 'px-2 py-1'
+                  )}
+                >
                   {LIFECYCLE_LABELS[fromLifecycle]}
                 </span>
                 <ArrowRight className="size-4 text-muted-foreground" />
@@ -322,7 +333,8 @@ export function StatusChangeRow({
             )}
             <span
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+                'inline-flex items-center gap-1.5 rounded-md text-xs font-medium',
+                compact ? 'px-1.5 py-0.5' : 'px-2 py-1',
                 isDeath ? 'bg-destructive/15 text-destructive' : 'bg-primary/15 text-primary'
               )}
             >
@@ -342,15 +354,21 @@ export function StatusChangeRow({
 export function RelationshipChangeRow({
   change,
   refName,
-  onPatch
+  onPatch,
+  compact
 }: {
   change: ConfirmedRelationshipChange
   refName: (r: EntityRef) => string
   onPatch: (patch: Partial<ConfirmedRelationshipChange>) => void
+  compact?: boolean
 }) {
   const isForm = change.action === 'form'
   const label = RELATIONS[change.relation]?.forward ?? change.relation
   const lineCls = isForm ? 'h-px bg-primary' : 'h-0 border-t border-dashed border-destructive/70'
+  const chipCls = cn(
+    'min-w-0 truncate rounded-md border border-border bg-secondary/60 font-display text-foreground',
+    compact ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm'
+  )
   // ADR-033: description is editable in review; disposition + confidence are shown (fine-tune post-apply).
   const feelings = [
     change.fromDisposition && `${refName(change.fromRef)} feels ${change.fromDisposition}`,
@@ -359,20 +377,12 @@ export function RelationshipChangeRow({
     .filter(Boolean)
     .join(' · ')
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        change.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
+    <div className={rowCls(change.include, compact)}>
       <div className="flex items-start gap-3">
         <Toggle on={change.include} onClick={() => onPatch({ include: !change.include })} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span
-              title={refName(change.fromRef)}
-              className="min-w-0 truncate rounded-md border border-border bg-secondary/60 px-2.5 py-1 font-display text-sm text-foreground"
-            >
+            <span title={refName(change.fromRef)} className={chipCls}>
               {refName(change.fromRef)}
             </span>
             <span className={cn('flex-1', lineCls)} />
@@ -382,14 +392,11 @@ export function RelationshipChangeRow({
               <Unlink className="size-4 shrink-0 text-destructive" />
             )}
             <span className={cn('flex-1', lineCls)} />
-            <span
-              title={refName(change.toRef)}
-              className="min-w-0 truncate rounded-md border border-border bg-secondary/60 px-2.5 py-1 font-display text-sm text-foreground"
-            >
+            <span title={refName(change.toRef)} className={chipCls}>
               {refName(change.toRef)}
             </span>
           </div>
-          <div className="mt-1.5 text-center text-xs">
+          <div className={cn('text-center text-xs', compact ? 'mt-1' : 'mt-1.5')}>
             <span className={isForm ? 'text-primary' : 'text-destructive'}>
               {isForm ? label : `no longer ${label}`}
             </span>
@@ -421,30 +428,29 @@ export function RelationshipChangeRow({
 export function FieldChangeRow({
   change,
   refName,
-  onToggle
+  onToggle,
+  compact
 }: {
   change: ConfirmedFieldChange
   refName: (r: EntityRef) => string
   onToggle: () => void
+  compact?: boolean
 }) {
   const { op, value, oldValue } = change
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-3',
-        change.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
-      )}
-    >
+    <div className={rowCls(change.include, compact)}>
       <div className="flex items-start gap-3">
         <Toggle on={change.include} onClick={onToggle} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-display text-[15px] text-foreground">{refName(change.entityRef)}</span>
+            <span className={cn('font-display text-foreground', compact ? 'text-sm' : 'text-[15px]')}>
+              {refName(change.entityRef)}
+            </span>
             <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
               {fieldLabel(change.field)}
             </span>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className={cn('flex flex-wrap items-center gap-2', compact ? 'mt-1' : 'mt-2')}>
             {op === 'add' && (
               <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary">
                 <Plus className="size-3.5" />
@@ -499,6 +505,32 @@ export function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
       )}
     >
       <Check className="size-3.5" />
+    </button>
+  )
+}
+
+/** A tri-state section-header toggle for bulk include/exclude (the close-out wizard's volume review):
+ *  all = check, some = minus, none = empty. Styled to match the per-row Toggle. */
+export function BulkToggle({
+  state,
+  onClick,
+  label
+}: {
+  state: 'all' | 'some' | 'none'
+  onClick: () => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Toggle all ${label}`}
+      className={cn(
+        'flex size-5 shrink-0 items-center justify-center rounded border transition-colors',
+        state === 'none' ? 'border-border text-transparent' : 'border-primary bg-primary/15 text-primary'
+      )}
+    >
+      {state === 'some' ? <Minus className="size-3.5" /> : <Check className="size-3.5" />}
     </button>
   )
 }

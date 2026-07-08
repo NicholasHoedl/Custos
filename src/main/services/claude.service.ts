@@ -18,7 +18,8 @@ import {
 } from '@shared/entity-types'
 import { ENTITY_PROFILES } from '@shared/entity-profiles'
 import { RELATIONS } from '@shared/relations'
-import type { RawExtraction } from '@shared/import-types'
+import type { ExtractionMode, RawExtraction } from '@shared/import-types'
+import type { RawEnrichment } from '@shared/enrich-types'
 import type { RetrievedChunk } from './vector-store.service'
 import { getKey, keyExists } from './key.service'
 
@@ -827,33 +828,85 @@ NOTES. Capture the narrative beats and facts as short notes, each tagged to the 
 
 REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its position in your entities array — "#0", "#1", and so on. Reference an EXISTING entity by the id shown in the existing-entities list. Every note must reference at least one entity. Prefer linking to an existing entity (by id) over proposing a duplicate of it.`
 
-// Changeset v2 (ADR-018, backfill interview): additionally extract the CHANGES the text narrates, so
-// they can be stamped at the session under review and feed the as-of timeline.
-const CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. status uses the same per-type STATUSES vocabulary above — prefer a listed value; free text only when none fits. Only emit CHANGES the text narrates — never a state merely described as ongoing.
+// Change instructions, split per array (ADR-035 two-tier): 'capture' mode gets STATUS only (time-
+// sensitive, feeds as-of chronology); 'full' mode (backstory step 2) gets all of them. The full-mode
+// text is unchanged from the pre-split CHANGES_INSTRUCTIONS so its behavior doesn't drift.
+const STATUS_CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. status uses the same per-type STATUSES vocabulary above — prefer a listed value; free text only when none fits. Only emit CHANGES the text narrates — never a state merely described as ongoing.`
 
-RELATIONSHIPS. Add a relationshipChanges item {fromRef, toRef, relation, action} BOTH when the text narrates a relationship forming ("form") or ending ("sever") — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — AND when it establishes a STANDING relationship (action "form"): family, friendship or mentorship, membership in a group, ownership, or where someone lives or something sits. Use "sever" ONLY for a narrated ending. Capture ties the text asserts, not incidental mentions of strangers. In a personal backstory, nearly every named person, place, or group has a standing tie to its subject — capture each one. Keep the narrative note describing the relationship as well. For a "form" tie, also fill in, WHEN the text supports it: a short "description" (the why/when of the bond); "fromDisposition" and "toDisposition" — a few words on how each side FEELS about the other (fromDisposition = how the fromRef entity feels about the toRef entity; the two can differ, and either may be omitted); and "confidence" — "rumored" or "suspected" when the tie is only hearsay or inferred, otherwise "confirmed" (the default). Omit any of these the text doesn't support; "sever" items take none of them.
+const RELATIONSHIP_CHANGES_INSTRUCTIONS = `RELATIONSHIPS. Add a relationshipChanges item {fromRef, toRef, relation, action} BOTH when the text narrates a relationship forming ("form") or ending ("sever") — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — AND when it establishes a STANDING relationship (action "form"): family, friendship or mentorship, membership in a group, ownership, or where someone lives or something sits. Use "sever" ONLY for a narrated ending. Capture ties the text asserts, not incidental mentions of strangers. In a personal backstory, nearly every named person, place, or group has a standing tie to its subject — capture each one. Keep the narrative note describing the relationship as well. For a "form" tie, also fill in, WHEN the text supports it: a short "description" (the why/when of the bond); "fromDisposition" and "toDisposition" — a few words on how each side FEELS about the other (fromDisposition = how the fromRef entity feels about the toRef entity; the two can differ, and either may be omitted); and "confidence" — "rumored" or "suspected" when the tie is only hearsay or inferred, otherwise "confirmed" (the default). Omit any of these the text doesn't support; "sever" items take none of them.`
 
-Relation keys and their meanings — pick the closest, authored from the forward side (the inverse is derived): located_in (someone or something is in a place) · member_of (a person belongs to a faction or group) · owns (a person or faction owns an item) · quest_giver_of (an npc or faction gives a quest) · involves (a quest or event involves someone or something) · ally_of (friends, companions, allies) · enemy_of (rivals, foes) · knows (acquainted) · related_to (FAMILY or kin — a sibling, parent, spouse, cousin; or any close personal bond no other key fits).
+const RELATION_VOCAB_GLOSS = `Relation keys and their meanings — pick the closest, authored from the forward side (the inverse is derived): located_in (someone or something is in a place) · member_of (a person belongs to a faction or group) · owns (a person or faction owns an item) · quest_giver_of (an npc or faction gives a quest) · involves (a quest or event involves someone or something) · ally_of (friends, companions, allies) · enemy_of (rivals, foes) · knows (acquainted) · related_to (FAMILY or kin — a sibling, parent, spouse, cousin; or any close personal bond no other key fits).`
 
-FIELD CHANGES. When the text reveals that an EXISTING entity's nature or details CHANGED — a new trait, goal, or flaw; one that no longer holds; or an updated type-specific attribute (a creature's weakness learned, a faction's alignment revealed, a quest's reward set) — add a fieldChanges item {entityRef, field, op, value, oldValue}. entityRef is an EXISTING entity's id (NEVER a "#index" — a new entity already carries its fields). field is "traits", "goals", or "flaws", OR one of that type's attribute keys (the same keys listed under ENTITIES). op: "add" a new value; "cut" one that no longer holds; "alter" to reword or replace one. For a LIST field (traits/goals/flaws), when cutting or altering put the EXACT existing item in oldValue — copy it verbatim from the existing-entities list — and the new text in value. Leave value or oldValue as "" when not applicable. Only propose changes the text NARRATES; never change an entity's name.
+const FIELD_CHANGES_INSTRUCTIONS = `FIELD CHANGES. When the text reveals that an EXISTING entity's nature or details CHANGED — a new trait, goal, or flaw; one that no longer holds; or an updated type-specific attribute (a creature's weakness learned, a faction's alignment revealed, a quest's reward set) — add a fieldChanges item {entityRef, field, op, value, oldValue}. entityRef is an EXISTING entity's id (NEVER a "#index" — a new entity already carries its fields). field is "traits", "goals", or "flaws", OR one of that type's attribute keys (the same keys listed under ENTITIES). op: "add" a new value; "cut" one that no longer holds; "alter" to reword or replace one. For a LIST field (traits/goals/flaws), when cutting or altering put the EXACT existing item in oldValue — copy it verbatim from the existing-entities list — and the new text in value. Leave value or oldValue as "" when not applicable. Only propose changes the text NARRATES; never change an entity's name.`
 
-These changes use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text supports none, return empty arrays.`
+const CHANGES_REFS_EPILOGUE = `These changes use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text supports none, return empty arrays.`
 
-/** System prompt for import extraction — the (cacheable) instructions. */
-export function buildExtractionSystem(withChanges = false): Anthropic.TextBlockParam[] {
-  const text = withChanges
-    ? `${EXTRACTION_INSTRUCTIONS}\n\n${CHANGES_INSTRUCTIONS}`
-    : EXTRACTION_INSTRUCTIONS
-  return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }]
+/** System prompt for import extraction — the (cacheable) instructions, assembled per mode (ADR-035). */
+export function buildExtractionSystem(mode: ExtractionMode): Anthropic.TextBlockParam[] {
+  const blocks =
+    mode === 'full'
+      ? [
+          EXTRACTION_INSTRUCTIONS,
+          STATUS_CHANGES_INSTRUCTIONS,
+          RELATIONSHIP_CHANGES_INSTRUCTIONS,
+          RELATION_VOCAB_GLOSS,
+          FIELD_CHANGES_INSTRUCTIONS,
+          CHANGES_REFS_EPILOGUE
+        ]
+      : [EXTRACTION_INSTRUCTIONS, STATUS_CHANGES_INSTRUCTIONS, CHANGES_REFS_EPILOGUE]
+  return [{ type: 'text', text: blocks.join('\n\n'), cache_control: { type: 'ephemeral' } }]
+}
+
+// The change-array item schemas, shared between extraction (per mode) and the Illuminate enrich schema
+// so the two can never drift (ADR-035).
+const STATUS_CHANGE_ITEM = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    entityRef: { type: 'string' },
+    lifecycle: { type: 'string', enum: [...LIFECYCLES] },
+    status: { type: 'string' }
+  },
+  required: ['entityRef', 'lifecycle']
+}
+
+const RELATIONSHIP_CHANGE_ITEM = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    fromRef: { type: 'string' },
+    toRef: { type: 'string' },
+    relation: { type: 'string', enum: Object.keys(RELATIONS) },
+    action: { type: 'string', enum: ['form', 'sever'] },
+    description: { type: 'string' },
+    fromDisposition: { type: 'string' },
+    toDisposition: { type: 'string' },
+    confidence: { type: 'string', enum: [...NOTE_CONFIDENCES] }
+  },
+  required: ['fromRef', 'toRef', 'relation', 'action']
+}
+
+const FIELD_CHANGE_ITEM = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    entityRef: { type: 'string' },
+    field: { type: 'string' },
+    op: { type: 'string', enum: ['add', 'cut', 'alter'] },
+    value: { type: 'string' },
+    oldValue: { type: 'string' }
+  },
+  required: ['entityRef', 'field', 'op', 'value', 'oldValue']
 }
 
 /**
  * Extraction schema. Attributes are an array of {key,value} string pairs (not an open map) so the
  * structured-output format stays a closed schema; import.service folds them into a Record. JSON Schema
  * can't bound counts — import.service validates/cleans. Every object needs additionalProperties:false.
- * With `withChanges` (backfill, ADR-018) the schema also requires the two change arrays.
+ * Mode (ADR-035): 'capture' emits entities + notes + statusChanges (rel/field arrays are OMITTED — the
+ * closed schema means the model cannot emit them at all); 'full' requires all five.
  */
-function extractionSchema(withChanges: boolean): Record<string, unknown> {
+export function extractionSchema(mode: ExtractionMode): Record<string, unknown> {
   const schema: {
     type: string
     additionalProperties: boolean
@@ -899,63 +952,20 @@ function extractionSchema(withChanges: boolean): Record<string, unknown> {
           },
           required: ['content', 'entityRefs']
         }
-      }
+      },
+      statusChanges: { type: 'array', items: STATUS_CHANGE_ITEM }
     },
-    required: ['entities', 'notes']
+    required: ['entities', 'notes', 'statusChanges']
   }
-  if (withChanges) {
-    schema.properties.statusChanges = {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          entityRef: { type: 'string' },
-          lifecycle: { type: 'string', enum: [...LIFECYCLES] },
-          status: { type: 'string' }
-        },
-        required: ['entityRef', 'lifecycle']
-      }
-    }
-    schema.properties.relationshipChanges = {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          fromRef: { type: 'string' },
-          toRef: { type: 'string' },
-          relation: { type: 'string', enum: Object.keys(RELATIONS) },
-          action: { type: 'string', enum: ['form', 'sever'] },
-          description: { type: 'string' },
-          fromDisposition: { type: 'string' },
-          toDisposition: { type: 'string' },
-          confidence: { type: 'string', enum: [...NOTE_CONFIDENCES] }
-        },
-        required: ['fromRef', 'toRef', 'relation', 'action']
-      }
-    }
-    schema.properties.fieldChanges = {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          entityRef: { type: 'string' },
-          field: { type: 'string' },
-          op: { type: 'string', enum: ['add', 'cut', 'alter'] },
-          value: { type: 'string' },
-          oldValue: { type: 'string' }
-        },
-        required: ['entityRef', 'field', 'op', 'value', 'oldValue']
-      }
-    }
+  if (mode === 'full') {
+    schema.properties.relationshipChanges = { type: 'array', items: RELATIONSHIP_CHANGE_ITEM }
+    schema.properties.fieldChanges = { type: 'array', items: FIELD_CHANGE_ITEM }
     schema.required = ['entities', 'notes', 'statusChanges', 'relationshipChanges', 'fieldChanges']
   }
   return schema
 }
 
-/** An existing entity as surfaced to the extractor: id/name/type for LINKING, plus (withChanges) its
+/** An existing entity as surfaced to the extractor: id/name/type for LINKING, plus ('full' mode) its
  *  current traits/goals/flaws/attributes so a FIELD CHANGE cut/alter can copy the exact existing item. */
 export interface ExtractExistingEntity {
   id: string
@@ -973,7 +983,7 @@ export interface ExtractExistingEntity {
 export function buildExtractionUserContent(
   text: string,
   existing: ExtractExistingEntity[],
-  withChanges = false,
+  mode: ExtractionMode,
   backstorySubject?: { id: string; name: string }
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
@@ -986,9 +996,9 @@ export function buildExtractionUserContent(
       .slice(0, 100)
       .map((e) => {
         const base = `- ${e.id} · ${e.name} (${e.type})`
-        // Only for a change extraction, and only for entities the text references: append the CURRENT
+        // Only for a FULL extraction, and only for entities the text references: append the CURRENT
         // fields so a field-change cut/alter can copy the exact existing item verbatim.
-        if (!withChanges || !mentioned(e.name)) return base
+        if (mode !== 'full' || !mentioned(e.name)) return base
         const parts: string[] = []
         if (e.traits?.length) parts.push(`traits: ${e.traits.join(', ')}`)
         if (e.goals?.length) parts.push(`goals: ${e.goals.join(', ')}`)
@@ -1002,9 +1012,10 @@ export function buildExtractionUserContent(
       .join('\n')
     content.push({
       type: 'text',
-      text: withChanges
-        ? `Existing entities in this campaign — reference one by its id to LINK to it (instead of creating a duplicate) or to propose a FIELD CHANGE. Current traits/goals/flaws/attributes are shown so a cut/alter can copy the exact existing item:\n${list}`
-        : `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
+      text:
+        mode === 'full'
+          ? `Existing entities in this campaign — reference one by its id to LINK to it (instead of creating a duplicate) or to propose a FIELD CHANGE. Current traits/goals/flaws/attributes are shown so a cut/alter can copy the exact existing item:\n${list}`
+          : `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
     })
   }
   if (backstorySubject) {
@@ -1014,14 +1025,15 @@ export function buildExtractionUserContent(
     })
   }
   content.push({ type: 'text', text: `Raw text to extract from:\n\n${text}` })
-  const changesAsk = backstorySubject
+  const fullAsk = backstorySubject
     ? `Extract the entities, notes, status changes, relationship changes (especially ${backstorySubject.name}'s standing ties), and field changes as JSON.`
     : 'Extract the entities, notes, status changes, relationship changes, and field changes as JSON.'
   content.push({
     type: 'text',
-    text: withChanges
-      ? `${changesAsk} Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.`
-      : 'Extract the entities and notes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
+    text:
+      mode === 'full'
+        ? `${fullAsk} Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.`
+        : 'Extract the entities, notes, and status changes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
   })
   return content
 }
@@ -1031,28 +1043,175 @@ export interface ExtractChangesetParams {
   existing: ExtractExistingEntity[]
   model: string
   effort: 'medium' | 'high'
-  withChanges?: boolean // changeset v2 (backfill): also extract status/relationship changes
+  mode: ExtractionMode // tier split (ADR-035): 'capture' (note-taker) or 'full' (backstory only)
   backstorySubject?: { id: string; name: string } // ADR-030 v3: whose backstory the text is
   signal?: AbortSignal
 }
 
 /** Single-shot structured extraction. Returns the raw (UNVALIDATED) changeset; import.service cleans it. */
 export async function extractChangeset(params: ExtractChangesetParams): Promise<RawExtraction> {
-  const withChanges = params.withChanges ?? false
   return structuredObjectCall<RawExtraction>({
     model: params.model,
     effort: params.effort,
-    schema: extractionSchema(withChanges),
-    system: buildExtractionSystem(withChanges),
+    schema: extractionSchema(params.mode),
+    system: buildExtractionSystem(params.mode),
     content: buildExtractionUserContent(
       params.text,
       params.existing,
-      withChanges,
+      params.mode,
       params.backstorySubject
     ),
     // A full-session paste extracts into many entities + notes — a larger budget than the 8192 default
     // (shared with adaptive thinking) so a real-world paste doesn't truncate mid-JSON.
     maxTokens: 16384,
+    signal: params.signal
+  })
+}
+
+// ---- Illuminate: per-entity enrichment (tier 2, ADR-035) ----
+// One focused call per entity: given its CURRENT profile, its full note history, its live ties, and the
+// campaign roster, propose only relationship + field changes as a diff of what the history supports but
+// the profile doesn't yet reflect. Real ids only — enrichment never creates entities/notes/status.
+
+const ENRICH_INSTRUCTIONS = `You maintain ONE entity's profile and relationships in a tabletop RPG campaign tracker. You are given that entity's CURRENT profile (description, status, traits, goals, flaws, type attributes), its full recorded note history (oldest first — some notes tagged (rumored) or (suspected) are uncertain), its current LIVE relationships, and a roster of the campaign's other entities. Propose ONLY two kinds of change, as a DIFF of what the note history supports but the profile and ties do not yet reflect. Prefer fewer, well-evidenced changes; if the history supports nothing new, return two empty arrays — that is a normal outcome.
+
+RELATIONSHIP CHANGES {fromRef, toRef, relation, action}: "form" for a standing or newly-evidenced tie the live list is missing — family, friendship or mentorship, membership, ownership, residence, alliance, enmity, acquaintance. "sever" ONLY when the notes narrate an ending. NEVER re-propose a tie already in the live relationships list. For a "form" tie, also fill in, WHEN the notes support it: a short "description" (the why/when of the bond); "fromDisposition" and "toDisposition" — a few words on how each side FEELS about the other (fromDisposition = how the fromRef entity feels about the toRef entity; the two can differ, and either may be omitted); and "confidence" — "rumored" or "suspected" when the tie rests only on hearsay or a hunch, otherwise "confirmed" (the default). "sever" items take none of these.
+
+${RELATION_VOCAB_GLOSS}
+
+FIELD CHANGES {entityRef, field, op, value, oldValue}: field is "traits", "goals", or "flaws", one of this entity type's attribute keys, or "description" (the entity's short prose summary — use "alter" when the history has outgrown it). op: "add" a new value; "cut" one the notes contradict; "alter" to reword or replace one. For a LIST field, when cutting or altering copy the EXACT existing item into oldValue — verbatim from the profile shown. Leave value or oldValue as "" when not applicable.
+
+REFERENCES. Use REAL entity ids only, exactly as shown in the profile, relationships, and roster — never "#index". Never propose new entities, notes, or status changes; never change a name or type. Every fieldChanges item's entityRef is the subject entity's id; every relationshipChanges item must include the subject as one endpoint.`
+
+const ENRICH_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    relationshipChanges: { type: 'array', items: RELATIONSHIP_CHANGE_ITEM },
+    fieldChanges: { type: 'array', items: FIELD_CHANGE_ITEM }
+  },
+  required: ['relationshipChanges', 'fieldChanges']
+}
+
+/** The enrichment subject's current profile, as surfaced to the model (the verbatim source for
+ *  cut/alter oldValue copying). */
+export interface EnrichSubject {
+  id: string
+  name: string
+  type: string
+  description: string | null
+  status: string | null
+  lifecycle: Lifecycle
+  traits: string[]
+  goals: string[]
+  flaws: string[]
+  attributes: Record<string, unknown>
+}
+
+/** System prompt for Illuminate — one cacheable instructions block. */
+export function buildEnrichSystem(): Anthropic.TextBlockParam[] {
+  return [{ type: 'text', text: ENRICH_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
+}
+
+/**
+ * The user turn for one entity's enrichment: profile → live ties (id-bearing lines, built by
+ * enrich.service — sever must reference the far endpoint by REAL id, which formatRelationships'
+ * names-only lines can't express) → roster (ranked mentioned-first, capped) → note history (pre-capped,
+ * oldest first, confidence-tagged) → the ask.
+ */
+export function buildEnrichUserContent(
+  subject: EnrichSubject,
+  notes: { content: string; confidence: NoteConfidence }[],
+  tieLines: string | null,
+  existing: { id: string; name: string; type: string }[],
+  omittedNotes = 0
+): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = []
+
+  const mark =
+    subject.lifecycle === 'ended'
+      ? ' [ended]'
+      : subject.lifecycle === 'presumed_ended'
+        ? ' [presumed ended — unconfirmed]'
+        : ''
+  const profile: string[] = [`${subject.id} · ${subject.name} (${subject.type})${mark}`]
+  if (subject.description) profile.push(`description: ${subject.description}`)
+  if (subject.status) profile.push(`status: ${subject.status}`)
+  if (subject.traits.length) profile.push(`traits: ${subject.traits.join(', ')}`)
+  if (subject.goals.length) profile.push(`goals: ${subject.goals.join(', ')}`)
+  if (subject.flaws.length) profile.push(`flaws: ${subject.flaws.join(', ')}`)
+  for (const [k, v] of Object.entries(subject.attributes)) {
+    const s = Array.isArray(v) ? v.join(', ') : v == null ? '' : String(v)
+    if (s) profile.push(`${k}: ${s}`)
+  }
+  content.push({
+    type: 'text',
+    text: `The entity to maintain — its CURRENT profile (copy list items verbatim into oldValue when cutting/altering):\n${profile.map((l) => `- ${l}`).join('\n')}`
+  })
+
+  if (tieLines) {
+    content.push({
+      type: 'text',
+      text: `Its current LIVE relationships — never re-propose one of these; sever one only when the notes narrate its end:\n${tieLines}`
+    })
+  }
+
+  if (existing.length) {
+    // Rank roster entries mentioned in the note text first, then cap — bounded + relevant, like extraction.
+    const haystack = notes.map((n) => n.content.toLowerCase()).join('\n')
+    const mentioned = (name: string): boolean => haystack.includes(name.toLowerCase())
+    const list = [...existing]
+      .sort((a, b) => (mentioned(a.name) ? 0 : 1) - (mentioned(b.name) ? 0 : 1))
+      .slice(0, 100)
+      .map((e) => `- ${e.id} · ${e.name} (${e.type})`)
+      .join('\n')
+    content.push({
+      type: 'text',
+      text: `Other entities in the campaign — reference by id for relationship endpoints:\n${list}`
+    })
+  }
+
+  if (notes.length) {
+    const omitted = omittedNotes > 0 ? `(+${omittedNotes} earlier notes omitted)\n` : ''
+    const lines = notes.map((n) => `- ${n.content}${confidenceTag(n.confidence)}`).join('\n')
+    content.push({
+      type: 'text',
+      text: `Everything recorded about ${subject.name} (${notes.length} notes, oldest first):\n${omitted}${lines}`
+    })
+  }
+
+  content.push({
+    type: 'text',
+    text: `Propose the relationship changes and field changes for ${subject.name} that this history supports but the profile does not yet reflect, as JSON. Real ids only.`
+  })
+  return content
+}
+
+export interface EnrichCallParams {
+  subject: EnrichSubject
+  notes: { content: string; confidence: NoteConfidence }[]
+  tieLines: string | null
+  existing: { id: string; name: string; type: string }[]
+  omittedNotes?: number
+  model: string
+  effort: 'medium' | 'high'
+  signal?: AbortSignal
+}
+
+/** Single-shot per-entity enrichment. Returns the raw (UNVALIDATED) two arrays; enrich.service cleans. */
+export async function enrichChangeset(params: EnrichCallParams): Promise<RawEnrichment> {
+  return structuredObjectCall<RawEnrichment>({
+    model: params.model,
+    effort: params.effort,
+    schema: ENRICH_SCHEMA,
+    system: buildEnrichSystem(),
+    content: buildEnrichUserContent(
+      params.subject,
+      params.notes,
+      params.tieLines,
+      params.existing,
+      params.omittedNotes ?? 0
+    ),
     signal: params.signal
   })
 }

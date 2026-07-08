@@ -41,10 +41,11 @@ const ALL: Accept = {
  *   Step 1 (Profile): the derived profile FIELDS (description / traits / goals / flaws / voice) with
  *   per-field accept toggles; Apply writes the accepted fields (entity.update) then REBUILDS the persona
  *   via the one canonical generator (persona.generate).
- *   Step 2 (World): the backstory run through the shared changeset engine (useImport withChanges) —
- *   proposed NEW entities, notes, and relationship ties, reviewed in the same ChangesetReview that
- *   Chronicle/Transcribe use and applied UNDATED (sessionId null → pre-tracking / pre-campaign
- *   background, ADR-030). Field changes are stripped — the MC's fields are step 1's job.
+ *   Step 2 (World): the backstory run through the shared changeset engine (useImport mode:'full' —
+ *   the ONE remaining full-extraction caller, ADR-035) — proposed NEW entities, notes, and relationship
+ *   ties, reviewed in the same ChangesetReview that Chronicle/Transcribe use and applied UNDATED
+ *   (sessionId null → pre-tracking / pre-campaign background, ADR-030). Field changes are stripped —
+ *   the MC's fields are step 1's job.
  * Both passes run in parallel on open; either step can be skipped; nothing writes without approval.
  */
 export function DeriveReview({
@@ -64,7 +65,8 @@ export function DeriveReview({
 }) {
   const derive = useDeriveProfile()
   // The world pass is told WHOSE backstory it's reading (ADR-030 v3) — standing ties anchor to the MC.
-  const imp = useImport({ withChanges: true, backstorySubjectId: pcId })
+  // FULL mode (ADR-035): backstory step 2 is the one flow that still extracts ties + field changes.
+  const imp = useImport({ mode: 'full', backstorySubjectId: pcId })
   const [step, setStep] = useState<'profile' | 'world'>('profile')
   const [accept, setAccept] = useState<Accept>(ALL)
   const [busy, setBusy] = useState(false)

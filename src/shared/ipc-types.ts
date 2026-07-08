@@ -27,6 +27,7 @@ import type { DeriveProfileRequest, DeriveProfileResult } from './derive-profile
 import type { SuggestRequest, SuggestResult } from './suggest-types'
 import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
 import type { ApplyResult, ConfirmedChangeset, ExtractRequest, ExtractResult } from './import-types'
+import type { EnrichEntityRequest, EnrichEntityResult, TouchedEntity } from './enrich-types'
 import type { CampaignExportResult } from './export-types'
 
 // ---- Input payloads ----
@@ -222,6 +223,11 @@ export interface LedgerApi {
     extract(input: ExtractRequest): Promise<ExtractResult>
     apply(payload: ConfirmedChangeset): Promise<ApplyResult>
   }
+  /** Illuminate (tier-2 enrichment, ADR-035): the pre-flight checklist + one focused call per entity. */
+  enrich: {
+    touched(sessionId: string): Promise<TouchedEntity[]>
+    entity(req: EnrichEntityRequest): Promise<EnrichEntityResult>
+  }
   persona: {
     get(entityId: string): Promise<PersonaBrief | null>
     generate(entityId: string): Promise<PersonaBrief>
@@ -294,6 +300,8 @@ export const IPC = {
   deriveProfileQuery: 'derive-profile:query',
   importExtract: 'import:extract',
   importApply: 'import:apply',
+  enrichTouched: 'enrich:touched',
+  enrichEntity: 'enrich:entity',
   personaGet: 'persona:get',
   personaGenerate: 'persona:generate',
   personaUpdate: 'persona:update',

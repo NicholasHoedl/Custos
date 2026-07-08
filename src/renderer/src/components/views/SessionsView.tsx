@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, Check, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CalendarClock, Check, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -10,14 +10,16 @@ import { formatTime } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { EmptyState } from '@renderer/components/chrome'
 import { SessionRecap } from '@renderer/components/sessions/SessionRecap'
+import { EnrichDialog } from '@renderer/components/sessions/EnrichDialog'
 import {
   DeleteSessionDialog,
   EditSessionDialog
 } from '@renderer/components/sessions/SessionDialogs'
 
 // Sessions view (ADR-032): a browsable list of the campaign's sessions with their saved summaries, and a
-// detail pane hosting the Previously… recap + the session's chronicle entries. Distinct from the sidebar's
-// SessionControl, which switches the ACTIVE session for capture; here you browse and manage them all.
+// detail pane hosting the Previously… recap + the session's chronicle entries + the Illuminate pass
+// (tier-2 enrichment, ADR-035). Distinct from the Chronicle header's SessionControl, which switches the
+// ACTIVE session for capture; here you browse and manage them all.
 export function SessionsView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   if (!activeCampaignId) {
@@ -35,6 +37,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [enrichOpen, setEnrichOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const ordered = [...sessions].sort((a, b) => b.number - a.number)
@@ -121,6 +124,10 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                 {selected.date && <p className="text-sm text-muted-foreground">{selected.date}</p>}
               </div>
               <div className="flex shrink-0 gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEnrichOpen(true)}>
+                  <Sparkles className="size-3.5" />
+                  Illuminate
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="size-3.5" />
                   Edit
@@ -141,6 +148,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
 
             <ChronicleEntries sessionId={selected.id} />
 
+            <EnrichDialog session={selected} open={enrichOpen} onOpenChange={setEnrichOpen} />
             <EditSessionDialog
               session={selected}
               open={editOpen}

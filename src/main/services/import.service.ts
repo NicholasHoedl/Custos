@@ -78,7 +78,7 @@ export async function extract(
       })),
       model: suggestModel,
       effort: suggestEffort,
-      withChanges: req.withChanges,
+      mode: req.mode ?? 'capture',
       backstorySubject: subject ? { id: subject.id, name: subject.name } : undefined,
       signal
     })
@@ -252,7 +252,7 @@ function validateExtraction(
     })
   }
 
-  // ---- Changeset v2 (ADR-018): status + relationship changes (absent unless withChanges) ----
+  // ---- Changeset v2 (ADR-018/035): status changes (both modes) + tie/field changes ('full' only) ----
 
   const refKey = (r: EntityRef): string => (r.kind === 'new' ? `n${r.index}` : `e${r.entityId}`)
   // Type lookup for relation allowedness: proposed entities by canonical index, existing by id.
@@ -293,21 +293,60 @@ function validateExtraction(
     statusChanges.push({ entityRef: ref, lifecycle, status })
   }
 
-  // 7) Relationship changes: both refs must resolve and differ; the relation must be a known key and
-  //    (when FORMING) allowed between the two types. Severing skips the type check — a legacy edge
-  //    should stay severable, and severing a non-existent edge is a no-op at apply time anyway.
+  // 7+8) Relationship + field changes: validated by the shared change validators (factored out for
+  //      Illuminate/enrich reuse, ADR-035) over a ctx built from this extraction's closures.
+  const changeCtx: ChangeValidationCtx = {
+    resolveRef,
+    refKey,
+    typeOfRef,
+    entityByRef: (r) =>
+      r.kind === 'existing' ? (existing.find((e) => e.id === r.entityId) ?? null) : null,
+    isLiveLink: (fromId, toId, relation) => findOpenLink(ctx, fromId, toId, relation) !== null
+  }
+  const relationshipChanges = validateRelationshipChanges(raw.relationshipChanges, changeCtx)
+  const fieldChanges = validateFieldChanges(raw.fieldChanges, changeCtx)
+
+  return { entities, notes, statusChanges, relationshipChanges, fieldChanges }
+}
+
+/**
+ * The lookups the change validators need — built by validateExtraction (import: "#index" + real-id refs)
+ * and by enrich.service (real-id-only refs). Factored out (ADR-035) so tier 2 reuses the exact ADR-031/033
+ * validation rules without the entity/note machinery.
+ */
+export interface ChangeValidationCtx {
+  resolveRef: (ref: string) => EntityRef | null
+  refKey: (r: EntityRef) => string
+  typeOfRef: (r: EntityRef) => EntityType | null
+  /** The CURRENT existing entity behind a ref — null for a proposed-new ref. */
+  entityByRef: (r: EntityRef) => Entity | null
+  /** Whether an equivalent OPEN edge already exists (wraps findOpenLink, incl. inverse direction). */
+  isLiveLink: (fromId: string, toId: string, relation: RelationKey) => boolean
+}
+
+/**
+ * Relationship changes: both refs must resolve and differ; the relation must be a known key and
+ * (when FORMING) allowed between the two types. Severing skips the type check — a legacy edge
+ * should stay severable, and severing a non-existent edge is a no-op at apply time anyway.
+ * ADR-031: an already-live tie between existing entities is dropped; intra-batch dupes are
+ * direction-aware. ADR-033: form ties carry capped description/dispositions + snapped confidence.
+ */
+export function validateRelationshipChanges(
+  raw: RawExtraction['relationshipChanges'],
+  v: ChangeValidationCtx
+): ProposedRelationshipChange[] {
   const relationshipChanges: ProposedRelationshipChange[] = []
   const seenRel = new Set<string>()
-  for (const rc of raw.relationshipChanges ?? []) {
+  for (const rc of raw ?? []) {
     if (!rc || typeof rc.fromRef !== 'string' || typeof rc.toRef !== 'string') continue
     if (typeof rc.relation !== 'string' || !isRelationKey(rc.relation)) continue
     if (rc.action !== 'form' && rc.action !== 'sever') continue
-    const fromRef = resolveRef(rc.fromRef)
-    const toRef = resolveRef(rc.toRef)
-    if (!fromRef || !toRef || refKey(fromRef) === refKey(toRef)) continue
+    const fromRef = v.resolveRef(rc.fromRef)
+    const toRef = v.resolveRef(rc.toRef)
+    if (!fromRef || !toRef || v.refKey(fromRef) === v.refKey(toRef)) continue
     if (rc.action === 'form') {
-      const ft = typeOfRef(fromRef)
-      const tt = typeOfRef(toRef)
+      const ft = v.typeOfRef(fromRef)
+      const tt = v.typeOfRef(toRef)
       if (!ft || !tt || !isRelationAllowed(rc.relation, ft, tt)) continue
       // ADR-031: a tie that's ALREADY live between two existing entities is a no-op (createLink is
       // idempotent, incl. the inverse authoring direction) — drop it instead of re-proposing it on
@@ -315,14 +354,14 @@ function validateExtraction(
       if (
         fromRef.kind === 'existing' &&
         toRef.kind === 'existing' &&
-        findOpenLink(ctx, fromRef.entityId, toRef.entityId, rc.relation)
+        v.isLiveLink(fromRef.entityId, toRef.entityId, rc.relation)
       ) {
         continue
       }
     }
     // Intra-batch dedup, DIRECTION-AWARE (ADR-031): "A ally_of B" + "B ally_of A" (symmetric), and
     // "A located_in B" + "B contains A" (directed pair), are the same edge — canonicalize before keying.
-    const key = `${canonicalRelKey(refKey(fromRef), refKey(toRef), rc.relation)}:${rc.action}`
+    const key = `${canonicalRelKey(v.refKey(fromRef), v.refKey(toRef), rc.relation)}:${rc.action}`
     if (seenRel.has(key)) continue
     seenRel.add(key)
     // Tie enrichment (ADR-033) — only meaningful on a FORM (a new edge carries the metadata; sever closes
@@ -344,17 +383,26 @@ function validateExtraction(
       confidence
     })
   }
+  return relationshipChanges
+}
 
-  // 8) Field changes: add/cut/alter a promoted list (traits/goals/flaws) or a type attribute on an
-  //    EXISTING entity. A #index (proposed) ref is dropped — a new entity carries its fields already.
-  //    For a LIST cut/alter, oldValue must match a CURRENT item (no silent no-ops); "" coerces to null.
+/**
+ * Field changes: add/cut/alter a promoted list (traits/goals/flaws), the DESCRIPTION (a real scalar
+ * column — ADR-035; previously it silently misrouted into the attributes bag), or a type attribute on
+ * an EXISTING entity. A #index (proposed) ref is dropped — a new entity carries its fields already.
+ * For a LIST cut/alter, oldValue must match a CURRENT item (no silent no-ops); "" coerces to null.
+ */
+export function validateFieldChanges(
+  raw: RawExtraction['fieldChanges'],
+  v: ChangeValidationCtx
+): ProposedFieldChange[] {
   const fieldChanges: ProposedFieldChange[] = []
   const seenField = new Set<string>()
-  for (const fc of raw.fieldChanges ?? []) {
+  for (const fc of raw ?? []) {
     if (!fc || typeof fc.entityRef !== 'string') continue
-    const ref = resolveRef(fc.entityRef)
+    const ref = v.resolveRef(fc.entityRef)
     if (!ref || ref.kind !== 'existing') continue
-    const ent = existing.find((e) => e.id === ref.entityId)
+    const ent = v.entityByRef(ref)
     if (!ent) continue
     const field = strOrUndef(fc.field)
     if (!field) continue
@@ -363,9 +411,11 @@ function validateExtraction(
     const value = strOrUndef(fc.value) ?? null
     const oldValue = strOrUndef(fc.oldValue) ?? null
 
-    const isPromoted = field === 'traits' || field === 'goals' || field === 'flaws'
+    const isDescription = field === 'description'
+    const isPromoted = !isDescription && (field === 'traits' || field === 'goals' || field === 'flaws')
     if (isPromoted && !profileFor(ent.type)[field as 'traits' | 'goals' | 'flaws']) continue
-    const profField = isPromoted ? null : profileFor(ent.type).fields.find((f) => f.key === field)
+    const profField =
+      isPromoted || isDescription ? null : profileFor(ent.type).fields.find((f) => f.key === field)
     const isList = isPromoted || profField?.kind === 'list'
     const current: string[] = isPromoted
       ? ent[field as 'traits' | 'goals' | 'flaws']
@@ -374,7 +424,11 @@ function validateExtraction(
         : []
 
     // Scalar no-ops (ADR-031): setting the value already there, or clearing an empty key, is noise.
-    const scalarCurrent = isList ? null : String(ent.attributes[field] ?? '')
+    const scalarCurrent = isList
+      ? null
+      : isDescription
+        ? (ent.description ?? '')
+        : String(ent.attributes[field] ?? '')
     if (op === 'add') {
       if (!value) continue
       if (isList && current.includes(value)) continue // already present
@@ -394,8 +448,7 @@ function validateExtraction(
     seenField.add(key)
     fieldChanges.push({ entityRef: ref, field, op, value, oldValue })
   }
-
-  return { entities, notes, statusChanges, relationshipChanges, fieldChanges }
+  return fieldChanges
 }
 
 function strOrUndef(v: unknown): string | undefined {
@@ -642,8 +695,14 @@ function applyListOp(
 }
 
 /** Compute the updateEntity patch for a confirmed field change (list op on traits/goals/flaws or a
- *  list-kind attribute; set/clear for a scalar attribute). Returns null when the change can't apply. */
+ *  list-kind attribute; set/clear for the description or a scalar attribute). Returns null when the
+ *  change can't apply. */
 function fieldChangePatch(ent: Entity, fc: ConfirmedFieldChange): UpdateEntityInput | null {
+  // Description is a REAL scalar column (ADR-035) — write it directly, never the attributes bag.
+  if (fc.field === 'description') {
+    if (fc.op === 'cut') return { description: null }
+    return fc.value ? { description: fc.value } : null
+  }
   if (fc.field === 'traits' || fc.field === 'goals' || fc.field === 'flaws') {
     const next = applyListOp(ent[fc.field], fc.op, fc.value, fc.oldValue)
     if (!next) return null

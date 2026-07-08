@@ -48,25 +48,37 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   Recall "Sources" list handle null-entity chunks. But paste-and-extract **Import deliberately still
   requires ≥1 entity per note** (an untagged extracted note is noise); don't "relax" the extraction
   prompt to allow untagged notes.
-- **Changeset field changes are existing-only + un-versioned** (ADR-028). Chronicle/Transcribe extraction
-  (`withChanges`) proposes a fourth change kind — add/cut/alter to an *existing* entity's
-  `traits`/`goals`/`flaws` or a per-type attribute — alongside status/relationship changes. Apply is a
-  plain `updateEntity` inside the batch txn (NO status-history row; NOT chronology-versioned) that
-  re-reads per change and recomputes the whole list/object (updateEntity REPLACES), so intra-batch edits
-  to one field compound. `validateExtraction` drops `#index` (new) refs, off-profile fields
-  (`profileFor`), and list cut/alter whose `oldValue` doesn't match a current item;
-  `buildExtractionUserContent` surfaces current fields ONLY for text-mentioned entities and ONLY when
-  `withChanges`. **No migration** (reuses existing columns). Relationship items are proposed for
-  **STANDING ties** the text establishes (family/membership/ownership/residence — `CHANGES_INSTRUCTIONS`
-  glosses the relation vocabulary, `related_to` = family), not just narrated form/sever; the backstory
-  flow passes `backstorySubjectId` so ties anchor to the MC (ADR-030 v3). **Dedup (ADR-031):**
-  `validateExtraction` drops verbatim-duplicate notes (normalized, vs existing notes + intra-batch) and
-  flags near-dupes (`possibleDuplicate` → review seeds them OFF with a badge), drops `form` ties whose
-  live edge already exists (`findOpenLink`) + direction-equivalent intra-batch dupes (`canonicalRelKey`),
-  and drops status/scalar-field no-ops — re-running the same text yields a near-empty changeset.
-  Extracted statuses SNAP to the type's curated presets (case-insensitive → canonical label + the
-  preset's EXPLICIT lifecycle, the only path to `presumed_ended`; `STATUS_VOCAB` in the prompt is
-  generated from `ENTITY_PROFILES`; free text stays allowed).
+- **Two-tier extraction (ADR-035): `ExtractionMode = 'capture' | 'full'`** replaced the old `withChanges`
+  boolean. **'capture'** (the Chronicle **close-out wizard** + the Transcribe dialog) proposes entities +
+  notes + **statusChanges ONLY** — the schema *omits* the tie/field arrays (closed schema; the model
+  can't emit them) and the roster context carries no current fields. Status stays in tier 1 because it
+  drives as-of chronology (ADR-017). **Chronicle entries save as PLAIN log lines — no per-entry AI**:
+  extraction runs when the user clicks **"Close out session"** (`capture/CloseOutDialog.tsx`), a LOCKED
+  wizard (Esc/overlay/X inert; exit only via Approve/Reject-with-confirm, or Close on hard failure) that
+  joins the session's entries oldest-first, runs ONE tier-1 extraction, applies it stamped at the
+  session, then **chains into Illuminate** (scan runs post-apply so it sees the fresh notes). Its review
+  is the shared `ChangesetReview` with opt-in volume props (`bulk` tri-state per-section toggles +
+  `density="compact"`); other callers pass neither and are unchanged. **'full'** (all five arrays) has exactly ONE caller: backstory step 2 (`DeriveReview`, with
+  `backstorySubjectId` so standing ties anchor to the MC — ADR-030 v3). Ties + field changes otherwise
+  come from **"Illuminate"** (code name `enrich`) — the manual per-session tier-2 pass on the Sessions
+  view: checklist of the session's touched entities (from `listNotesForSession` entityIds) → ONE focused
+  call per entity (`enrich.service` → `enrichChangeset`; grounding = full note history capped 30 +
+  current profile + id-bearing live-tie lines + roster) proposing ONLY relationship/field changes with
+  **REAL-ID refs** (never `#index`; never new entities/notes/status/type) → renderer merges (cross-entity
+  tie dedup via `inverseKey`, `use-enrich`) → shared `ChangesetReview` → ONE `import.apply` stamped at
+  the enriched session (ties open intervals at N). Field changes stay existing-only + un-versioned
+  (ADR-028): plain `updateEntity` in the batch txn, re-read per change so intra-batch edits compound;
+  **`description` is now a legal field-change target writing the REAL column** (it used to misroute into
+  `attributes` — fixed). Enrich post-filters: subject-only + field whitelist (`description|traits|goals|
+  flaws` ∪ `profileKeys(type)`). The tie/field validators are FACTORED (`validateRelationshipChanges` /
+  `validateFieldChanges` over `ChangeValidationCtx`) and shared by both paths — **Dedup (ADR-031)** rules
+  ride along: verbatim-dupe notes dropped, near-dupes flagged (`possibleDuplicate` → seeded OFF), live
+  `form` ties dropped (`findOpenLink`) + direction-equivalent intra-batch dupes (`canonicalRelKey`),
+  status/scalar no-ops dropped — re-running the same text OR re-Illuminating a session yields a
+  near-empty changeset. An EMPTY per-entity enrichment is `ok:true` (the sweep steady-state), unlike
+  extract's `'empty'` failure. Extracted statuses SNAP to the type's curated presets (case-insensitive →
+  canonical label + the preset's EXPLICIT lifecycle, the only path to `presumed_ended`; `STATUS_VOCAB` is
+  generated from `ENTITY_PROFILES`; free text stays allowed). **No migration** (mode is TS-level).
 - **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` /
   `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
   `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,
@@ -76,14 +88,20 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
   populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
   fields but is test-only; `getHierarchy` ignores them (structural).
-- **UI label ↔ code name (ADR-024/032):** the nav labels are Character · Chronicle · **Sessions** · Codex ·
-  **Lore** · **Counsel** · Converse · **Transcribe** · Settings; the code names stay `recall` (Lore),
-  `suggest` (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe). Sessions +
-  Transcribe are TOP-LEVEL views (ADR-032 promoted them out of Codex, which is now Inscribe + Annals only);
-  Previously…/recap lives in the Sessions view (`SessionsView` + `components/sessions/SessionRecap`). The
-  assistant is **"the Keeper"** in-app; "Claude"/Anthropic only in Settings + onboarding. Shared failure
-  copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes `bad_key` from `no_key`); the
-  Character page's derive tool is user-labeled **"Draft from backstory"**.
+- **UI label ↔ code name (ADR-024/032/036):** the nav labels are Character · Chronicle · **Sessions** ·
+  Codex · **Lore** · **Counsel** · Converse · Settings; the code names stay `recall` (Lore), `suggest`
+  (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate).
+  **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
+  (`capture/TranscribeDialog.tsx`; `views/ImportView.tsx` is deleted, `'import'` left `ViewKey`). The
+  Chronicle header hosts THREE controls: the **active-session selector** (`sessions/SessionControl.tsx`,
+  extracted from the Sidebar; its auto-select-latest effect still runs app-wide because MainPanel keeps
+  views mounted) · **Transcribe** · **"Close out session"** (`capture/CloseOutDialog.tsx`, the ADR-035
+  ritual). **"Illuminate"** (`sessions/EnrichDialog.tsx`; row pieces shared via `sessions/enrich-rows.tsx`)
+  is ALSO a standalone per-session button in the SessionsView detail header (the surgical re-run). Codex is Inscribe + Annals only; Annals shows a read-only "Filing
+  under Session N" hint (it stamps `note.sessionId = activeSessionId`). Previously…/recap lives in the
+  Sessions view. The assistant is **"the Keeper"** in-app; "Claude"/Anthropic only in Settings +
+  onboarding. Shared failure copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes
+  `bad_key` from `no_key`); the Character page's derive tool is user-labeled **"Draft from backstory"**.
 - **Three AI lenses, two shapes.** Recall (**Lore**) *streams* prose with citations; Suggest (**Counsel**)
   and Converse (ADR-025, reshaped by **ADR-034**) are *single-shot structured* — `structuredArrayCall` → a
   discriminated-union result, no stream, no citations. Converse now emits **questions ONLY** (no briefing): a
@@ -116,8 +134,9 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `CharacterDashboard.tsx` — NOT an `EntityDetail` reuse — with silent blur-autosave text fields
   [attributes re-read fresh before writing since updateEntity REPLACES], promoted lists edited via a
   per-card `ListEditDialog` popup [read-only chips otherwise], and a backstory-coupled **two-step Suggest**:
-  step 1 = profile fields, step 2 = world entities/notes/ties via `useImport({withChanges:true})` +
-  `ChangesetReview`, applied UNDATED — an EXPLICIT `sessionId: null` now means PRE-TRACKING in
+  step 1 = profile fields, step 2 = world entities/notes/ties via `useImport({mode:'full'})` (the ONE
+  remaining full-extraction caller, ADR-035) + `ChangesetReview`, applied UNDATED — an EXPLICIT
+  `sessionId: null` now means PRE-TRACKING in
   `createEntity`/`createLink`/`updateEntity` (`undefined` keeps the latest-session fallback); plus a
   picker to set/re-designate it). Codex still lists the MC (★) but selecting it shows a redirect card to the
   Character page (`CaptureView`), so the persona/derive UI lives only there. **Persona is ONE canonical

@@ -3,10 +3,10 @@ import { useAppStore } from '@renderer/store/app-store'
 import { OnboardingChecklist } from '@renderer/components/OnboardingChecklist'
 import { EventFeed } from '@renderer/components/capture/EventFeed'
 
-// The Journal is the primary at-the-table view (ADR: main character + journal-driven capture): a running
-// log of what happened, each entry turned into entities/notes/changes by Claude for inline review (see
-// EventFeed). Promoted to a top-level, default view so capture-by-writing is the main path; manual entity
-// editing lives in Codex. EventFeed is the sole host of the journal (Chronicle) now.
+// The Journal is the primary at-the-table view: a running log of plain entries (no per-entry AI —
+// extraction is the header's "Close out session" wizard, ADR-035 as-built; see EventFeed/CloseOutDialog).
+// Promoted to a top-level, default view so capture-by-writing is the main path; manual entity editing
+// lives in Codex. EventFeed is the sole host of the journal (Chronicle) now.
 export function JournalView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
@@ -25,7 +25,7 @@ export function JournalView() {
     )
   }
 
-  // Key by campaign so a pending extraction review never survives a campaign switch (its entity refs
-  // belong to the old campaign). Mirrors how CaptureView keys its panels.
+  // Key by campaign so per-campaign UI state (open dialogs, composer text) never survives a campaign
+  // switch. Mirrors how CaptureView keys its panels.
   return <EventFeed key={activeCampaignId} sessionId={activeSessionId} restoring={restoringSession} />
 }

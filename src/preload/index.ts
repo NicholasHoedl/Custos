@@ -101,6 +101,10 @@ const api: LedgerApi = {
     extract: (input) => ipcRenderer.invoke(IPC.importExtract, input),
     apply: (payload) => ipcRenderer.invoke(IPC.importApply, payload)
   },
+  enrich: {
+    touched: (sessionId) => ipcRenderer.invoke(IPC.enrichTouched, sessionId),
+    entity: (req) => ipcRenderer.invoke(IPC.enrichEntity, req)
+  },
   persona: {
     get: (entityId) => ipcRenderer.invoke(IPC.personaGet, entityId),
     generate: (entityId) => ipcRenderer.invoke(IPC.personaGenerate, entityId),

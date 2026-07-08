@@ -173,7 +173,7 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
       relationshipChanges: []
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.statusChanges).toEqual([
@@ -209,7 +209,7 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
       ]
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.relationshipChanges).toEqual([
@@ -248,7 +248,7 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
       statusChanges: [{ entityRef: '#1', lifecycle: 'ended', status: 'Dead' }],
       relationshipChanges: []
     })
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.statusChanges[0].entityRef).toEqual({ kind: 'new', index: 0 })
@@ -264,7 +264,7 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
       statusChanges: [{ entityRef: npc.id, lifecycle: 'ended', status: 'Dead' }],
       relationshipChanges: []
     })
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true) // a lone status change is a real proposal
 
     // Plain-import shape (no change arrays at all) still validates, with empty change arrays.
@@ -338,7 +338,7 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       ]
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.relationshipChanges).toEqual([
@@ -384,7 +384,7 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       ]
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.relationshipChanges).toHaveLength(2)
@@ -404,7 +404,7 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       relationshipChanges: []
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.statusChanges).toHaveLength(1)
@@ -432,7 +432,7 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       relationshipChanges: []
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.statusChanges).toEqual([
@@ -477,7 +477,7 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       ]
     })
 
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.fieldChanges).toHaveLength(1)
@@ -518,7 +518,7 @@ describe('import.service — tie enrichment (ADR-033)', () => {
         }
       ]
     })
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     const [form, sever] = res.proposal.relationshipChanges
@@ -550,7 +550,7 @@ describe('import.service — tie enrichment (ADR-033)', () => {
         { fromRef: a.id, toRef: b.id, relation: 'knows', action: 'form', confidence: 'definitely' }
       ]
     })
-    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.relationshipChanges[0].confidence).toBe('confirmed')
@@ -592,7 +592,7 @@ describe('import.service — changeset v2 field changes (ADR-028)', () => {
       ]
     })
 
-    const res = await extract(ctx, { campaignId, text: 'Glasstaff and the Nothic', withChanges: true }, sig())
+    const res = await extract(ctx, { campaignId, text: 'Glasstaff and the Nothic', mode: 'full' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.fieldChanges).toEqual([

@@ -8,6 +8,7 @@ import type {
   ConfirmedRelationshipChange,
   ConfirmedStatusChange,
   ExtractFailureReason,
+  ExtractionMode,
   ExtractionProposal,
   ProposedEntity
 } from '@shared/import-types'
@@ -35,11 +36,11 @@ function seedEntity(p: ProposedEntity): ConfirmedEntity {
 
 /**
  * Two-phase import: extract (Claude) → editable review draft → apply (one transaction).
- * With `withChanges` (backfill, ADR-018) extraction also proposes status/relationship changes, and
- * `apply` accepts a session override (roster → session 1; beats → the session under review) instead
- * of the app's active session.
+ * `mode` (ADR-035): 'capture' (default — entities + notes + status; Chronicle/Transcribe) or 'full'
+ * (all five arrays incl. ties + field changes; the backstory wizard only). `apply` accepts a session
+ * override (an explicit null = undated/pre-tracking) instead of the app's active session.
  */
-export function useImport(opts?: { withChanges?: boolean; backstorySubjectId?: string }): {
+export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: string }): {
   status: ImportStatus
   proposal: ExtractionProposal | null
   entities: ConfirmedEntity[]
@@ -59,7 +60,7 @@ export function useImport(opts?: { withChanges?: boolean; backstorySubjectId?: s
   apply: (sessionIdOverride?: string | null) => void
   reset: () => void
 } {
-  const withChanges = opts?.withChanges ?? false
+  const mode = opts?.mode ?? 'capture'
   const backstorySubjectId = opts?.backstorySubjectId
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [proposal, setProposal] = useState<ExtractionProposal | null>(null)
@@ -82,7 +83,7 @@ export function useImport(opts?: { withChanges?: boolean; backstorySubjectId?: s
       setError(null)
       setResult(null)
       ledger.import
-        .extract({ campaignId: activeCampaignId, text, withChanges, backstorySubjectId })
+        .extract({ campaignId: activeCampaignId, text, mode, backstorySubjectId })
         .then((res) => {
           if (!res.ok) {
             setStatus('idle')
@@ -114,7 +115,7 @@ export function useImport(opts?: { withChanges?: boolean; backstorySubjectId?: s
           setError(String(e))
         })
     },
-    [activeCampaignId, withChanges, backstorySubjectId]
+    [activeCampaignId, mode, backstorySubjectId]
   )
 
   const apply = useCallback(
