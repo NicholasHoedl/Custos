@@ -36,7 +36,16 @@ export interface RawExtraction {
   /** Changeset v2 (withChanges only): state changes the text narrates, e.g. a death or a completion. */
   statusChanges?: { entityRef: string; lifecycle?: string; status?: string }[]
   /** Changeset v2 (withChanges only): relationships that formed or ended during the described events. */
-  relationshipChanges?: { fromRef: string; toRef: string; relation: string; action: string }[]
+  relationshipChanges?: {
+    fromRef: string
+    toRef: string
+    relation: string
+    action: string
+    description?: string
+    fromDisposition?: string
+    toDisposition?: string
+    confidence?: string
+  }[]
   /** Changeset v2+ (withChanges only): edits to an EXISTING entity's fields (traits/goals/flaws/attributes). */
   fieldChanges?: { entityRef: string; field?: string; op?: string; value?: string; oldValue?: string }[]
 }
@@ -83,6 +92,11 @@ export interface ProposedRelationshipChange {
   toRef: EntityRef
   relation: RelationKey
   action: 'form' | 'sever'
+  // Tie enrichment (ADR-033) — only meaningful for `form` (a new edge carries these; sever just closes one).
+  description?: string | null
+  fromDisposition?: string | null
+  toDisposition?: string | null
+  confidence?: NoteConfidence
 }
 
 export type FieldChangeOp = 'add' | 'cut' | 'alter'
@@ -155,6 +169,10 @@ export interface ConfirmedRelationshipChange {
   relation: RelationKey
   action: 'form' | 'sever'
   include: boolean
+  description?: string | null
+  fromDisposition?: string | null
+  toDisposition?: string | null
+  confidence?: NoteConfidence
 }
 
 export interface ConfirmedFieldChange {

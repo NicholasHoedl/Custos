@@ -55,6 +55,30 @@ describe('link.service', () => {
     expect(() => updateLink(ctx, 'nope', { description: 'x' })).toThrow()
   })
 
+  it('persists + edits directional disposition and confidence (ADR-033); defaults confidence to confirmed', () => {
+    const mira = createEntity(ctx, { campaignId, type: 'npc', name: 'Mira' })
+    const l = createLink(ctx, {
+      campaignId,
+      fromEntityId: aldric.id,
+      toEntityId: mira.id,
+      relation: 'related_to',
+      fromDisposition: 'protective, guilty',
+      toDisposition: 'adoring'
+    })
+    expect(l.fromDisposition).toBe('protective, guilty')
+    expect(l.toDisposition).toBe('adoring')
+    expect(l.confidence).toBe('confirmed') // default when omitted
+
+    // Edit disposition + confidence independently of description; the interval is untouched.
+    const up = updateLink(ctx, l.id, { toDisposition: 'resentful', confidence: 'rumored' })
+    expect(up.toDisposition).toBe('resentful')
+    expect(up.fromDisposition).toBe('protective, guilty') // unchanged (not in the patch)
+    expect(up.confidence).toBe('rumored')
+    expect(up.startSessionNumber).toBe(l.startSessionNumber)
+    // Clearing a disposition to blank normalizes to null.
+    expect(updateLink(ctx, l.id, { fromDisposition: '  ' }).fromDisposition).toBeNull()
+  })
+
   it('rejects a relation not allowed between the two types', () => {
     expect(() =>
       createLink(ctx, { campaignId, fromEntityId: aldric.id, toEntityId: inn.id, relation: 'owns' })

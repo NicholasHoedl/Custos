@@ -325,7 +325,24 @@ function validateExtraction(
     const key = `${canonicalRelKey(refKey(fromRef), refKey(toRef), rc.relation)}:${rc.action}`
     if (seenRel.has(key)) continue
     seenRel.add(key)
-    relationshipChanges.push({ fromRef, toRef, relation: rc.relation, action: rc.action })
+    // Tie enrichment (ADR-033) — only meaningful on a FORM (a new edge carries the metadata; sever closes
+    // an existing one). Cap lengths; snap confidence to the note vocabulary (default confirmed).
+    const isForm = rc.action === 'form'
+    const cap = (s: string | undefined, n: number): string | null => strOrUndef(s)?.slice(0, n) ?? null
+    const confidence: NoteConfidence =
+      isForm && (rc.confidence === 'rumored' || rc.confidence === 'suspected')
+        ? rc.confidence
+        : 'confirmed'
+    relationshipChanges.push({
+      fromRef,
+      toRef,
+      relation: rc.relation,
+      action: rc.action,
+      description: isForm ? cap(rc.description, 240) : null,
+      fromDisposition: isForm ? cap(rc.fromDisposition, 120) : null,
+      toDisposition: isForm ? cap(rc.toDisposition, 120) : null,
+      confidence
+    })
   }
 
   // 8) Field changes: add/cut/alter a promoted list (traits/goals/flaws) or a type attribute on an
@@ -539,6 +556,10 @@ export function applyChangeset(
           fromEntityId: fromId,
           toEntityId: toId,
           relation: rc.relation,
+          description: rc.description ?? undefined,
+          fromDisposition: rc.fromDisposition ?? undefined,
+          toDisposition: rc.toDisposition ?? undefined,
+          confidence: rc.confidence,
           sessionId: batchSession
         })
         result.relationshipChangesApplied++

@@ -137,12 +137,12 @@ The MVP delivers all three pillars at their simplest viable form. It is a single
 - Suggest panel tied to active PC and campaign
 - Free-text situation input
 - RAG retrieval of relevant context
-- Claude Opus 4.8 (adaptive thinking + structured output) returns **4 attitude-based recommendations** — the model picks the 4 attitudes the PC is most likely to adopt and writes a unique in-character action for each *(shipped as **8 multi-tag options** + a **directions** mode — ADR-016; see §10)*
+- Claude Opus 4.8 (adaptive thinking + structured output) returns **4 attitude-based recommendations** — the model picks the 4 attitudes the PC is most likely to adopt and writes a unique in-character action for each *(shipped as **6 multi-tag options** + a **directions** mode — ADR-016/026; see §10)*
 - Results render as 4 distinct attitude cards
 - Graceful offline degradation (clear unavailable message)
 
 **Onboarding (first run)**
-- Explicit first-run onboarding step: enter the Anthropic API key and download the local embedding model (~25 MB) with visible progress, before AI features (Recall / Suggest) are enabled
+- Explicit first-run onboarding step: enter the Anthropic API key and download the local embedding model (~30 MB) with visible progress, before AI features (Lore / Counsel) are enabled
 
 **Settings**
 - API key entry and secure storage (Electron safeStorage)
@@ -285,8 +285,8 @@ feeds the persona, and by **surfacing** previously-invisible data to the AI — 
 `traits`/`goals`/`flaws` + combat/social-salient attributes (a creature's weakness/tactics, a faction's
 alignment), so structured data reaches Recall/Suggest, not just the free-text description.
 
-**Converse** (ADR-025) — a **third AI lens** beside Recall and Suggest (surfaced in the UI as Consult ·
-Counsel · Converse). Given the active PC (the asker) and a chosen **target** entity, one structured call
+**Converse** (ADR-025) — a **third AI lens** beside Recall and Suggest (surfaced in the UI as Lore ·
+Counsel · Converse; Recall→Lore per ADR-032). Given the active PC (the asker) and a chosen **target** entity, one structured call
 returns a short **briefing** — what's *known*, what's *open / suspected*, and the target's *connections* —
 then **in-character questions** the PC could ask to draw them out, each tagged with the thread it opens and
 why. It mirrors Suggest's single-shot structured pipeline but grounds by **direct fetch** (the target's
@@ -296,16 +296,18 @@ model setting — **no migration, no new settings**. Discovered-only: gaps and W
 
 **Current scene** (ADR-015; picker relocated to the Suggest pane in ADR-023; **Counsel-only + Time-of-Day dropped in ADR-027**) — a "present moment" (location, party present, the
 NPCs/factions being faced, the embarked quest, and a scene *mode*: combat / social / exploration /
-stealth / downtime / travel). It is pinned into grounding and steers **Suggest (Counsel) only** — Consult (Recall) is a scene-free out-of-character notes narrator.
+stealth / downtime / travel). It is pinned into grounding and steers **Suggest (Counsel) only** — Lore (Recall) is a scene-free out-of-character notes narrator.
 
 **Notes are many-to-many** — a note can be tagged to one OR many entities (via a `note_entity`
 join table), authored and managed from a Notes pane inside Capture.
 
-**Session Recap** (ADR-013) — a Capture pane that streams a neutral "Previously on…" of a chosen
-session, grounded in that session's journal entries + notes, and saves it to the session summary. This
-supersedes the "automated session summarization" non-goal listed in §4.
+**Session Recap** (ADR-013; **surfaced as "Previously…" in the top-level Sessions view, ADR-032**) —
+streams a neutral "Previously on…" of a chosen session, grounded in that session's chronicle entries +
+notes, and saves it to the session summary. This supersedes the "automated session summarization" non-goal
+listed in §4.
 
-**Paste-and-Extract Import** (ADR-014; extended in ADR-018/023) — a Capture pane that turns pasted text —
+**Paste-and-Extract Import** (ADR-014; extended in ADR-018/023; **a top-level Transcribe view since
+ADR-032**) — turns pasted text —
 session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes,
 status/relationship changes, and field changes** (add/cut/alter to an existing entity's
 traits/goals/flaws & attributes, ADR-028), applied in one transaction and **tied to a session you choose** (the
@@ -362,7 +364,7 @@ on Windows) and a signed **NSIS installer** (`npm run dist`).
 **Grim visual identity** (ADR-024) — the renderer was re-themed from the original cool cyan/slate to a grim
 dark-fantasy **"Ash & Ember"** palette (warm charcoal, bone, a dying-ember accent, dried-blood death), with
 an evocative-but-clear glossary (the AI is *the Keeper*; Recall / Suggest / Capture / Journal / Import
-surface as *Consult / Counsel / Codex / Chronicle / Transcribe*) and a **death motif** that turns the
+surface as *Lore / Counsel / Codex / Chronicle / Transcribe*, plus a top-level Sessions view — ADR-032) and a **death motif** that turns the
 lifecycle + note-confidence model into the visual language — a Fallen entity's name is struck through with a
 blood skull. Labels + tokens only, **no migration**; full as-built reference in `docs/design/theme.md`.
 
@@ -385,7 +387,7 @@ description/traits/goals/flaws/voice from a written backstory for **per-field ap
 **Character page + unified persona** (ADR-030) — a dedicated **Character** page (first in the navbar) is now
 the single home for the main character: set/re-designate it there and manage its full profile (the dashboard
 a bespoke two-column dashboard — text fields edit in place, the trait/goal/flaw/voice lists edit via
-per-card popup editors, and the AI workflow is front-and-center: **Suggest** (with an info popover) sits on
+per-card popup editors, and the AI workflow is front-and-center: **Draft from backstory** (with an info popover) sits on
 the backstory card — disabled with a hint when there's no backstory and until you change it after a run —
 and runs a **two-step review**: the profile fields, then **world material** (new people/places/factions,
 notes, and **standing relationship ties** — the extractor is told whose backstory it is) extracted from
@@ -410,6 +412,12 @@ assistant speaks as **"the Keeper"** everywhere but Settings; failure messages, 
 popovers are unified (Counsel gained one); **notes and relationship ties are editable in place**; and a
 handful of bugs closed (a global keyboard-shortcut leak, NPC flaws being write-only, the main-character
 search detour, a dead-end when a campaign had no session).
+
+**Tie enrichment** (ADR-033) — a relationship now carries **how each side feels** (a short free-text
+disposition, *per direction*, so "A is devoted to B while B merely tolerates A" is expressible) and an
+**epistemic confidence** (known / rumored / suspected, like notes). The in-character lenses (Counsel,
+Converse) read the asymmetric feeling; the Draft/Chronicle/Transcribe extractors propose it (plus the tie's
+description) for review; and the Ties list shows it inline and edits it in place. Migration 0010.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file

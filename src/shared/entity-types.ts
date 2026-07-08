@@ -116,6 +116,11 @@ export interface EntityLink {
   toEntityId: string
   relation: string // forward RelationKey (see @shared/relations)
   description: string | null // the "why/when" of the edge — the RAG-context lever
+  // Tie enrichment (ADR-033): how each endpoint FEELS about the other (short free-text, per direction so
+  // asymmetric feelings live on one edge); confidence mirrors note confidence so the AI can hedge.
+  fromDisposition: string | null // how `from` feels about `to`
+  toDisposition: string | null // how `to` feels about `from`
+  confidence: NoteConfidence // 'confirmed' | 'rumored' | 'suspected' (ADR-021 vocabulary)
   campaignId: string
   createdAt: number | null
   startSessionNumber: number | null // chronology: interval start; null = pre-tracking

@@ -106,9 +106,9 @@ export function ChangesetReview({
                 key={i}
                 change={c}
                 refName={refName}
-                onToggle={() =>
+                onPatch={(p) =>
                   imp.setRelationshipChanges((cs) =>
-                    cs.map((x, j) => (j === i ? { ...x, include: !x.include } : x))
+                    cs.map((x, j) => (j === i ? { ...x, ...p } : x))
                   )
                 }
               />

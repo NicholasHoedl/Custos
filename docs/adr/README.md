@@ -2,7 +2,7 @@
 
 This directory records the significant architecture decisions for **Ledger**, a local-first
 Electron desktop app for D&D narrative tracking with Claude-powered Recall (RAG) and a
-multi-attitude Suggest feature.
+multi-tag Counsel feature.
 
 Each ADR captures the **context**, the **options considered**, the **decision**, and its
 **consequences**. An ADR is immutable once **Accepted** — to change a decision, write a new
@@ -44,6 +44,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [030](030-character-page-unified-persona.md) | Character page (first-in-nav home for the main character) + unified single-canonical persona generator | Accepted | 2026-07-07 |
 | [031](031-changeset-dedup-hardening.md) | Changeset dedup hardening: near-duplicate notes, already-live ties, no-op changes | Accepted | 2026-07-08 |
 | [032](032-ux-consolidation.md) | UX consolidation: nav restructure (Sessions/Transcribe), naming (Lore, Draft, Keeper voice), shared failure copy, note/tie editability | Accepted | 2026-07-08 |
+| [033](033-tie-enrichment.md) | Tie enrichment: per-direction disposition + epistemic confidence (+ AI-populated descriptions), migration 0010 | Accepted | 2026-07-08 |
 
 ## Status legend
 

@@ -108,15 +108,23 @@ export interface CreateLinkInput {
   toEntityId: string
   relation: RelationKey
   description?: string
+  /** Tie enrichment (ADR-033): how each side feels (short free text, per direction) + epistemic weight. */
+  fromDisposition?: string | null
+  toDisposition?: string | null
+  confidence?: NoteConfidence // defaults to 'confirmed'
   /** Capture context: session to stamp the interval start at. `undefined` = latest-session fallback;
    *  EXPLICIT `null` = a pre-tracking interval (open since before session 1 — ADR-030 undated imports). */
   sessionId?: string | null
 }
 
-/** Edit an existing relationship's context description (ADR-032). The relation type + endpoints are
- *  immutable — changing those is semantically a sever + a new tie, so this touches description only. */
+/** Edit an existing relationship's context (ADR-032/033). The relation type + endpoints are immutable —
+ *  changing those is semantically a sever + a new tie — so this touches the description, the per-direction
+ *  dispositions, and the confidence only. Each field is applied only when present. */
 export interface UpdateLinkInput {
   description?: string | null
+  fromDisposition?: string | null
+  toDisposition?: string | null
+  confidence?: NoteConfidence
 }
 
 export interface EntitySearchResult {

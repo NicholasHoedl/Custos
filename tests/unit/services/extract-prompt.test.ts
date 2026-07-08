@@ -23,6 +23,13 @@ describe('extraction prompt — field changes (ADR-028)', () => {
     expect(plain).not.toMatch(/FIELD CHANGES/)
   })
 
+  it('the withChanges system asks for tie disposition + confidence (ADR-033)', () => {
+    const withChanges = buildExtractionSystem(true)[0].text
+    expect(withChanges).toMatch(/fromDisposition/)
+    expect(withChanges).toMatch(/how each side FEELS/)
+    expect(withChanges).toMatch(/rumored.*suspected/) // confidence hedging
+  })
+
   it('withChanges surfaces a MENTIONED entity’s current fields so a cut/alter can copy them verbatim', () => {
     const existing = [
       { id: 'e1', name: 'Glasstaff', type: 'npc', traits: ['Cautious'], goals: ['Guard the manor'] },

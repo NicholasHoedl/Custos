@@ -251,9 +251,10 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 
 **Goal:** In-character action recommendations during live play. The developer describes the current situation and receives **4 distinct attitude-based recommendations** — the model selects the 4 attitudes the active PC is most likely to adopt and writes a unique in-character action for each — via a Claude Opus 4.8 structured-output call (adaptive thinking), grounded in the PC's traits and campaign history.
 
-> **As shipped:** the 4-of-7 fixed-attitude model below was later superseded by **ADR-016** — Suggest
-> now returns **8 options** from a ~62-tag vocabulary (1 primary + ≤2 secondary tags), plus an
-> open-ended "what's next" directions mode. The text below is the historical plan.
+> **As shipped:** the 4-of-7 fixed-attitude model below was later superseded by **ADR-016** — Counsel
+> (formerly Suggest) now returns **6 options** (trimmed from 8 in ADR-026) from a multi-tag vocabulary
+> (1 primary + ≤2 secondary tags), plus an open-ended "what's next" directions mode. The text below is
+> the historical plan.
 
 ### Key Tasks
 
@@ -287,7 +288,7 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Playwright test: Suggest panel with a mocked structured response renders 4 attitude cards
 - Expected output: Tests pass; the 4-distinct-attitude contract is verified
 
-### Done Criteria for Phase 3 — ✅ all met *(as 4-of-7 originally; later evolved to 8 multi-tag options, ADR-016)*
+### Done Criteria for Phase 3 — ✅ all met *(as 4-of-7 originally; later evolved to 6 multi-tag options, ADR-016/026)*
 
 - [x] Developer can complete the "Suggest" user flow from SPEC.md (Flow D) end-to-end
 - [x] Active PC context (traits, goals) is included in the Suggest prompt
@@ -346,7 +347,7 @@ These are listed in approximate priority order for planning reference. None are 
 | M0 | Working Electron + React shell, DB connected, IPC bridge typed, design system in place, tests running | ✅ Shipped |
 | M1 | Full Capture workflow: all entity types, notes, links, quick-add, local search | ✅ Shipped |
 | M2 | Full Recall workflow: local embeddings, vector search, Claude-synthesized cited answers, offline degradation | ✅ Shipped |
-| M3 | Full Suggest workflow: attitude-based in-character recommendations (structured output), context-grounded | ✅ Shipped *(evolved to 8 multi-tag options, ADR-016)* |
+| M3 | Full Counsel workflow: attitude-based in-character recommendations (structured output), context-grounded | ✅ Shipped *(evolved to 6 multi-tag options, ADR-016/026)* |
 | MVP Complete | All three pillars working, testable, and usable at the table | ✅ Shipped — see SPEC §10 for what shipped beyond it |
 
 ---

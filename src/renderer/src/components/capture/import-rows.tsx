@@ -342,15 +342,22 @@ export function StatusChangeRow({
 export function RelationshipChangeRow({
   change,
   refName,
-  onToggle
+  onPatch
 }: {
   change: ConfirmedRelationshipChange
   refName: (r: EntityRef) => string
-  onToggle: () => void
+  onPatch: (patch: Partial<ConfirmedRelationshipChange>) => void
 }) {
   const isForm = change.action === 'form'
   const label = RELATIONS[change.relation]?.forward ?? change.relation
   const lineCls = isForm ? 'h-px bg-primary' : 'h-0 border-t border-dashed border-destructive/70'
+  // ADR-033: description is editable in review; disposition + confidence are shown (fine-tune post-apply).
+  const feelings = [
+    change.fromDisposition && `${refName(change.fromRef)} feels ${change.fromDisposition}`,
+    change.toDisposition && `${refName(change.toRef)} feels ${change.toDisposition}`
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
     <div
       className={cn(
@@ -359,7 +366,7 @@ export function RelationshipChangeRow({
       )}
     >
       <div className="flex items-start gap-3">
-        <Toggle on={change.include} onClick={onToggle} />
+        <Toggle on={change.include} onClick={() => onPatch({ include: !change.include })} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span
@@ -386,7 +393,22 @@ export function RelationshipChangeRow({
             <span className={isForm ? 'text-primary' : 'text-destructive'}>
               {isForm ? label : `no longer ${label}`}
             </span>
+            {isForm && change.confidence && change.confidence !== 'confirmed' && (
+              <span className="ml-1 text-metal">· {NOTE_CONFIDENCE_LABELS[change.confidence]}</span>
+            )}
           </div>
+          {isForm && (
+            <div className="mt-2 space-y-1">
+              <Input
+                value={change.description ?? ''}
+                onChange={(e) => onPatch({ description: e.target.value })}
+                disabled={!change.include}
+                placeholder="Why / context (optional)"
+                className="h-7 text-xs"
+              />
+              {feelings && <p className="text-[11px] text-muted-foreground">{feelings}</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>

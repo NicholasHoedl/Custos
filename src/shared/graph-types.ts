@@ -1,4 +1,4 @@
-import type { Entity, EntityLink, Note } from './entity-types'
+import type { Entity, EntityLink, Note, NoteConfidence } from './entity-types'
 
 export type LinkDirection = 'out' | 'in'
 
@@ -17,6 +17,12 @@ export interface ContextNeighbor {
   viaRelation: string
   viaLabel: string
   viaDescription: string | null
+  // ADR-033: the tie's enrichment, oriented for the seed entity (near = the seed's feeling about this
+  // neighbor, far = the neighbor's feeling about the seed). Kept consistent with EntityLink even though
+  // this seam is currently only exercised by tests (the live AI path is listForEntity → formatRelationships).
+  viaNearDisposition: string | null
+  viaFarDisposition: string | null
+  viaConfidence: NoteConfidence
   direction: LinkDirection
 }
 

@@ -66,6 +66,25 @@ describe('graph traversal', () => {
     expect(innEdge?.viaDescription).toBe('runs it')
   })
 
+  it('getEntityContext neighbor carries the tie disposition + confidence, oriented for the seed (ADR-033)', () => {
+    const aldric = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
+    const mira = createEntity(ctx, { campaignId, type: 'npc', name: 'Mira' })
+    createLink(ctx, {
+      campaignId,
+      fromEntityId: aldric.id,
+      toEntityId: mira.id,
+      relation: 'related_to',
+      fromDisposition: 'protective',
+      toDisposition: 'adoring',
+      confidence: 'rumored'
+    })
+    const n = getEntityContext(ctx, aldric.id, 1).neighbors.find((x) => x.entity.name === 'Mira')
+    // Seed (Aldric) is the `from`, so near = fromDisposition, far = toDisposition.
+    expect(n?.viaNearDisposition).toBe('protective')
+    expect(n?.viaFarDisposition).toBe('adoring')
+    expect(n?.viaConfidence).toBe('rumored')
+  })
+
   it('getEntityContext respects the depth bound', () => {
     const a = createEntity(ctx, { campaignId, type: 'npc', name: 'A' })
     const b = createEntity(ctx, { campaignId, type: 'npc', name: 'B' })

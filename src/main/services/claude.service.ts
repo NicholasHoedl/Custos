@@ -150,7 +150,9 @@ export function buildSystem(mode: RecallMode, ctx: RecallContext): Anthropic.Tex
  * model never sees the entity_link graph otherwise, so it cannot know who owns/controls/is allied with
  * what — which is exactly the gap that let an answer invent an unsupported "the staff is mine" claim.
  * De-duplicated by edge id and capped so the prompt stays bounded. `name` is the retrieved entity; each
- * view's `label` is already oriented (name → other).
+ * view's `label` is already oriented (name → other). Each line carries the tie's epistemic tag (ADR-021
+ * confidence), its why/when description, and — the key for the in-character lenses (ADR-033) — the
+ * DIRECTIONAL disposition: how `name` feels about `other` and how `other` feels back (often asymmetric).
  */
 export function formatRelationships(
   items: { name: string; views: RelationshipView[] }[],
@@ -165,8 +167,19 @@ export function formatRelationships(
       if (lines.length >= maxTotal || perEntity >= maxPerEntity) break
       if (seenEdges.has(v.link.id)) continue
       seenEdges.add(v.link.id)
+      const conf = confidenceTag(v.link.confidence)
       const desc = v.link.description ? ` (${v.link.description})` : ''
-      lines.push(`- ${name} ${v.label} ${v.other.name}${desc}`)
+      // Orient the per-direction disposition for `name`: near = how name feels about other.
+      const near = v.direction === 'out' ? v.link.fromDisposition : v.link.toDisposition
+      const far = v.direction === 'out' ? v.link.toDisposition : v.link.fromDisposition
+      const feelings = [
+        near && `${name} feels ${near}`,
+        far && `${v.other.name} feels ${far}`
+      ]
+        .filter(Boolean)
+        .join('; ')
+      const feel = feelings ? ` — ${feelings}` : ''
+      lines.push(`- ${name} ${v.label} ${v.other.name}${conf}${desc}${feel}`)
       perEntity++
     }
   }
@@ -817,7 +830,7 @@ REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its positi
 // they can be stamped at the session under review and feed the as-of timeline.
 const CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. status uses the same per-type STATUSES vocabulary above — prefer a listed value; free text only when none fits. Only emit CHANGES the text narrates — never a state merely described as ongoing.
 
-RELATIONSHIPS. Add a relationshipChanges item {fromRef, toRef, relation, action} BOTH when the text narrates a relationship forming ("form") or ending ("sever") — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — AND when it establishes a STANDING relationship (action "form"): family, friendship or mentorship, membership in a group, ownership, or where someone lives or something sits. Use "sever" ONLY for a narrated ending. Capture ties the text asserts, not incidental mentions of strangers. In a personal backstory, nearly every named person, place, or group has a standing tie to its subject — capture each one. Keep the narrative note describing the relationship as well.
+RELATIONSHIPS. Add a relationshipChanges item {fromRef, toRef, relation, action} BOTH when the text narrates a relationship forming ("form") or ending ("sever") — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — AND when it establishes a STANDING relationship (action "form"): family, friendship or mentorship, membership in a group, ownership, or where someone lives or something sits. Use "sever" ONLY for a narrated ending. Capture ties the text asserts, not incidental mentions of strangers. In a personal backstory, nearly every named person, place, or group has a standing tie to its subject — capture each one. Keep the narrative note describing the relationship as well. For a "form" tie, also fill in, WHEN the text supports it: a short "description" (the why/when of the bond); "fromDisposition" and "toDisposition" — a few words on how each side FEELS about the other (fromDisposition = how the fromRef entity feels about the toRef entity; the two can differ, and either may be omitted); and "confidence" — "rumored" or "suspected" when the tie is only hearsay or inferred, otherwise "confirmed" (the default). Omit any of these the text doesn't support; "sever" items take none of them.
 
 Relation keys and their meanings — pick the closest, authored from the forward side (the inverse is derived): located_in (someone or something is in a place) · member_of (a person belongs to a faction or group) · owns (a person or faction owns an item) · quest_giver_of (an npc or faction gives a quest) · involves (a quest or event involves someone or something) · ally_of (friends, companions, allies) · enemy_of (rivals, foes) · knows (acquainted) · related_to (FAMILY or kin — a sibling, parent, spouse, cousin; or any close personal bond no other key fits).
 
@@ -912,7 +925,11 @@ function extractionSchema(withChanges: boolean): Record<string, unknown> {
           fromRef: { type: 'string' },
           toRef: { type: 'string' },
           relation: { type: 'string', enum: Object.keys(RELATIONS) },
-          action: { type: 'string', enum: ['form', 'sever'] }
+          action: { type: 'string', enum: ['form', 'sever'] },
+          description: { type: 'string' },
+          fromDisposition: { type: 'string' },
+          toDisposition: { type: 'string' },
+          confidence: { type: 'string', enum: [...NOTE_CONFIDENCES] }
         },
         required: ['fromRef', 'toRef', 'relation', 'action']
       }

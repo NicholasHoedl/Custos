@@ -118,7 +118,7 @@ A Python sidecar for embeddings (sentence-transformers) would play to the develo
 - A bloated distributable (Python + sentence-transformers + numpy is several hundred MB)
 - IPC over stdio or a local HTTP socket — more failure surface
 
-Transformers.js with ONNX runs the same model family in the Node.js main process with no additional runtime, ~50MB for the model file, and trivial packaging. Quality for `all-MiniLM-L6-v2` is identical to the Python equivalent because they share the same ONNX model weights. The Python sidecar is listed as ADR-001 and deferred to a future phase only if CPU inference speed proves unacceptable.
+Transformers.js with ONNX runs the same model family in the Node.js main process with no additional runtime, a ~30 MB one-time model download, and trivial packaging. Quality for `all-MiniLM-L6-v2` is identical to the Python equivalent because they share the same ONNX model weights. The Python sidecar is listed as ADR-001 and deferred to a future phase only if CPU inference speed proves unacceptable.
 
 ---
 
@@ -253,10 +253,19 @@ EntityLink
   id           UUID PK
   fromEntityId UUID FK → Entity.id
   toEntityId   UUID FK → Entity.id
-  relation     TEXT ('member_of' | 'located_in' | 'involved_in' | 'owns' | 'allied_with' | ...)
+  relation     TEXT ('member_of' | 'located_in' | 'involved_in' | 'owns' | 'ally_of' | 'related_to' | ...)
+  description  TEXT (nullable — the "why/when" of the edge; the RAG-context lever the model reads verbatim)
+  fromDisposition TEXT (nullable — how `from` FEELS about `to`, a short free-text phrase) — ADR-033
+  toDisposition   TEXT (nullable — how `to` feels about `from`; per-direction so asymmetry lives on one edge) — ADR-033
+  confidence   TEXT ('confirmed' | 'rumored' | 'suspected') NOT NULL default 'confirmed' — the AI hedges on it (ADR-033)
   campaignId   UUID FK → Campaign.id
   startSession INTEGER (nullable — session # the link formed; NULL = pre-tracking) — ADR-017
   endSession   INTEGER (nullable — NULL = live; set on "sever" to close the validity interval) — ADR-017
+
+  # A tie serves four jobs (ADR-033): AI grounding (formatRelationships → the prompt — the ONLY path the
+  # edge graph reaches the model), hierarchy traversal (located_in/member_of CTEs), the in-character sense
+  # of who-knows-whom (disposition + relation), and UI browsing. `relation` is the typed skeleton;
+  # `description`/`fromDisposition`/`toDisposition` are the free-text specifics.
 
 EventLog
   id           UUID PK
@@ -550,7 +559,7 @@ All communication between renderer and main process goes through typed IPC chann
 > stamped at the current session — and each campaign persists a **mandatory main character**
 > (`campaign.main_character_id`, created with the campaign) — the **sole** in-character lens (ADR-029; the
 > active-PC switcher is gone). Backstory, the PC persona, and a promoted `voice_examples` field are
-> main-character-only, and a **Suggest-from-backstory** wizard (`services/derive-profile.service.ts`,
+> main-character-only, and a **Draft-from-backstory** wizard (`services/derive-profile.service.ts`,
 > `hooks/use-derive-profile.ts`, `components/entities/DeriveReview.tsx`) proposes the profile FIELDS for
 > approval — the persona is then rebuilt by the ONE canonical generator (`persona.service`) — and, in a
 > second step, world entities/notes/ties extracted from the backstory via the changeset engine, applied

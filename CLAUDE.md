@@ -34,7 +34,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **10 migrations (0000–0009)**.
+  `.sql`, keep `_journal.json` + the snapshot. Currently **11 migrations (0000–0010)**.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -70,7 +70,12 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
 - **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` /
   `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
   `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,
-  via the shared `confidenceTag`) get injected. Change what the model is told *here*.
+  via the shared `confidenceTag`) get injected. Change what the model is told *here*. **Ties** are rendered
+  by the single `formatRelationships` (fed by `listForEntity`) — one line per edge carrying the confidence
+  tag, the description, AND the **directional disposition** (how each side FEELS — `from_disposition` /
+  `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
+  populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
+  fields but is test-only; `getHierarchy` ignores them (structural).
 - **UI label ↔ code name (ADR-024/032):** the nav labels are Character · Chronicle · **Sessions** · Codex ·
   **Lore** · **Counsel** · Converse · **Transcribe** · Settings; the code names stay `recall` (Lore),
   `suggest` (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe). Sessions +

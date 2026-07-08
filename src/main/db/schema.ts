@@ -144,6 +144,12 @@ export const entityLink = sqliteTable(
       .references(() => entity.id, { onDelete: 'cascade' }),
     relation: text('relation').notNull(), // forward RelationKey (see @shared/relations)
     description: text('description'), // the "why/when" of the edge — the key RAG-context lever
+    // Tie enrichment (ADR-033): directional disposition — how each endpoint FEELS about the other, a short
+    // free-text phrase per direction so asymmetric feelings live on ONE edge. Confidence mirrors note
+    // confidence (ADR-021): confirmed | rumored | suspected, so the in-character AI can hedge.
+    fromDisposition: text('from_disposition'), // how `from` feels about `to`
+    toDisposition: text('to_disposition'), // how `to` feels about `from`
+    confidence: text('confidence').notNull().default('confirmed'), // NoteConfidence
     campaignId: text('campaign_id')
       .notNull()
       .references(() => campaign.id, { onDelete: 'cascade' }),

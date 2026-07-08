@@ -1,5 +1,5 @@
 import { and, eq, isNull, or } from 'drizzle-orm'
-import type { Entity, EntityLink } from '@shared/entity-types'
+import type { Entity, EntityLink, NoteConfidence } from '@shared/entity-types'
 import type { RelationKey } from '@shared/relations'
 import type { CreateLinkInput, HierarchyKind, UpdateLinkInput } from '@shared/ipc-types'
 import type {
@@ -45,7 +45,11 @@ export function createLink(ctx: DbContext, input: CreateLinkInput): EntityLink {
     fromEntityId: input.fromEntityId,
     toEntityId: input.toEntityId,
     relation: input.relation,
-    description: input.description ?? null,
+    description: input.description?.trim() || null,
+    // Tie enrichment (ADR-033): per-direction feeling + epistemic weight.
+    fromDisposition: input.fromDisposition?.trim() || null,
+    toDisposition: input.toDisposition?.trim() || null,
+    confidence: input.confidence ?? 'confirmed',
     campaignId: input.campaignId,
     createdAt: now(),
     // Chronology (ADR-017): a new relationship opens an interval at the active session. An explicit
@@ -127,16 +131,16 @@ export function severLink(ctx: DbContext, id: string, sessionId?: string): void 
 export function updateLink(ctx: DbContext, id: string, patch: UpdateLinkInput): EntityLink {
   const row = ctx.drizzle.select().from(schema.entityLink).where(eq(schema.entityLink.id, id)).get()
   if (!row) throw new Error('Relationship not found')
-  if (patch.description !== undefined) {
-    const description = patch.description?.trim() || null
-    ctx.drizzle
-      .update(schema.entityLink)
-      .set({ description })
-      .where(eq(schema.entityLink.id, id))
-      .run()
-    return rowToLink({ ...row, description })
+  // Only the provided fields change; endpoints + relation stay immutable (ADR-033).
+  const set: Partial<typeof schema.entityLink.$inferInsert> = {}
+  if (patch.description !== undefined) set.description = patch.description?.trim() || null
+  if (patch.fromDisposition !== undefined) set.fromDisposition = patch.fromDisposition?.trim() || null
+  if (patch.toDisposition !== undefined) set.toDisposition = patch.toDisposition?.trim() || null
+  if (patch.confidence !== undefined) set.confidence = patch.confidence
+  if (Object.keys(set).length > 0) {
+    ctx.drizzle.update(schema.entityLink).set(set).where(eq(schema.entityLink.id, id)).run()
   }
-  return rowToLink(row)
+  return rowToLink({ ...row, ...set })
 }
 
 export function deleteLink(ctx: DbContext, id: string): void {
@@ -181,7 +185,9 @@ export function listForEntity(ctx: DbContext, entityId: string, asOf?: number): 
   return views
 }
 
-/** Containment hierarchy (breadcrumb of ancestors + the contained subtree), via recursive CTEs. */
+/** Containment hierarchy (breadcrumb of ancestors + the contained subtree), via recursive CTEs.
+ *  Structural only — deliberately ignores disposition/confidence/description (ADR-033); containment is a
+ *  fact of place/membership, not a feeling. */
 export function getHierarchy(ctx: DbContext, entityId: string, kind: HierarchyKind): HierarchyView {
   const { fwd, inv } = HIERARCHY_PAIR[kind]
 
@@ -268,6 +274,10 @@ export function getEntityContext(ctx: DbContext, entityId: string, depth = 1): E
           viaRelation: l.relation,
           viaLabel: def ? (isOut ? def.forward : def.inverse) : l.relation,
           viaDescription: l.description,
+          // ADR-033: orient the tie's disposition for the frontier entity (near = its feeling about `other`).
+          viaNearDisposition: isOut ? l.fromDisposition : l.toDisposition,
+          viaFarDisposition: isOut ? l.toDisposition : l.fromDisposition,
+          viaConfidence: l.confidence as NoteConfidence,
           direction: isOut ? 'out' : 'in'
         })
         next.push(otherId)

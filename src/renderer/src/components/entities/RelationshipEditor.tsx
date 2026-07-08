@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Info, Link2, Pencil, Trash2, X } from 'lucide-react'
+import { Link2, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { ENTITY_TYPE_LABELS, type Entity, type EntityLink } from '@shared/entity-types'
+import {
+  ENTITY_TYPE_LABELS,
+  NOTE_CONFIDENCES,
+  NOTE_CONFIDENCE_LABELS,
+  type Entity,
+  type NoteConfidence
+} from '@shared/entity-types'
+import type { RelationshipView } from '@shared/graph-types'
 import { relationsForTypes, type RelationKey } from '@shared/relations'
 import { ledger } from '@renderer/lib/ipc'
 import { useRelationships } from '@renderer/hooks/use-ledger'
@@ -9,6 +16,7 @@ import { useAppStore } from '@renderer/store/app-store'
 import { EntityBadge } from './EntityBadge'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
+import { Label } from '@renderer/components/ui/label'
 import { Textarea } from '@renderer/components/ui/textarea'
 import {
   Dialog,
@@ -46,7 +54,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   const { relationships, refresh } = useRelationships(entity.id)
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingLink, setEditingLink] = useState<EntityLink | null>(null)
+  const [editingRel, setEditingRel] = useState<RelationshipView | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Keyboard: press "L" (while an entity is open and you're not typing) to open the link picker.
@@ -104,28 +112,35 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
       {relationships.length === 0 ? (
         <p className="text-xs text-muted-foreground">No ties yet.</p>
       ) : (
-        <ul className="space-y-1.5">
-          {relationships.map((rel) => (
-            <li key={rel.link.id} className="flex items-center gap-2 text-sm">
-              <span className="shrink-0 text-muted-foreground">{rel.label}</span>
-              <EntityBadge entity={rel.other} onClick={() => setSelectedEntity(rel.other.id)} />
-              {rel.link.description && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <Info className="size-3.5 shrink-0 text-muted-foreground" />
+        <ul className="space-y-1">
+          {relationships.map((rel) => {
+            // Orient the per-direction disposition for THIS entity (ADR-033): near = how it feels about
+            // the other; far = how the other feels back.
+            const near = rel.direction === 'out' ? rel.link.fromDisposition : rel.link.toDisposition
+            const far = rel.direction === 'out' ? rel.link.toDisposition : rel.link.fromDisposition
+            const feelings = [
+              near && `${entity.name} feels ${near}`,
+              far && `${rel.other.name} feels ${far}`
+            ]
+              .filter(Boolean)
+              .join(' · ')
+            return (
+              <li key={rel.link.id} className="rounded-md px-1 py-1 hover:bg-muted/40">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="shrink-0 text-muted-foreground">{rel.label}</span>
+                  <EntityBadge entity={rel.other} onClick={() => setSelectedEntity(rel.other.id)} />
+                  {rel.link.confidence !== 'confirmed' && (
+                    <span className="shrink-0 rounded bg-metal/15 px-1.5 py-0.5 text-[10px] text-metal">
+                      {NOTE_CONFIDENCE_LABELS[rel.link.confidence]}
                     </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{rel.link.description}</TooltipContent>
-                </Tooltip>
-              )}
-              <div className="ml-auto flex shrink-0 items-center">
+                  )}
+                  <div className="ml-auto flex shrink-0 items-center">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={() => setEditingLink(rel.link)}
+                      onClick={() => setEditingRel(rel)}
                       className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label="Edit context"
+                      aria-label="Edit tie"
                     >
                       <Pencil className="size-3.5" />
                     </button>
@@ -156,9 +171,17 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
                   </TooltipTrigger>
                   <TooltipContent>Delete permanently — for a mistake (no history)</TooltipContent>
                 </Tooltip>
-              </div>
-            </li>
-          ))}
+                  </div>
+                </div>
+                {(rel.link.description || feelings) && (
+                  <div className="mt-0.5 space-y-0.5 pl-1 text-xs text-muted-foreground">
+                    {rel.link.description && <p className="italic">{rel.link.description}</p>}
+                    {feelings && <p>{feelings}</p>}
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
 
@@ -173,12 +196,13 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
         }}
       />
 
-      {editingLink && (
-        <TieDescriptionDialog
-          link={editingLink}
+      {editingRel && (
+        <TieEditDialog
+          rel={editingRel}
+          subjectName={entity.name}
           open
           onOpenChange={(o) => {
-            if (!o) setEditingLink(null)
+            if (!o) setEditingRel(null)
           }}
           onSaved={refresh}
         />
@@ -187,31 +211,51 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   )
 }
 
-// Edit a tie's "why / context" description (ADR-032). The relation + endpoints are immutable — changing
-// those is a sever + a new link — so only the description is editable here.
-function TieDescriptionDialog({
-  link,
+// Edit a tie's context: description + per-direction disposition + confidence (ADR-033). The relation +
+// endpoints are immutable — changing those is a sever + a new link.
+function TieEditDialog({
+  rel,
+  subjectName,
   open,
   onOpenChange,
   onSaved
 }: {
-  link: EntityLink
+  rel: RelationshipView
+  subjectName: string
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
+  const link = rel.link
+  const isOut = rel.direction === 'out'
+  const fromName = isOut ? subjectName : rel.other.name
+  const toName = isOut ? rel.other.name : subjectName
+
   const [description, setDescription] = useState(link.description ?? '')
+  const [fromDisposition, setFromDisposition] = useState(link.fromDisposition ?? '')
+  const [toDisposition, setToDisposition] = useState(link.toDisposition ?? '')
+  const [confidence, setConfidence] = useState<NoteConfidence>(link.confidence)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (open) setDescription(link.description ?? '')
+    if (open) {
+      setDescription(link.description ?? '')
+      setFromDisposition(link.fromDisposition ?? '')
+      setToDisposition(link.toDisposition ?? '')
+      setConfidence(link.confidence)
+    }
   }, [open, link])
 
   async function submit() {
     if (busy) return
     setBusy(true)
     try {
-      await ledger.link.update(link.id, { description: description.trim() || null })
+      await ledger.link.update(link.id, {
+        description: description.trim() || null,
+        fromDisposition: fromDisposition.trim() || null,
+        toDisposition: toDisposition.trim() || null,
+        confidence
+      })
       toast.success('Tie updated')
       onSaved()
       onOpenChange(false)
@@ -227,15 +271,50 @@ function TieDescriptionDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Edit tie</DialogTitle>
-          <DialogDescription>The why or context behind this relationship.</DialogDescription>
+          <DialogDescription>The why, how each side feels, and how sure you are.</DialogDescription>
         </DialogHeader>
-        <Textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          autoFocus
-          placeholder="e.g. Met in the mines; owes them a debt."
-        />
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+          <div className="space-y-1.5">
+            <Label>Why / context</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="e.g. Met in the mines; owes them a debt."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>How {fromName} feels about {toName}</Label>
+            <Input
+              value={fromDisposition}
+              onChange={(e) => setFromDisposition(e.target.value)}
+              placeholder="e.g. loyal but carries guilt"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>How {toName} feels about {fromName}</Label>
+            <Input
+              value={toDisposition}
+              onChange={(e) => setToDisposition(e.target.value)}
+              placeholder="e.g. protective, mentor-fond"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Confidence</Label>
+            <Select value={confidence} onValueChange={(v) => setConfidence(v as NoteConfidence)}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NOTE_CONFIDENCES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {NOTE_CONFIDENCE_LABELS[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancel
@@ -261,6 +340,9 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
   const [other, setOther] = useState<Entity | null>(null)
   const [relation, setRelation] = useState<RelationKey | ''>('')
   const [description, setDescription] = useState('')
+  const [fromDisposition, setFromDisposition] = useState('')
+  const [toDisposition, setToDisposition] = useState('')
+  const [confidence, setConfidence] = useState<NoteConfidence>('confirmed')
   const [busy, setBusy] = useState(false)
   const relationTriggerRef = useRef<HTMLButtonElement>(null)
 
@@ -269,6 +351,9 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
       setOther(null)
       setRelation('')
       setDescription('')
+      setFromDisposition('')
+      setToDisposition('')
+      setConfidence('confirmed')
     }
   }, [open])
 
@@ -294,7 +379,10 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
         fromEntityId: entity.id,
         toEntityId: other.id,
         relation,
-        description: description.trim() || undefined
+        description: description.trim() || undefined,
+        fromDisposition: fromDisposition.trim() || undefined,
+        toDisposition: toDisposition.trim() || undefined,
+        confidence
       })
       toast.success('Linked', { description: `${entity.name} → ${other.name}` })
       onCreated()
@@ -361,6 +449,43 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="e.g. since the heist in Neverwinter"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0 space-y-1.5">
+                <span className="block truncate text-xs font-medium text-muted-foreground">
+                  {entity.name} feels…
+                </span>
+                <Input
+                  value={fromDisposition}
+                  onChange={(e) => setFromDisposition(e.target.value)}
+                  placeholder="loyal, wary…"
+                />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <span className="block truncate text-xs font-medium text-muted-foreground">
+                  {other.name} feels…
+                </span>
+                <Input
+                  value={toDisposition}
+                  onChange={(e) => setToDisposition(e.target.value)}
+                  placeholder="protective, hostile…"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Confidence</span>
+              <Select value={confidence} onValueChange={(v) => setConfidence(v as NoteConfidence)}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {NOTE_CONFIDENCES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {NOTE_CONFIDENCE_LABELS[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}

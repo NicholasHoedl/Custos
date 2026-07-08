@@ -43,8 +43,8 @@ npm run dev         # launch the app with hot reload
 
 On first run, create a campaign (each is created with its **main character** — the hero you play), then
 open **Settings** to add your API key (stored encrypted via Electron safeStorage — it never leaves your
-machine except to call Anthropic) and download the ~30 MB local search model. Capture works without
-either; Recall and Suggest need both; Converse and the Character page's AI tools need only the key.
+machine except to call Anthropic) and download the ~30 MB local search model. Codex capture works without
+either; Lore and Counsel need both; Converse and the Character page's AI tools need only the key.
 
 ## Scripts
 

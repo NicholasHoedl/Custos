@@ -86,11 +86,18 @@ describe('relationship context (grounding)', () => {
     id: string,
     label: string,
     otherName: string,
-    description: string | null = null
+    description: string | null = null,
+    extra: { from?: string; to?: string; confidence?: string; direction?: 'out' | 'in' } = {}
   ): RelationshipView =>
     ({
-      link: { id, description },
-      direction: 'out',
+      link: {
+        id,
+        description,
+        fromDisposition: extra.from ?? null,
+        toDisposition: extra.to ?? null,
+        confidence: extra.confidence ?? 'confirmed'
+      },
+      direction: extra.direction ?? 'out',
       label,
       other: { name: otherName }
     }) as unknown as RelationshipView
@@ -103,6 +110,44 @@ describe('relationship context (grounding)', () => {
     expect(out).toContain('- Elaria owns Glass Staff (claimed it)')
     expect(out).not.toContain('owned by')
     expect(out?.split('\n')).toHaveLength(1)
+  })
+
+  it('renders confidence tag + directional disposition (ADR-033)', () => {
+    const out = formatRelationships([
+      {
+        name: 'Alaeric',
+        views: [
+          view('l2', 'ally of', 'Victor', 'a debt from the jail cell', {
+            from: 'loyal but guilty',
+            to: 'mentor-fond',
+            confidence: 'rumored'
+          })
+        ]
+      }
+    ])
+    // near = the seed's feeling (out → fromDisposition); far = the other's (toDisposition).
+    expect(out).toContain('- Alaeric ally of Victor · (rumored) (a debt from the jail cell)')
+    expect(out).toContain('Alaeric feels loyal but guilty')
+    expect(out).toContain('Victor feels mentor-fond')
+  })
+
+  it('orients disposition when the seed is the TARGET (direction "in")', () => {
+    // Mira is the `to` side (link is Alaeric→Mira), so from=Alaeric feels `from`, to=Mira feels `to`.
+    const out = formatRelationships([
+      {
+        name: 'Mira',
+        views: [
+          view('l3', 'related to', 'Alaeric', null, {
+            from: 'protective',
+            to: 'adoring',
+            direction: 'in'
+          })
+        ]
+      }
+    ])
+    // Seed is `to`, so near = toDisposition (Mira's feeling), far = fromDisposition (Alaeric's).
+    expect(out).toContain('Mira feels adoring')
+    expect(out).toContain('Alaeric feels protective')
   })
 
   it('returns null when there are no relationships', () => {

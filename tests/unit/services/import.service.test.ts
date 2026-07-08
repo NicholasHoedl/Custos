@@ -217,13 +217,21 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
         fromRef: { kind: 'new', index: 0 },
         toRef: { kind: 'existing', entityId: inn.id },
         relation: 'located_in',
-        action: 'form'
+        action: 'form',
+        description: null,
+        fromDisposition: null,
+        toDisposition: null,
+        confidence: 'confirmed'
       },
       {
         fromRef: { kind: 'new', index: 0 },
         toRef: { kind: 'new', index: 1 },
         relation: 'ally_of',
-        action: 'sever'
+        action: 'sever',
+        description: null,
+        fromDisposition: null,
+        toDisposition: null,
+        confidence: 'confirmed'
       }
     ])
   })
@@ -338,13 +346,21 @@ describe('import.service — dedup hardening (ADR-031)', () => {
         fromRef: { kind: 'existing', entityId: aldric.id },
         toRef: { kind: 'existing', entityId: sildar.id },
         relation: 'ally_of',
-        action: 'form'
+        action: 'form',
+        description: null,
+        fromDisposition: null,
+        toDisposition: null,
+        confidence: 'confirmed'
       },
       {
         fromRef: { kind: 'existing', entityId: aldric.id },
         toRef: { kind: 'existing', entityId: mirna.id },
         relation: 'ally_of',
-        action: 'sever'
+        action: 'sever',
+        description: null,
+        fromDisposition: null,
+        toDisposition: null,
+        confidence: 'confirmed'
       }
     ])
   })
@@ -466,6 +482,78 @@ describe('import.service — dedup hardening (ADR-031)', () => {
     if (!res.ok) return
     expect(res.proposal.fieldChanges).toHaveLength(1)
     expect(res.proposal.fieldChanges[0].value).toBe('fire')
+  })
+})
+
+describe('import.service — tie enrichment (ADR-033)', () => {
+  it('carries description + directional disposition + confidence on form ties; ignores them on sever', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const a = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
+    const b = createEntity(ctx, { campaignId, type: 'npc', name: 'Mira' })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [
+        {
+          fromRef: a.id,
+          toRef: b.id,
+          relation: 'related_to',
+          action: 'form',
+          description: 'siblings from the dock ward',
+          fromDisposition: 'protective, guilty',
+          toDisposition: 'adoring',
+          confidence: 'rumored'
+        },
+        // A sever carries no enrichment; confidence normalizes to confirmed.
+        {
+          fromRef: a.id,
+          toRef: b.id,
+          relation: 'ally_of',
+          action: 'sever',
+          description: 'ignored',
+          fromDisposition: 'ignored',
+          confidence: 'suspected'
+        }
+      ]
+    })
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    const [form, sever] = res.proposal.relationshipChanges
+    expect(form).toMatchObject({
+      description: 'siblings from the dock ward',
+      fromDisposition: 'protective, guilty',
+      toDisposition: 'adoring',
+      confidence: 'rumored'
+    })
+    expect(sever).toMatchObject({
+      action: 'sever',
+      description: null,
+      fromDisposition: null,
+      toDisposition: null,
+      confidence: 'confirmed'
+    })
+  })
+
+  it('snaps an invalid confidence to confirmed', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const a = createEntity(ctx, { campaignId, type: 'npc', name: 'A' })
+    const b = createEntity(ctx, { campaignId, type: 'npc', name: 'B' })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [
+        { fromRef: a.id, toRef: b.id, relation: 'knows', action: 'form', confidence: 'definitely' }
+      ]
+    })
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.relationshipChanges[0].confidence).toBe('confirmed')
   })
 })
 
