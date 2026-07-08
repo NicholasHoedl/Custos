@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { CircleDashed, Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
+import { CircleDashed, Pencil, Skull, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPE_LABELS,
@@ -19,7 +19,6 @@ import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
 import { EntityHistory } from './EntityHistory'
 import { PersonaEditor } from './PersonaEditor'
-import { DeriveReview } from './DeriveReview'
 import { Button } from '@renderer/components/ui/button'
 import { Separator } from '@renderer/components/ui/separator'
 import {
@@ -49,8 +48,6 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deriveOpen, setDeriveOpen] = useState(false)
-  const [personaKey, setPersonaKey] = useState(0) // bump to remount PersonaEditor after a derive apply
   const [hierarchy, setHierarchy] = useState<HierarchyView | null>(null)
 
   const isHierarchical = entity?.type === 'location' || entity?.type === 'faction'
@@ -147,17 +144,8 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {isMainCharacter && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeriveOpen(true)}
-              title="Suggest traits, goals, flaws, voice, and persona from this character's backstory"
-            >
-              <Sparkles className="size-3.5" />
-              Suggest
-            </Button>
-          )}
+          {/* The main character's derive/persona tooling lives on the Character page (ADR-030) —
+              Codex redirects the MC there, so no Suggest surface here. */}
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="size-3.5" />
             Edit
@@ -207,7 +195,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
         {entity.type === 'pc' && isMainCharacter && (
           <>
             <Separator />
-            <PersonaEditor key={personaKey} entityId={entity.id} />
+            <PersonaEditor entityId={entity.id} />
           </>
         )}
 
@@ -272,19 +260,6 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
           onEntityChanged()
         }}
       />
-
-      {isMainCharacter && (
-        <DeriveReview
-          pcId={entity.id}
-          open={deriveOpen}
-          onOpenChange={setDeriveOpen}
-          onApplied={() => {
-            refreshEntity()
-            onEntityChanged()
-            setPersonaKey((k) => k + 1)
-          }}
-        />
-      )}
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>

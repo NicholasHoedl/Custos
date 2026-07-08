@@ -81,9 +81,13 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (Counsel/Converse) + `buildSystem` (Recall) via `voiceExamplesBlock`. Grandfathered null-MC campaigns show
   "Set a main character". (Campaign wording reverted from the ADR-024 "Saga".)
 - **Character page + ONE persona generator (ADR-030).** The main character is managed on a dedicated
-  **Character page** (`views/CharacterView.tsx`, FIRST in the nav; a bespoke two-column inline-editing
-  `CharacterDashboard.tsx` — NOT an `EntityDetail` reuse — with silent autosave [attributes re-read fresh
-  before writing since updateEntity REPLACES], and a backstory-coupled Suggest guard; plus a
+  **Character page** (`views/CharacterView.tsx`, FIRST in the nav; a bespoke two-column
+  `CharacterDashboard.tsx` — NOT an `EntityDetail` reuse — with silent blur-autosave text fields
+  [attributes re-read fresh before writing since updateEntity REPLACES], promoted lists edited via a
+  per-card `ListEditDialog` popup [read-only chips otherwise], and a backstory-coupled **two-step Suggest**:
+  step 1 = profile fields, step 2 = world entities/notes/ties via `useImport({withChanges:true})` +
+  `ChangesetReview`, applied UNDATED — an EXPLICIT `sessionId: null` now means PRE-TRACKING in
+  `createEntity`/`createLink`/`updateEntity` (`undefined` keeps the latest-session fallback); plus a
   picker to set/re-designate it). Codex still lists the MC (★) but selecting it shows a redirect card to the
   Character page (`CaptureView`), so the persona/derive UI lives only there. **Persona is ONE canonical
   generator** (`PERSONA_SYSTEM` via `persona.service` `generatePersona`): the **derive-from-backstory** tool

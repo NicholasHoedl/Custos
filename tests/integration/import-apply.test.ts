@@ -23,8 +23,8 @@ import { createCampaign } from '../../src/main/services/campaign.service'
 import { createSession } from '../../src/main/services/session.service'
 import { createEntity, getEntity, listEntities } from '../../src/main/services/entity.service'
 import { createLink, listForEntity } from '../../src/main/services/link.service'
-import { stateAsOf } from '../../src/main/services/chronology.service'
-import { listNotesForSession } from '../../src/main/services/note.service'
+import { getEntityHistory, stateAsOf } from '../../src/main/services/chronology.service'
+import { listNotesForEntity, listNotesForSession } from '../../src/main/services/note.service'
 import { BruteForceVectorStore } from '../../src/main/services/vector-store.service'
 import { applyChangeset } from '../../src/main/services/import.service'
 
@@ -255,6 +255,50 @@ describe('import.service — applyChangeset v2 (backfill changes, ADR-018)', () 
 
     expect(listForEntity(ctx, npc.id)).toHaveLength(1) // still exactly one live edge (idempotent form)
     expect(stateAsOf(ctx, npc.id, 5)).toEqual({ lifecycle: 'active', status: 'Busy' })
+  })
+})
+
+describe('import.service — applyChangeset undated batch (pre-campaign background, ADR-030)', () => {
+  it('an explicit null session applies as PRE-TRACKING: baselines + ties predate session 1; notes undated', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    createSession(ctx, { campaignId }) // 1
+    createSession(ctx, { campaignId }) // 2 — the old latest-session fallback would have stamped here
+    const mc = createEntity(ctx, { campaignId, type: 'pc', name: 'Alaeric' })
+
+    applyChangeset(ctx, store, {
+      campaignId,
+      sessionId: null, // undated: backstory material predates the campaign
+      entities: [{ index: 0, action: 'create', type: 'npc', name: 'Victor' }],
+      notes: [
+        {
+          content: 'Victor taught Alaeric everything he knows',
+          entityRefs: [{ kind: 'new', index: 0 }],
+          tags: [],
+          confidence: 'confirmed',
+          include: true
+        }
+      ],
+      statusChanges: [],
+      relationshipChanges: [
+        {
+          fromRef: { kind: 'existing', entityId: mc.id },
+          toRef: { kind: 'new', index: 0 },
+          relation: 'ally_of',
+          action: 'form',
+          include: true
+        }
+      ]
+    })
+
+    const victor = listEntities(ctx, campaignId, 'npc')[0]
+    // Baseline is pre-tracking (since NULL) — NOT stamped at the latest session.
+    expect(getEntityHistory(ctx, victor.id)[0].sinceSessionNumber).toBeNull()
+    // The tie is a pre-tracking interval: already live as of session 1.
+    expect(listForEntity(ctx, mc.id, 1)).toHaveLength(1)
+    // The note is undated (timeless under as-of).
+    expect(listNotesForEntity(ctx, victor.id)[0].sessionId).toBeNull()
   })
 })
 

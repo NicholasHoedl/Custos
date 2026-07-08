@@ -48,8 +48,12 @@ export function createLink(ctx: DbContext, input: CreateLinkInput): EntityLink {
     description: input.description ?? null,
     campaignId: input.campaignId,
     createdAt: now(),
-    // Chronology (ADR-017): a new relationship opens an interval at the active session.
-    startSessionNumber: resolveCaptureSessionNumber(ctx, input.sessionId, input.campaignId),
+    // Chronology (ADR-017): a new relationship opens an interval at the active session. An explicit
+    // null sessionId (undated import, ADR-030) = a PRE-TRACKING interval, open since before session 1.
+    startSessionNumber:
+      input.sessionId === null
+        ? null
+        : resolveCaptureSessionNumber(ctx, input.sessionId, input.campaignId),
     endSessionNumber: null
   }
   ctx.drizzle.insert(schema.entityLink).values(row).run()

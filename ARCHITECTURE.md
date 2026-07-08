@@ -549,11 +549,14 @@ All communication between renderer and main process goes through typed IPC chann
 > stamped at the current session — and each campaign persists a **mandatory main character**
 > (`campaign.main_character_id`, created with the campaign) — the **sole** in-character lens (ADR-029; the
 > active-PC switcher is gone). Backstory, the PC persona, and a promoted `voice_examples` field are
-> main-character-only, and a **derive-from-backstory** tool (`services/derive-profile.service.ts`,
+> main-character-only, and a **Suggest-from-backstory** wizard (`services/derive-profile.service.ts`,
 > `hooks/use-derive-profile.ts`, `components/entities/DeriveReview.tsx`) proposes the profile FIELDS for
-> approval — the persona is then rebuilt by the ONE canonical generator (`persona.service`), and the main
-> character is managed on a dedicated **Character page** (`views/CharacterView.tsx`, first in the nav; the
-> sidebar shows a read-only "Playing as X" and Codex redirects the MC there), ADR-030.
+> approval — the persona is then rebuilt by the ONE canonical generator (`persona.service`) — and, in a
+> second step, world entities/notes/ties extracted from the backstory via the changeset engine, applied
+> UNDATED (an explicit `sessionId: null` = a pre-tracking baseline/interval). The main character is
+> managed on a dedicated **Character page** (`views/CharacterView.tsx`, first in the nav; a bespoke
+> `components/entities/CharacterDashboard.tsx` dashboard with popup list editing via `ListEditDialog.tsx`;
+> the sidebar shows a read-only "Playing as X" and Codex redirects the MC there), ADR-030.
 > The third AI lens **Converse** (ADR-025) adds `services/converse.service.ts`, `ipc/converse.ts`,
 > `views/ConverseView.tsx`, `hooks/use-converse.ts`, and `shared/converse-types.ts`. Packaging assets live in `build/`
 > (`icon.svg` → `icon.png`, ADR-024) with CI in `.github/workflows/`.

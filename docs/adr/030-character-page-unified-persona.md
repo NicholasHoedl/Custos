@@ -9,11 +9,23 @@ indicator; Codex marks the main character with a ★ that redirects to the page.
 the full suite (192 tests).
 
 **As-built refinement:** the dashboard was reworked from a reused `EntityDetail` into a **bespoke,
-two-column, inline-editing** component (`CharacterDashboard.tsx`) — everything is visible and edits in place
-(silent autosave; error-toast only), and the **Suggest** action lives on the backstory card: disabled with a
-hint when there's no backstory, and disabled after a run until the backstory changes (a session-local
-guard). It still composes the same self-contained pieces (`PersonaEditor`, `TagInput`, `StatusCombobox`,
-`RelationshipEditor`, `EntityHistory`, `DeriveReview`). `EntityDetail` is unchanged and still serves Codex.
+two-column** component (`CharacterDashboard.tsx`) — text fields edit in place and save on blur (silent
+autosave; error-toast only), and the **Suggest** action lives on the backstory card: disabled with a hint
+when there's no backstory, and disabled after a run until the backstory changes (a session-local guard).
+It composes the same self-contained pieces (`PersonaEditor`, `StatusCombobox`, `RelationshipEditor`,
+`EntityHistory`, `DeriveReview`). `EntityDetail` still serves Codex (its main-character derive surface was
+removed — dead code once Codex redirects the MC here).
+
+**As-built v3:** (a) the four promoted **lists** (traits/goals/flaws/voice) are **read-only chips** with a
+per-card **Edit → `ListEditDialog`** popup (editable rows + delete + add; explicit Save/Cancel; one batched
+write per editing session — replacing the inline TagInputs and their save-race machinery). (b) **Suggest is
+a two-step wizard**: Step 1 = the profile fields (as before); Step 2 = the backstory run through the
+**shared changeset engine** (`useImport({withChanges:true})` + `ChangesetReview`) proposing **new entities,
+notes, and relationship ties**, applied **undated** — an explicit `sessionId: null` now means
+**PRE-TRACKING** in `createEntity`/`createLink`/`updateEntity` (baselines + interval starts `NULL`, i.e.
+pre-campaign background; `undefined` keeps the live-capture latest-session fallback). Field changes are
+stripped from Step 2 (the MC's fields are Step 1's job); the re-run lock engages on either step's apply.
+(c) An **info popover** next to Suggest documents what it does + best practices.
 
 **Date:** 2026-07-07
 **Deciders:** Solo developer

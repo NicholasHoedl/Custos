@@ -1,12 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
+import type { Entity } from '@shared/entity-types'
 import type { DeriveProfileFailureReason } from '@shared/derive-profile-types'
 import type { UpdateEntityInput } from '@shared/ipc-types'
 import { cn } from '@renderer/lib/utils'
 import { ledger } from '@renderer/lib/ipc'
+import { plural } from '@renderer/lib/format'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useDeriveProfile } from '@renderer/hooks/use-derive-profile'
+import { useImport } from '@renderer/hooks/use-import'
+import { ChangesetReview } from '@renderer/components/capture/ChangesetReview'
 import { Button } from '@renderer/components/ui/button'
 import {
   Dialog,
@@ -42,37 +46,69 @@ const REASON_MESSAGE: Record<DeriveProfileFailureReason, string> = {
 }
 
 /**
- * The "derive profile from backstory" review (ADR-029/030): runs the single-shot AI pass, shows each
- * proposed FIELD (description / traits / goals / flaws / voice examples) with an accept toggle, and on
- * Apply writes the accepted fields (entity.update) then REBUILDS the persona from the updated profile via
- * the one canonical generator (persona.generate). Nothing is written until Apply. Empty suggestions are
- * disabled + never overwrite existing values.
+ * The "Suggest from backstory" review (ADR-029/030) — a TWO-STEP wizard:
+ *   Step 1 (Profile): the derived profile FIELDS (description / traits / goals / flaws / voice) with
+ *   per-field accept toggles; Apply writes the accepted fields (entity.update) then REBUILDS the persona
+ *   via the one canonical generator (persona.generate).
+ *   Step 2 (World): the backstory run through the shared changeset engine (useImport withChanges) —
+ *   proposed NEW entities, notes, and relationship ties, reviewed in the same ChangesetReview that
+ *   Chronicle/Transcribe use and applied UNDATED (sessionId null → pre-tracking / pre-campaign
+ *   background, ADR-030). Field changes are stripped — the MC's fields are step 1's job.
+ * Both passes run in parallel on open; either step can be skipped; nothing writes without approval.
  */
 export function DeriveReview({
   pcId,
+  backstory,
+  campaignEntities,
   open,
   onOpenChange,
   onApplied
 }: {
   pcId: string
+  backstory: string
+  campaignEntities: Entity[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onApplied: () => void
 }) {
   const derive = useDeriveProfile()
+  const imp = useImport({ withChanges: true })
+  const [step, setStep] = useState<'profile' | 'world'>('profile')
   const [accept, setAccept] = useState<Accept>(ALL)
   const [busy, setBusy] = useState(false)
+  const worldApplied = useRef(false)
   const { run, reset } = derive
+  const { extract: impExtract, reset: impReset } = imp
 
-  // Run once each time the dialog opens; clear when it closes.
+  // On open: run BOTH passes in parallel — field derivation (step 1) and the world extraction (step 2).
+  // Reset both when the dialog closes.
   useEffect(() => {
     if (open) {
+      setStep('profile')
       setAccept(ALL)
+      worldApplied.current = false
       run(pcId)
+      impExtract(backstory)
     } else {
       reset()
+      impReset()
     }
-  }, [open, pcId, run, reset])
+  }, [open, pcId, backstory, run, reset, impExtract, impReset])
+
+  // Step 1 owns the main character's profile fields — double-proposing them as field CHANGES in step 2
+  // would be confusing, so strip them from the world review (deliberate, ADR-030 v3).
+  const { status: impStatus, setFieldChanges } = imp
+  useEffect(() => {
+    if (impStatus === 'review') setFieldChanges([])
+  }, [impStatus, setFieldChanges])
+
+  // The world apply resolves asynchronously (the hook flips to 'done') — notify the dashboard once.
+  useEffect(() => {
+    if (imp.status === 'done' && !worldApplied.current) {
+      worldApplied.current = true
+      onApplied()
+    }
+  }, [imp.status, onApplied])
 
   const profile = derive.status === 'done' && derive.result?.ok ? derive.result.profile : null
   const failure =
@@ -88,7 +124,7 @@ export function DeriveReview({
       (accept.flaws && profile.flaws.length > 0) ||
       (accept.voiceExamples && profile.voiceExamples.length > 0))
 
-  async function apply(): Promise<void> {
+  async function applyProfile(): Promise<void> {
     if (!profile) return
     setBusy(true)
     try {
@@ -98,17 +134,18 @@ export function DeriveReview({
       if (accept.traits && profile.traits.length) patch.traits = profile.traits
       if (accept.goals && profile.goals.length) patch.goals = profile.goals
       if (accept.flaws && profile.flaws.length) patch.flaws = profile.flaws
-      if (accept.voiceExamples && profile.voiceExamples.length) patch.voiceExamples = profile.voiceExamples
+      if (accept.voiceExamples && profile.voiceExamples.length)
+        patch.voiceExamples = profile.voiceExamples
       if (Object.keys(patch).length > 0) {
         await ledger.entity.update(pcId, patch)
         // Rebuild the persona from the now-updated fields via the ONE canonical generator (ADR-030).
         // Best-effort: if it fails the fields are still saved and the user can Regenerate on the page.
         await ledger.persona.generate(pcId).catch(() => {})
+        useUiStore.getState().bumpEntities()
+        toast.success('Profile updated from backstory')
+        onApplied()
       }
-      useUiStore.getState().bumpEntities()
-      toast.success('Profile updated from backstory')
-      onApplied()
-      onOpenChange(false)
+      setStep('world')
     } catch (err) {
       toast.error('Could not apply', { description: String(err) })
     } finally {
@@ -116,83 +153,159 @@ export function DeriveReview({
     }
   }
 
+  const worldWaiting =
+    imp.status === 'extracting' || (imp.status === 'idle' && imp.reason === null && !imp.error)
+  const worldChanges = imp.result
+    ? imp.result.statusChangesApplied +
+      imp.result.relationshipChangesApplied +
+      imp.result.fieldChangesApplied
+    : 0
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display text-xl">
             <Sparkles className="size-5 text-primary" />
-            Derive profile from backstory
+            Suggest from backstory
           </DialogTitle>
           <DialogDescription>
-            Review the suggestions and choose which to apply. Nothing changes until you apply.
+            {step === 'profile'
+              ? 'Step 1 of 2 — the character’s profile. Choose what to apply; the persona is rebuilt from it.'
+              : 'Step 2 of 2 — people, places, notes, and ties found in the backstory, added as pre-campaign background.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
-          {derive.status === 'thinking' && (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Reading the backstory…
-            </p>
-          )}
-          {derive.status === 'error' && (
-            <p className="py-10 text-center text-sm text-destructive">{derive.error}</p>
-          )}
-          {failure && (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {REASON_MESSAGE[failure]}
-            </p>
-          )}
-          {profile && (
-            <>
-              <FieldRow
-                label="Description"
-                on={accept.description}
-                empty={!profile.description}
-                onToggle={() => toggle('description')}
-              >
-                <p className="text-sm text-foreground/90">{profile.description || '—'}</p>
-              </FieldRow>
-              <ListRow
-                label="Traits"
-                items={profile.traits}
-                on={accept.traits}
-                onToggle={() => toggle('traits')}
-              />
-              <ListRow
-                label="Goals"
-                items={profile.goals}
-                on={accept.goals}
-                onToggle={() => toggle('goals')}
-              />
-              <ListRow
-                label="Flaws"
-                items={profile.flaws}
-                on={accept.flaws}
-                onToggle={() => toggle('flaws')}
-              />
-              <ListRow
-                label="Voice examples"
-                items={profile.voiceExamples}
-                quoted
-                on={accept.voiceExamples}
-                onToggle={() => toggle('voiceExamples')}
-              />
-              <p className="px-1 text-xs text-muted-foreground">
-                Applying rebuilds this character’s persona brief from the accepted fields.
+        {step === 'profile' ? (
+          <>
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+              {derive.status === 'thinking' && (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Reading the backstory…
+                </p>
+              )}
+              {derive.status === 'error' && (
+                <p className="py-10 text-center text-sm text-destructive">{derive.error}</p>
+              )}
+              {failure && (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  {REASON_MESSAGE[failure]}
+                </p>
+              )}
+              {profile && (
+                <>
+                  <FieldRow
+                    label="Description"
+                    on={accept.description}
+                    empty={!profile.description}
+                    onToggle={() => toggle('description')}
+                  >
+                    <p className="text-sm text-foreground/90">{profile.description || '—'}</p>
+                  </FieldRow>
+                  <ListRow
+                    label="Traits"
+                    items={profile.traits}
+                    on={accept.traits}
+                    onToggle={() => toggle('traits')}
+                  />
+                  <ListRow
+                    label="Goals"
+                    items={profile.goals}
+                    on={accept.goals}
+                    onToggle={() => toggle('goals')}
+                  />
+                  <ListRow
+                    label="Flaws"
+                    items={profile.flaws}
+                    on={accept.flaws}
+                    onToggle={() => toggle('flaws')}
+                  />
+                  <ListRow
+                    label="Voice examples"
+                    items={profile.voiceExamples}
+                    quoted
+                    on={accept.voiceExamples}
+                    onToggle={() => toggle('voiceExamples')}
+                  />
+                  <p className="px-1 text-xs text-muted-foreground">
+                    Applying rebuilds this character’s persona brief from the accepted fields.
+                  </p>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button variant="outline" onClick={() => setStep('world')} disabled={busy}>
+                Skip
+              </Button>
+              <Button onClick={() => void applyProfile()} disabled={!willApply || busy}>
+                {busy ? 'Applying…' : 'Apply & continue'}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            {worldWaiting ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Reading the backstory for people, places, and ties…
               </p>
-            </>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
-            Cancel
-          </Button>
-          <Button onClick={() => void apply()} disabled={!willApply || busy}>
-            {busy ? 'Applying…' : 'Apply selected'}
-          </Button>
-        </DialogFooter>
+            ) : imp.status === 'review' || imp.status === 'applying' ? (
+              <div className="flex max-h-[60vh] min-h-0 flex-col">
+                <ChangesetReview
+                  imp={imp}
+                  campaignEntities={campaignEntities}
+                  applyLabel="Add to campaign"
+                  onApply={() => imp.apply(null)} // undated: pre-campaign background (pre-tracking, ADR-030)
+                  onDiscard={() => onOpenChange(false)}
+                />
+              </div>
+            ) : imp.status === 'done' && imp.result ? (
+              <div className="space-y-3 py-8 text-center">
+                <p className="text-sm text-foreground">
+                  Added <strong>{imp.result.createdEntityIds.length}</strong>{' '}
+                  {plural(imp.result.createdEntityIds.length, 'new entity', 'new entities')}
+                  {imp.result.linkedEntityIds.length > 0 && (
+                    <> · linked {imp.result.linkedEntityIds.length}</>
+                  )}
+                  {worldChanges > 0 && (
+                    <>
+                      {' '}
+                      · <strong>{worldChanges}</strong> {plural(worldChanges, 'tie', 'ties')}
+                    </>
+                  )}
+                  {imp.result.createdNoteIds.length > 0 && (
+                    <>
+                      {' '}
+                      · {imp.result.createdNoteIds.length}{' '}
+                      {plural(imp.result.createdNoteIds.length, 'note', 'notes')}
+                    </>
+                  )}{' '}
+                  — as pre-campaign background.
+                </p>
+                <Button size="sm" onClick={() => onOpenChange(false)}>
+                  Done
+                </Button>
+              </div>
+            ) : imp.status === 'error' ? (
+              <p className="py-10 text-center text-sm text-destructive">{imp.error}</p>
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                {imp.reason === 'empty'
+                  ? 'Nothing new found in the backstory — its people and places may already be in the campaign.'
+                  : 'Could not read the backstory for world material. Try again in a moment.'}
+              </p>
+            )}
+            {imp.status !== 'review' && imp.status !== 'applying' && imp.status !== 'done' && (
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            )}
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

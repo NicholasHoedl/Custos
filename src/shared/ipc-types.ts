@@ -64,7 +64,10 @@ export interface CreateEntityInput {
   attributes?: Record<string, unknown>
   status?: string
   lifecycle?: Lifecycle // chronology: defaults to the status heuristic when omitted
-  sessionId?: string // capture context: active session id, stamps the baseline history row
+  /** Capture context: the session to stamp the baseline history row at. `undefined` = the live-capture
+   *  fallback (latest session); EXPLICIT `null` = undated/PRE-TRACKING — the entity predates session 1
+   *  (backstory-derived + undated imports, ADR-030). */
+  sessionId?: string | null
 }
 export interface UpdateEntityInput {
   name?: string
@@ -76,7 +79,9 @@ export interface UpdateEntityInput {
   attributes?: Record<string, unknown>
   status?: string | null
   lifecycle?: Lifecycle
-  sessionId?: string // capture context: active session id, stamps a status/lifecycle change
+  /** Capture context: session to stamp a status/lifecycle change at. `undefined` = latest-session
+   *  fallback; EXPLICIT `null` = undated/pre-tracking (see CreateEntityInput.sessionId, ADR-030). */
+  sessionId?: string | null
 }
 export interface CreateNoteInput {
   campaignId: string // the note's home campaign (required); the note may tag 0..N entities
@@ -103,7 +108,9 @@ export interface CreateLinkInput {
   toEntityId: string
   relation: RelationKey
   description?: string
-  sessionId?: string // capture context: active session id, stamps the interval start
+  /** Capture context: session to stamp the interval start at. `undefined` = latest-session fallback;
+   *  EXPLICIT `null` = a pre-tracking interval (open since before session 1 — ADR-030 undated imports). */
+  sessionId?: string | null
 }
 
 export interface EntitySearchResult {

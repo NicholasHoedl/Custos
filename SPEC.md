@@ -384,9 +384,12 @@ description/traits/goals/flaws/voice from a written backstory for **per-field ap
 
 **Character page + unified persona** (ADR-030) — a dedicated **Character** page (first in the navbar) is now
 the single home for the main character: set/re-designate it there and manage its full profile (the dashboard
-a bespoke two-column, inline-editing dashboard — everything visible + edits in place, with the AI workflow
-front-and-center: the **Suggest** action sits on the backstory card, disabled with a hint when there's no
-backstory and until you change it after a run). The
+a bespoke two-column dashboard — text fields edit in place, the trait/goal/flaw/voice lists edit via
+per-card popup editors, and the AI workflow is front-and-center: **Suggest** (with an info popover) sits on
+the backstory card — disabled with a hint when there's no backstory and until you change it after a run —
+and runs a **two-step review**: the profile fields, then **world material** (new people/places/factions,
+notes, and ties) extracted from the backstory via the changeset engine and added as undated,
+**pre-campaign background**). The
 sidebar shows a read-only **"Playing as X"** indicator that links to the page, and Codex marks the main
 character with a ★ that redirects there. The two persona generators are **collapsed into one canonical
 template**: the derive tool proposes only the structured fields, and the persona is (re)built from the full

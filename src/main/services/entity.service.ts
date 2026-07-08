@@ -53,7 +53,12 @@ export function createEntity(ctx: DbContext, input: CreateEntityInput): Entity {
     createdAt: ts,
     updatedAt: ts
   }
-  const sinceSessionNumber = resolveCaptureSessionNumber(ctx, input.sessionId, input.campaignId)
+  // Explicit null (undated import, ADR-030) = a PRE-TRACKING baseline (the entity predates session 1);
+  // undefined keeps the live-capture fallback (latest session).
+  const sinceSessionNumber =
+    input.sessionId === null
+      ? null
+      : resolveCaptureSessionNumber(ctx, input.sessionId, input.campaignId)
   ctx.drizzle.transaction((tx) => {
     tx.insert(schema.entity).values(row).run()
     // Seed a baseline history row so stateAsOf has a value from this entity's creation onward.
@@ -83,9 +88,11 @@ export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInpu
   const newStatus = patch.status !== undefined ? patch.status : before.status
   const newLifecycle: Lifecycle = patch.lifecycle !== undefined ? patch.lifecycle : before.lifecycle
   const changed = newStatus !== before.status || newLifecycle !== before.lifecycle
-  const sinceSessionNumber = changed
-    ? resolveCaptureSessionNumber(ctx, patch.sessionId, before.campaignId)
-    : null
+  const sinceSessionNumber = !changed
+    ? null
+    : patch.sessionId === null
+      ? null // explicit undated (pre-tracking) change — see CreateEntityInput.sessionId (ADR-030)
+      : resolveCaptureSessionNumber(ctx, patch.sessionId, before.campaignId)
 
   ctx.drizzle.transaction((tx) => {
     tx.update(schema.entity).set(set).where(eq(schema.entity.id, id)).run()

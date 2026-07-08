@@ -369,8 +369,9 @@ export function applyChangeset(
         status: ce.status,
         attributes: ce.attributes,
         // Backfill (ADR-018): stamp the baseline at the entity's intro session, falling back to the
-        // batch's session (createEntity resolves the id → number, with the latest-session fallback).
-        sessionId: ce.sessionId ?? payload.sessionId ?? undefined
+        // batch's session. A NULL batch session (undated import / backstory, ADR-030) flows through as an
+        // explicit pre-tracking baseline — the entity predates session 1.
+        sessionId: ce.sessionId ?? payload.sessionId
       })
       idByIndex.set(ce.index, created.id)
       result.createdEntityIds.push(created.id)
@@ -378,7 +379,8 @@ export function applyChangeset(
 
     const resolve = (r: EntityRef): string | null =>
       r.kind === 'existing' ? r.entityId : (idByIndex.get(r.index) ?? null)
-    const batchSession = payload.sessionId ?? undefined
+    // NULL = undated batch (ADR-030): status changes + link intervals apply as pre-tracking.
+    const batchSession = payload.sessionId
 
     // ---- Changeset v2 (ADR-018): dated changes, stamped at the batch's session ----
 
@@ -436,7 +438,8 @@ export function applyChangeset(
           result.skipped.push({ kind: 'change', reason: 'no live relationship to sever' })
           continue
         }
-        severLink(ctx, open.id, batchSession)
+        // Sever has no pre-tracking representation (an interval needs a real end) — keep the fallback.
+        severLink(ctx, open.id, batchSession ?? undefined)
         result.relationshipChangesApplied++
       }
     }

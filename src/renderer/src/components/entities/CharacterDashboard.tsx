@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { CircleDashed, Skull, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { CircleDashed, Info, Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPE_LABELS,
@@ -29,18 +29,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@renderer/components/ui/alert-dialog'
-import { TagInput } from './TagInput'
+import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 import { StatusCombobox } from './StatusCombobox'
+import { ListEditDialog } from './ListEditDialog'
 import { PersonaEditor } from './PersonaEditor'
 import { RelationshipEditor } from './RelationshipEditor'
 import { EntityHistory } from './EntityHistory'
 import { DeriveReview } from './DeriveReview'
 
-// The main character's DASHBOARD (ADR-030, as-built ADR-030 refinement): a bespoke, two-column,
-// inline-editing surface — a "character sheet" (identity + traits/goals/flaws/voice) beside "story &
-// voice" (backstory + Suggest, persona, ties), with history + notes below. Everything saves in place
-// (silent; error-toast only). Replaces the reused EntityDetail on the Character page; EntityDetail still
-// serves Codex. Loads its own copy of the entity so it can refetch after each inline save.
+// The main character's DASHBOARD (ADR-030): a bespoke, two-column surface — a "character sheet"
+// (identity + traits/goals/flaws/voice) beside "story & voice" (backstory + Suggest, persona, ties),
+// with history + notes below. Text fields save in place on blur (silent; error-toast only); the four
+// promoted LISTS are read-only chips edited via a per-card popup (ListEditDialog — one batched write per
+// editing session, ADR-030 v3). Replaces the reused EntityDetail on the Character page; EntityDetail
+// still serves Codex. Loads its own copy of the entity so it can refetch after each save.
 export function CharacterDashboard({
   mainCharacterId,
   allEntities,
@@ -59,6 +61,8 @@ export function CharacterDashboard({
   // fresh launch re-enables Suggest; set after a successful derive; cleared-by-comparison when the
   // backstory is edited. NOT persisted.
   const [lastDerived, setLastDerived] = useState<string | null>(null)
+  // Which promoted list the popup editor is open for (traits/goals/flaws/voice) — ADR-030 v3.
+  const [editList, setEditList] = useState<PromotedListKey | null>(null)
 
   if (!entity) {
     return (
@@ -241,34 +245,21 @@ export function CharacterDashboard({
               </Field>
             </Card>
 
-            <Card title="Traits">
-              <ListField
-                value={entity.traits}
-                onSave={(v) => savePromoted({ traits: v })}
-                placeholder="Add a trait — e.g. gruff"
-              />
+            <Card title="Traits" action={<EditListButton onClick={() => setEditList('traits')} />}>
+              <ChipList items={entity.traits} />
             </Card>
-            <Card title="Goals">
-              <ListField
-                value={entity.goals}
-                onSave={(v) => savePromoted({ goals: v })}
-                placeholder="Add a goal — e.g. protect the town"
-              />
+            <Card title="Goals" action={<EditListButton onClick={() => setEditList('goals')} />}>
+              <ChipList items={entity.goals} />
             </Card>
-            <Card title="Flaws">
-              <ListField
-                value={entity.flaws}
-                onSave={(v) => savePromoted({ flaws: v })}
-                placeholder="A vice, fear, or weakness"
-              />
+            <Card title="Flaws" action={<EditListButton onClick={() => setEditList('flaws')} />}>
+              <ChipList items={entity.flaws} />
             </Card>
-            <Card title="Voice examples">
-              <ListField
-                value={entity.voiceExamples}
-                onSave={(v) => savePromoted({ voiceExamples: v })}
-                placeholder="A line they'd say"
-              />
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
+            <Card
+              title="Voice examples"
+              action={<EditListButton onClick={() => setEditList('voiceExamples')} />}
+            >
+              <ChipList items={entity.voiceExamples} />
+              <p className="mt-2 text-[11px] text-muted-foreground">
                 Sample lines in their own words — these ground Counsel and Converse.
               </p>
             </Card>
@@ -279,16 +270,19 @@ export function CharacterDashboard({
             <Card
               title="Backstory"
               action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!canSuggest}
-                  onClick={() => setDeriveOpen(true)}
-                  title={suggestHint || 'Derive traits, goals, flaws, and voice from the backstory'}
-                >
-                  <Sparkles className="size-3.5" />
-                  Suggest
-                </Button>
+                <div className="flex items-center gap-1">
+                  <SuggestInfo />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canSuggest}
+                    onClick={() => setDeriveOpen(true)}
+                    title={suggestHint || 'Derive the profile and world material from the backstory'}
+                  >
+                    <Sparkles className="size-3.5" />
+                    Suggest
+                  </Button>
+                </div>
               }
             >
               <InlineText
@@ -377,6 +371,8 @@ export function CharacterDashboard({
 
       <DeriveReview
         pcId={mainCharacterId}
+        backstory={savedBackstory}
+        campaignEntities={allEntities}
         open={deriveOpen}
         onOpenChange={setDeriveOpen}
         onApplied={() => {
@@ -385,8 +381,60 @@ export function CharacterDashboard({
           setPersonaKey((k) => k + 1)
         }}
       />
+
+      {editList && (
+        <ListEditDialog
+          title={LIST_META[editList].title}
+          hint={LIST_META[editList].hint}
+          placeholder={LIST_META[editList].placeholder}
+          open
+          onOpenChange={(o) => {
+            if (!o) setEditList(null)
+          }}
+          value={entity[editList]}
+          onSave={(next) => savePromoted(listPatch(editList, next))}
+        />
+      )}
     </div>
   )
+}
+
+type PromotedListKey = 'traits' | 'goals' | 'flaws' | 'voiceExamples'
+
+const LIST_META: Record<PromotedListKey, { title: string; placeholder: string; hint: string }> = {
+  traits: {
+    title: 'Edit traits',
+    placeholder: 'Add a trait — e.g. gruff',
+    hint: 'Personality traits that shape how they act.'
+  },
+  goals: {
+    title: 'Edit goals',
+    placeholder: 'Add a goal — e.g. protect the town',
+    hint: 'What they actively want.'
+  },
+  flaws: {
+    title: 'Edit flaws',
+    placeholder: 'A vice, fear, or weakness',
+    hint: 'What trips them up — the richest roleplay hooks.'
+  },
+  voiceExamples: {
+    title: 'Edit voice examples',
+    placeholder: "A line they'd say",
+    hint: 'Lines in their own words — these ground Counsel and Converse.'
+  }
+}
+
+function listPatch(key: PromotedListKey, next: string[]): UpdateEntityInput {
+  switch (key) {
+    case 'traits':
+      return { traits: next }
+    case 'goals':
+      return { goals: next }
+    case 'flaws':
+      return { flaws: next }
+    case 'voiceExamples':
+      return { voiceExamples: next }
+  }
 }
 
 // A titled panel. Persona/Ties/History render their own headings, so those cards pass no title.
@@ -412,35 +460,69 @@ function Card({
   )
 }
 
-// Traits/goals/flaws/voice: optimistic local state so rapid chip edits build from the latest list (not a
-// stale controlled prop), ORDERED saves (a promise chain) so they can't land out of order, and a
-// pending-guard on the sync so an in-flight refetch can't clobber a still-uncommitted edit. Fixes a
-// rapid-edit save race the plain controlled TagInput had.
-function ListField({
-  value,
-  onSave,
-  placeholder
-}: {
-  value: string[]
-  onSave: (next: string[]) => Promise<void>
-  placeholder?: string
-}) {
-  const [items, setItems] = useState(value)
-  const pending = useRef(0)
-  const chain = useRef<Promise<void>>(Promise.resolve())
-  useEffect(() => {
-    if (pending.current === 0) setItems(value) // only re-sync when no local edit is in flight
-  }, [value])
-  function change(next: string[]): void {
-    setItems(next)
-    pending.current += 1
-    chain.current = chain.current
-      .then(() => onSave(next))
-      .finally(() => {
-        pending.current -= 1
-      })
+// The list cards are READ-ONLY chips (ADR-030 v3) — editing happens in ListEditDialog via the per-card
+// Edit button, so each editing session is one batched write (no inline add fields, no save races).
+function EditListButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick}>
+      <Pencil className="size-3.5" />
+      Edit
+    </Button>
+  )
+}
+
+function ChipList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p className="text-xs text-muted-foreground">None yet — use Edit to add.</p>
   }
-  return <TagInput value={items} onChange={change} placeholder={placeholder} />
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((it, i) => (
+        <span
+          key={`${it}-${i}`}
+          className="max-w-full break-words rounded-md bg-muted/60 px-2 py-1 text-xs leading-snug text-foreground"
+        >
+          {it}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// What Suggest does + how to get good results (ADR-030 v3) — the workflow is otherwise invisible
+// until you trip over the backstory requirement or the re-run lock.
+function SuggestInfo() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          aria-label="About Suggest"
+        >
+          <Info className="size-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 space-y-2 text-xs leading-relaxed">
+        <p className="text-sm font-medium text-foreground">What Suggest does</p>
+        <p className="text-muted-foreground">
+          Reads the backstory and proposes, in two reviewed steps: first this character&apos;s profile —
+          description, traits, goals, flaws, voice examples (the persona is rebuilt from what you accept)
+          — then world material: new people, places, and factions, notes, and relationship ties, added as
+          pre-campaign background. Nothing is written until you approve each item.
+        </p>
+        <p className="text-sm font-medium text-foreground">Get the best results</p>
+        <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+          <li>Use real names for people, places, and groups.</li>
+          <li>State relationships outright — &ldquo;Victor was his mentor.&rdquo;</li>
+          <li>Concrete events beat vague vibes.</li>
+          <li>Show how the character speaks — it feeds the voice examples.</li>
+          <li>Edit the backstory and run again any time — Suggest unlocks when it changes.</li>
+        </ul>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
