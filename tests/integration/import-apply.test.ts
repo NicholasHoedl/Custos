@@ -302,6 +302,26 @@ describe('import.service — applyChangeset undated batch (pre-campaign backgrou
   })
 })
 
+describe('import.service — applyChangeset status presets (ADR-031 as-built)', () => {
+  it('a created entity whose status matches a preset adopts the preset lifecycle (npc "Missing" → presumed lost)', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+
+    applyChangeset(ctx, store, {
+      campaignId,
+      sessionId: null,
+      entities: [{ index: 0, action: 'create', type: 'npc', name: 'Mira', status: 'Missing' }],
+      notes: []
+    })
+
+    const mira = listEntities(ctx, campaignId, 'npc')[0]
+    // The heuristic can never derive presumed_ended (ADR-021) — the preset's explicit lifecycle must win.
+    expect(mira.lifecycle).toBe('presumed_ended')
+    expect(mira.status).toBe('Missing')
+  })
+})
+
 describe('import.service — applyChangeset field changes (ADR-028)', () => {
   it('applies add/cut/alter to lists + attributes, compounding within the batch; skips excluded + missing', () => {
     const ctx = makeTestDb()

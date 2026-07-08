@@ -248,6 +248,14 @@ export function NoteRow({
                 #{t}
               </span>
             ))}
+            {note.possibleDuplicate && (
+              <span
+                className="rounded bg-metal/15 px-1.5 py-0.5 text-[11px] text-metal"
+                title="Very similar to a note already in the campaign — include only if it adds something new."
+              >
+                Possible duplicate
+              </span>
+            )}
             <div className="ml-auto flex items-center gap-1 text-metal">
               {note.confidence !== 'confirmed' && <CircleDashed className="size-3" />}
               <Select

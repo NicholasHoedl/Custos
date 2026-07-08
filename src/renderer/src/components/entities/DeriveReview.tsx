@@ -72,7 +72,8 @@ export function DeriveReview({
   onApplied: () => void
 }) {
   const derive = useDeriveProfile()
-  const imp = useImport({ withChanges: true })
+  // The world pass is told WHOSE backstory it's reading (ADR-030 v3) — standing ties anchor to the MC.
+  const imp = useImport({ withChanges: true, backstorySubjectId: pcId })
   const [step, setStep] = useState<'profile' | 'world'>('profile')
   const [accept, setAccept] = useState<Accept>(ALL)
   const [busy, setBusy] = useState(false)

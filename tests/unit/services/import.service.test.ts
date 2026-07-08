@@ -36,6 +36,8 @@ vi.mock('electron-log/main', () => ({ default: { error: vi.fn(), warn: vi.fn(), 
 import { makeTestDb } from '../../helpers/test-db'
 import { createCampaign } from '../../../src/main/services/campaign.service'
 import { createEntity } from '../../../src/main/services/entity.service'
+import { createLink } from '../../../src/main/services/link.service'
+import { createNote } from '../../../src/main/services/note.service'
 import { extract } from '../../../src/main/services/import.service'
 
 const sig = (): AbortSignal => new AbortController().signal
@@ -265,6 +267,205 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
     expect(res2.proposal.statusChanges).toEqual([])
     expect(res2.proposal.relationshipChanges).toEqual([])
     expect(res2.proposal.fieldChanges).toEqual([])
+  })
+})
+
+describe('import.service — dedup hardening (ADR-031)', () => {
+  it('drops verbatim-duplicate notes (normalized + intra-batch) and flags near-duplicates for review', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const victor = createEntity(ctx, { campaignId, type: 'npc', name: 'Victor' })
+    createNote(ctx, {
+      campaignId,
+      entityIds: [victor.id],
+      content: 'Victor was hanged for a killing they shared.'
+    })
+    createNote(ctx, {
+      campaignId,
+      entityIds: [victor.id],
+      content: 'Victor taught Alaeric to steal, scam, pickpocket, and pick locks'
+    })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [
+        // Verbatim (differs only by case/punctuation) → dropped outright.
+        { content: 'victor was hanged for a killing they shared', entityRefs: [victor.id] },
+        // Near-duplicate (one detail added) → kept but flagged so review defaults it OFF.
+        {
+          content: 'Victor taught Alaeric to steal, scam, pickpocket, and pick locks in Waterdeep',
+          entityRefs: [victor.id]
+        },
+        // Genuinely new → kept, unflagged.
+        { content: 'Mira vanished on the docks three years ago', entityRefs: [victor.id] },
+        // Intra-batch duplicate of the previous → dropped.
+        { content: 'Mira vanished on the docks, three years ago!', entityRefs: [victor.id] }
+      ]
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't' }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.notes).toHaveLength(2)
+    expect(res.proposal.notes[0].possibleDuplicate).toBe(true)
+    expect(res.proposal.notes[0].content).toMatch(/Waterdeep/)
+    expect(res.proposal.notes[1].possibleDuplicate).toBeUndefined()
+  })
+
+  it('drops form proposals whose live tie already exists (either authoring direction); sever unaffected', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const aldric = createEntity(ctx, { campaignId, type: 'npc', name: 'Aldric' })
+    const mirna = createEntity(ctx, { campaignId, type: 'npc', name: 'Mirna' })
+    const sildar = createEntity(ctx, { campaignId, type: 'npc', name: 'Sildar' })
+    createLink(ctx, { campaignId, fromEntityId: aldric.id, toEntityId: mirna.id, relation: 'ally_of' })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [
+        { fromRef: aldric.id, toRef: mirna.id, relation: 'ally_of', action: 'form' }, // already live → dropped
+        { fromRef: mirna.id, toRef: aldric.id, relation: 'ally_of', action: 'form' }, // inverse authoring → dropped
+        { fromRef: aldric.id, toRef: sildar.id, relation: 'ally_of', action: 'form' }, // new tie → kept
+        { fromRef: aldric.id, toRef: mirna.id, relation: 'ally_of', action: 'sever' } // sever → kept
+      ]
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.relationshipChanges).toEqual([
+      {
+        fromRef: { kind: 'existing', entityId: aldric.id },
+        toRef: { kind: 'existing', entityId: sildar.id },
+        relation: 'ally_of',
+        action: 'form'
+      },
+      {
+        fromRef: { kind: 'existing', entityId: aldric.id },
+        toRef: { kind: 'existing', entityId: mirna.id },
+        relation: 'ally_of',
+        action: 'sever'
+      }
+    ])
+  })
+
+  it('collapses direction-equivalent duplicates within one batch (symmetric + directed pairs)', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const inn = createEntity(ctx, { campaignId, type: 'location', name: 'Stonehill Inn' })
+    extractFn.mockResolvedValue({
+      entities: [
+        { type: 'npc', name: 'Aldric' },
+        { type: 'npc', name: 'Mirna' }
+      ],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [
+        { fromRef: '#0', toRef: '#1', relation: 'ally_of', action: 'form' },
+        { fromRef: '#1', toRef: '#0', relation: 'ally_of', action: 'form' }, // same symmetric tie → collapsed
+        { fromRef: '#0', toRef: inn.id, relation: 'located_in', action: 'form' },
+        { fromRef: inn.id, toRef: '#0', relation: 'contains', action: 'form' } // same directed edge → collapsed
+      ]
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.relationshipChanges).toHaveLength(2)
+  })
+
+  it('drops a status change equal to the entity’s current state (guaranteed no-op)', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Toblen', status: 'Alive' })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [
+        { entityRef: npc.id, lifecycle: npc.lifecycle, status: 'Alive' }, // current state → dropped
+        { entityRef: npc.id, lifecycle: 'active', status: 'Wounded' } // real change → kept
+      ],
+      relationshipChanges: []
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.statusChanges).toHaveLength(1)
+    expect(res.proposal.statusChanges[0].status).toBe('Wounded')
+  })
+
+  it('snaps statuses to the type’s canonical preset (label + explicit lifecycle) before the no-op drop', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Alaeric', status: 'Active' })
+    const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Toblen', status: 'Alive' })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [
+        // Lowercase variant of the current preset → normalized "Active" → equals current → dropped.
+        { entityRef: pc.id, lifecycle: 'active', status: 'active' },
+        // Preset wins over a contradictory model lifecycle: "dead" → "Dead" + ended.
+        { entityRef: pc.id, lifecycle: 'active', status: 'dead' },
+        // Presets are the ONLY path to presumed_ended — the heuristic never derives it (ADR-021).
+        { entityRef: npc.id, status: 'missing' },
+        // Genuinely novel status stays free text with the model's lifecycle.
+        { entityRef: npc.id, lifecycle: 'active', status: 'Wounded' }
+      ],
+      relationshipChanges: []
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.statusChanges).toEqual([
+      { entityRef: { kind: 'existing', entityId: pc.id }, lifecycle: 'ended', status: 'Dead' },
+      { entityRef: { kind: 'existing', entityId: npc.id }, lifecycle: 'presumed_ended', status: 'Missing' },
+      { entityRef: { kind: 'existing', entityId: npc.id }, lifecycle: 'active', status: 'Wounded' }
+    ])
+  })
+
+  it('normalizes a proposed entity’s baseline status to the canonical preset casing', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    extractFn.mockResolvedValue({
+      entities: [{ type: 'npc', name: 'Sildar', status: 'alive' }],
+      notes: []
+    })
+    const res = await extract(ctx, { campaignId, text: 't' }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.entities[0].status).toBe('Alive')
+  })
+
+  it('drops scalar field no-ops: alter/add to the current value, cut of an empty key', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const nothic = createEntity(ctx, {
+      campaignId,
+      type: 'creature',
+      name: 'Nothic',
+      attributes: { weakness: 'daylight' }
+    })
+    extractFn.mockResolvedValue({
+      entities: [],
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [],
+      fieldChanges: [
+        { entityRef: nothic.id, field: 'weakness', op: 'alter', value: 'daylight', oldValue: '' }, // no-op → dropped
+        { entityRef: nothic.id, field: 'weakness', op: 'add', value: 'daylight', oldValue: '' }, // no-op → dropped
+        { entityRef: nothic.id, field: 'habitat', op: 'cut', value: '', oldValue: '' }, // nothing to clear → dropped
+        { entityRef: nothic.id, field: 'weakness', op: 'alter', value: 'fire', oldValue: '' } // real change → kept
+      ]
+    })
+
+    const res = await extract(ctx, { campaignId, text: 't', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.fieldChanges).toHaveLength(1)
+    expect(res.proposal.fieldChanges[0].value).toBe('fire')
   })
 })
 

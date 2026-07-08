@@ -4,6 +4,7 @@ import {
   type Entity,
   type EntityType,
   type Lifecycle,
+  type Note,
   type NoteConfidence
 } from '@shared/entity-types'
 import type {
@@ -23,8 +24,8 @@ import type {
   ProposedStatusChange,
   RawExtraction
 } from '@shared/import-types'
-import { isRelationAllowed, isRelationKey } from '@shared/relations'
-import { profileFor } from '@shared/entity-profiles'
+import { RELATIONS, isRelationAllowed, isRelationKey, type RelationKey } from '@shared/relations'
+import { profileFor, type StatusPreset } from '@shared/entity-profiles'
 import type { UpdateEntityInput } from '@shared/ipc-types'
 import type { DbContext } from './db-context'
 import type { VectorStore } from './vector-store.service'
@@ -32,7 +33,7 @@ import { FUZZY_THRESHOLD, nameMatchScore } from './vector-store.service'
 import { lifecycleHeuristic } from './chronology.service'
 import { createEntity, getEntity, listEntities, updateEntity } from './entity.service'
 import { createLink, findOpenLink, severLink } from './link.service'
-import { createNote } from './note.service'
+import { createNote, listAllNotes } from './note.service'
 import { indexEntity, indexNote } from './embedding-index.service'
 import { getSettings } from './settings.service'
 import { extractChangeset as claudeExtract, isAvailable } from './claude.service'
@@ -60,6 +61,10 @@ export async function extract(
 
     const existing = listEntities(ctx, campaignId)
     const { suggestModel, suggestEffort } = getSettings()
+    // ADR-030 v3: the backstory flow names its subject so the standing ties anchor to that character.
+    const subject = req.backstorySubjectId
+      ? existing.find((e) => e.id === req.backstorySubjectId)
+      : undefined
     const raw = await claudeExtract({
       text,
       existing: existing.map((e) => ({
@@ -74,9 +79,12 @@ export async function extract(
       model: suggestModel,
       effort: suggestEffort,
       withChanges: req.withChanges,
+      backstorySubject: subject ? { id: subject.id, name: subject.name } : undefined,
       signal
     })
-    const proposal = validateExtraction(raw, existing)
+    // ADR-031: existing notes + live edges feed the dedup — an exact re-import drops silently, a
+    // near-duplicate note is flagged for review, an already-recorded tie never reaches the review.
+    const proposal = validateExtraction(ctx, raw, existing, listAllNotes(ctx, campaignId))
     if (
       proposal.entities.length === 0 &&
       proposal.notes.length === 0 &&
@@ -109,7 +117,12 @@ export async function extract(
  * and drop notes left with no valid reference. `index` stays the model's ORIGINAL position so refs line
  * up across validation and apply.
  */
-function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionProposal {
+function validateExtraction(
+  ctx: DbContext,
+  raw: RawExtraction,
+  existing: Entity[],
+  existingNotes: Note[]
+): ExtractionProposal {
   const existingById = new Set(existing.map((e) => e.id))
 
   // 1) Validate entities, keeping each one's ORIGINAL index (note refs are positional).
@@ -136,12 +149,15 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
         }
       }
     }
+    // Snap a preset-matching status to its canonical casing ("alive" → "Alive", ADR-031 as-built).
+    const rawStatus = strOrUndef(e.status)
+    const statusPreset = presetStatusFor(e.type as EntityType, rawStatus ?? null)
     valids.push({
       index: i,
       type: e.type as EntityType,
       name,
       description: strOrUndef(e.description),
-      status: strOrUndef(e.status),
+      status: statusPreset ? statusPreset.label : rawStatus,
       attributes: Object.keys(attributes).length ? attributes : undefined
     })
   })
@@ -192,6 +208,14 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
   }
 
   // 5) Notes: clean content, resolve + dedup refs, drop any note with no valid reference.
+  //    Dedup (ADR-031): an EXACT normalized match — against the campaign's existing notes or an earlier
+  //    note in this batch — is dropped outright (it's already recorded); a NEAR-duplicate of an existing
+  //    note (token overlap ≥ NOTE_DUP_THRESHOLD) is kept but flagged, so review defaults it OFF.
+  const existingNorms = existingNotes.map((n) => ({
+    norm: normalizeNoteText(n.content),
+    tokens: noteTokens(n.content)
+  }))
+  const seenNoteNorms = new Set<string>()
   const notes: ProposedNote[] = []
   for (const n of raw.notes ?? []) {
     if (!n || typeof n.content !== 'string' || !n.content.trim()) continue
@@ -207,12 +231,25 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
       refs.push(resolved)
     }
     if (refs.length === 0) continue
+    const content = n.content.trim()
+    const norm = normalizeNoteText(content)
+    if (seenNoteNorms.has(norm)) continue // intra-batch duplicate
+    seenNoteNorms.add(norm)
+    if (existingNorms.some((ex) => ex.norm === norm)) continue // already recorded verbatim
+    const tokens = noteTokens(content)
+    const possibleDuplicate = existingNorms.some((ex) => jaccard(tokens, ex.tokens) >= NOTE_DUP_THRESHOLD)
     const tags = (Array.isArray(n.tags) ? n.tags : [])
       .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
       .map((t) => t.trim())
     const confidence: NoteConfidence =
       n.confidence === 'rumored' || n.confidence === 'suspected' ? n.confidence : 'confirmed'
-    notes.push({ content: n.content.trim(), entityRefs: refs, tags, confidence })
+    notes.push({
+      content,
+      entityRefs: refs,
+      tags,
+      confidence,
+      possibleDuplicate: possibleDuplicate || undefined
+    })
   }
 
   // ---- Changeset v2 (ADR-018): status + relationship changes (absent unless withChanges) ----
@@ -236,9 +273,20 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
       typeof sc.lifecycle === 'string' && (LIFECYCLES as readonly string[]).includes(sc.lifecycle)
         ? (sc.lifecycle as Lifecycle)
         : null
-    const status = strOrUndef(sc.status) ?? null
-    if (!validLifecycle && status === null) continue
-    const lifecycle = validLifecycle ?? lifecycleHeuristic(status)
+    const rawStatus = strOrUndef(sc.status) ?? null
+    if (!validLifecycle && rawStatus === null) continue
+    // Snap a preset match to its canonical label + EXPLICIT lifecycle (ADR-031 as-built) — the same
+    // mapping the form's status combobox applies. The preset wins over a contradictory model lifecycle,
+    // and it's the only path to `presumed_ended` (the heuristic never derives it, ADR-021).
+    const preset = presetStatusFor(typeOfRef(ref), rawStatus)
+    const status = preset ? preset.label : rawStatus
+    const lifecycle = preset ? preset.lifecycle : (validLifecycle ?? lifecycleHeuristic(status))
+    // ADR-031: proposing an existing entity's CURRENT state is a guaranteed no-op (updateEntity only
+    // appends history when something changed) — drop it instead of surfacing review noise.
+    if (ref.kind === 'existing') {
+      const ent = existing.find((e) => e.id === ref.entityId)
+      if (ent && ent.lifecycle === lifecycle && (ent.status ?? null) === status) continue
+    }
     const key = `${refKey(ref)}:${lifecycle}:${status ?? ''}`
     if (seenStatus.has(key)) continue
     seenStatus.add(key)
@@ -261,8 +309,20 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
       const ft = typeOfRef(fromRef)
       const tt = typeOfRef(toRef)
       if (!ft || !tt || !isRelationAllowed(rc.relation, ft, tt)) continue
+      // ADR-031: a tie that's ALREADY live between two existing entities is a no-op (createLink is
+      // idempotent, incl. the inverse authoring direction) — drop it instead of re-proposing it on
+      // every re-run of the same text.
+      if (
+        fromRef.kind === 'existing' &&
+        toRef.kind === 'existing' &&
+        findOpenLink(ctx, fromRef.entityId, toRef.entityId, rc.relation)
+      ) {
+        continue
+      }
     }
-    const key = `${refKey(fromRef)}>${refKey(toRef)}:${rc.relation}:${rc.action}`
+    // Intra-batch dedup, DIRECTION-AWARE (ADR-031): "A ally_of B" + "B ally_of A" (symmetric), and
+    // "A located_in B" + "B contains A" (directed pair), are the same edge — canonicalize before keying.
+    const key = `${canonicalRelKey(refKey(fromRef), refKey(toRef), rc.relation)}:${rc.action}`
     if (seenRel.has(key)) continue
     seenRel.add(key)
     relationshipChanges.push({ fromRef, toRef, relation: rc.relation, action: rc.action })
@@ -296,15 +356,20 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
         ? attrStringArray(ent.attributes[field])
         : []
 
+    // Scalar no-ops (ADR-031): setting the value already there, or clearing an empty key, is noise.
+    const scalarCurrent = isList ? null : String(ent.attributes[field] ?? '')
     if (op === 'add') {
       if (!value) continue
       if (isList && current.includes(value)) continue // already present
+      if (!isList && scalarCurrent === value) continue // already set to this
     } else if (op === 'cut') {
       if (isList && !current.includes(oldValue ?? value ?? '')) continue // must name a real item
+      if (!isList && !scalarCurrent) continue // nothing to clear
     } else {
       // alter
       if (!value) continue
       if (isList && !(oldValue && current.includes(oldValue))) continue // must reference a real item
+      if (!isList && scalarCurrent === value) continue // no-op alter
     }
 
     const key = `${ref.entityId}:${field}:${op}:${value ?? ''}:${oldValue ?? ''}`
@@ -322,6 +387,48 @@ function strOrUndef(v: unknown): string | undefined {
 
 function attrStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+/** Case-insensitive match of a status against the type's curated presets (ADR-031 as-built): returns the
+ *  canonical preset — label casing + its EXPLICIT lifecycle — the mapping the form's combobox applies. */
+function presetStatusFor(type: EntityType | null, raw: string | null): StatusPreset | null {
+  if (!type || !raw) return null
+  const t = raw.trim().toLowerCase()
+  return (profileFor(type).status ?? []).find((p) => p.label.toLowerCase() === t) ?? null
+}
+
+// ---- Dedup helpers (ADR-031) ----
+
+/** Two notes whose token overlap reaches this are "the same fact reworded" — flagged, review-off. */
+const NOTE_DUP_THRESHOLD = 0.8
+
+/** Case/punctuation/whitespace-insensitive canonical form — the EXACT-duplicate identity. */
+function normalizeNoteText(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Meaningful words (≥3 chars) as a set — order/casing/punctuation don't matter for similarity. */
+function noteTokens(s: string): Set<string> {
+  return new Set(normalizeNoteText(s).split(' ').filter((t) => t.length >= 3))
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let inter = 0
+  for (const t of a) if (b.has(t)) inter++
+  return inter / (a.size + b.size - inter)
+}
+
+/** Direction-independent identity for a relationship edge: "A ally_of B" ≡ "B ally_of A" (symmetric)
+ *  and "A located_in B" ≡ "B contains A" (directed pair) — mirrors findOpenLink's equivalence. */
+function canonicalRelKey(fromKey: string, toKey: string, relation: RelationKey): string {
+  const fwd = `${fromKey}>${toKey}:${relation}`
+  const rev = `${toKey}>${fromKey}:${RELATIONS[relation].inverseKey}`
+  return fwd < rev ? fwd : rev
 }
 
 /**
@@ -367,6 +474,9 @@ export function applyChangeset(
         name: ce.name,
         description: ce.description,
         status: ce.status,
+        // A preset status carries an explicit lifecycle (npc "Missing" → presumed_ended) that the
+        // heuristic can never derive (ADR-021) — adopt it, exactly like the form's combobox does.
+        lifecycle: presetStatusFor(ce.type, ce.status ?? null)?.lifecycle,
         attributes: ce.attributes,
         // Backfill (ADR-018): stamp the baseline at the entity's intro session, falling back to the
         // batch's session. A NULL batch session (undated import / backstory, ADR-030) flows through as an

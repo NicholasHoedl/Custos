@@ -42,6 +42,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [028](028-changeset-field-changes.md) | Changeset field changes: add/cut/alter to existing entities' traits/goals/flaws & attributes | Accepted | 2026-07-07 |
 | [029](029-main-character-overhaul.md) | Main character overhaul: mandatory single-lens protagonist, main-char-only depth, Voice Examples & derive-from-backstory | Accepted | 2026-07-07 |
 | [030](030-character-page-unified-persona.md) | Character page (first-in-nav home for the main character) + unified single-canonical persona generator | Accepted | 2026-07-07 |
+| [031](031-changeset-dedup-hardening.md) | Changeset dedup hardening: near-duplicate notes, already-live ties, no-op changes | Accepted | 2026-07-08 |
 
 ## Status legend
 

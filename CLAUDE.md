@@ -55,7 +55,17 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   to one field compound. `validateExtraction` drops `#index` (new) refs, off-profile fields
   (`profileFor`), and list cut/alter whose `oldValue` doesn't match a current item;
   `buildExtractionUserContent` surfaces current fields ONLY for text-mentioned entities and ONLY when
-  `withChanges`. **No migration** (reuses existing columns).
+  `withChanges`. **No migration** (reuses existing columns). Relationship items are proposed for
+  **STANDING ties** the text establishes (family/membership/ownership/residence — `CHANGES_INSTRUCTIONS`
+  glosses the relation vocabulary, `related_to` = family), not just narrated form/sever; the backstory
+  flow passes `backstorySubjectId` so ties anchor to the MC (ADR-030 v3). **Dedup (ADR-031):**
+  `validateExtraction` drops verbatim-duplicate notes (normalized, vs existing notes + intra-batch) and
+  flags near-dupes (`possibleDuplicate` → review seeds them OFF with a badge), drops `form` ties whose
+  live edge already exists (`findOpenLink`) + direction-equivalent intra-batch dupes (`canonicalRelKey`),
+  and drops status/scalar-field no-ops — re-running the same text yields a near-empty changeset.
+  Extracted statuses SNAP to the type's curated presets (case-insensitive → canonical label + the
+  preset's EXPLICIT lifecycle, the only path to `presumed_ended`; `STATUS_VOCAB` in the prompt is
+  generated from `ENTITY_PROFILES`; free text stays allowed).
 - **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` /
   `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
   `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,

@@ -15,6 +15,7 @@ import {
   type Lifecycle,
   type NoteConfidence
 } from '@shared/entity-types'
+import { ENTITY_PROFILES } from '@shared/entity-profiles'
 import { RELATIONS } from '@shared/relations'
 import type { RawExtraction } from '@shared/import-types'
 import type { RetrievedChunk } from './vector-store.service'
@@ -790,11 +791,19 @@ export async function deriveProfileCall(params: DeriveProfileParams): Promise<Re
 
 // ---- Import extraction (paste-and-extract) ----
 
+// The curated status vocabulary per type, generated from the profiles so the prompt can never drift from
+// the pickers (ADR-031 as-built). Free text stays allowed — the validator snaps matches to canonical.
+const STATUS_VOCAB = ENTITY_TYPES.map(
+  (t) => `${t}: ${(ENTITY_PROFILES[t].status ?? []).map((s) => s.label).join(' | ')}`
+).join('; ')
+
 const EXTRACTION_INSTRUCTIONS = `You extract structured campaign data from pasted raw text (session notes, a chat log, a backstory doc) for a tabletop RPG tracker. Return ENTITIES and NOTES.
 
 ONLY WHAT THE TEXT SUPPORTS. Extract only entities and facts the text states or strongly implies — invent nothing. Prefer fewer, high-confidence items. If the text contains none of a kind, return an empty array.
 
 ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event, creature), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance; creature: abilities, tactics, weakness, habitat. Never invent an attribute value the text doesn't give.
+
+STATUSES. Per type, prefer EXACTLY one of these; use free text only when none fits: ${STATUS_VOCAB}.
 
 An "event" entity is ONLY for a large-scale event that changes the WORLD — a city destroyed, a ruler assassinated, a war declared, a plague, a historically significant happening (usually independent of the party). What the party did, found, fought, or witnessed in a session is a NOTE, never an event entity — unless the outcome itself is world-changing (they killed the king).
 
@@ -806,13 +815,15 @@ REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its positi
 
 // Changeset v2 (ADR-018, backfill interview): additionally extract the CHANGES the text narrates, so
 // they can be stamped at the session under review and feed the as-of timeline.
-const CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. Only emit CHANGES the text narrates — never a state merely described as ongoing.
+const CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. status uses the same per-type STATUSES vocabulary above — prefer a listed value; free text only when none fits. Only emit CHANGES the text narrates — never a state merely described as ongoing.
 
-RELATIONSHIP CHANGES. When the text narrates a relationship forming or ending — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — add a relationshipChanges item {fromRef, toRef, relation, action} with action "form" or "sever", using only the allowed relation keys. Keep the narrative note describing it as well.
+RELATIONSHIPS. Add a relationshipChanges item {fromRef, toRef, relation, action} BOTH when the text narrates a relationship forming ("form") or ending ("sever") — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — AND when it establishes a STANDING relationship (action "form"): family, friendship or mentorship, membership in a group, ownership, or where someone lives or something sits. Use "sever" ONLY for a narrated ending. Capture ties the text asserts, not incidental mentions of strangers. In a personal backstory, nearly every named person, place, or group has a standing tie to its subject — capture each one. Keep the narrative note describing the relationship as well.
+
+Relation keys and their meanings — pick the closest, authored from the forward side (the inverse is derived): located_in (someone or something is in a place) · member_of (a person belongs to a faction or group) · owns (a person or faction owns an item) · quest_giver_of (an npc or faction gives a quest) · involves (a quest or event involves someone or something) · ally_of (friends, companions, allies) · enemy_of (rivals, foes) · knows (acquainted) · related_to (FAMILY or kin — a sibling, parent, spouse, cousin; or any close personal bond no other key fits).
 
 FIELD CHANGES. When the text reveals that an EXISTING entity's nature or details CHANGED — a new trait, goal, or flaw; one that no longer holds; or an updated type-specific attribute (a creature's weakness learned, a faction's alignment revealed, a quest's reward set) — add a fieldChanges item {entityRef, field, op, value, oldValue}. entityRef is an EXISTING entity's id (NEVER a "#index" — a new entity already carries its fields). field is "traits", "goals", or "flaws", OR one of that type's attribute keys (the same keys listed under ENTITIES). op: "add" a new value; "cut" one that no longer holds; "alter" to reword or replace one. For a LIST field (traits/goals/flaws), when cutting or altering put the EXACT existing item in oldValue — copy it verbatim from the existing-entities list — and the new text in value. Leave value or oldValue as "" when not applicable. Only propose changes the text NARRATES; never change an entity's name.
 
-These changes use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text narrates none, return empty arrays.`
+These changes use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text supports none, return empty arrays.`
 
 /** System prompt for import extraction — the (cacheable) instructions. */
 export function buildExtractionSystem(withChanges = false): Anthropic.TextBlockParam[] {
@@ -938,11 +949,14 @@ export interface ExtractExistingEntity {
   attributes?: Record<string, unknown>
 }
 
-/** The user turn for extraction: the existing-entity list (linking + field changes) + the raw pasted text. */
+/** The user turn for extraction: the existing-entity list (linking + field changes) + the raw pasted text.
+ *  `backstorySubject` (ADR-030 v3): the character whose personal backstory the text is — named so the
+ *  standing ties anchor to them. */
 export function buildExtractionUserContent(
   text: string,
   existing: ExtractExistingEntity[],
-  withChanges = false
+  withChanges = false,
+  backstorySubject?: { id: string; name: string }
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (existing.length) {
@@ -975,11 +989,20 @@ export function buildExtractionUserContent(
         : `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
     })
   }
+  if (backstorySubject) {
+    content.push({
+      type: 'text',
+      text: `This text is the personal BACKSTORY of ${backstorySubject.name} — entity ${backstorySubject.id} in the list above. It establishes that character's standing relationships: most relationship items you emit should involve ${backstorySubject.id}.`
+    })
+  }
   content.push({ type: 'text', text: `Raw text to extract from:\n\n${text}` })
+  const changesAsk = backstorySubject
+    ? `Extract the entities, notes, status changes, relationship changes (especially ${backstorySubject.name}'s standing ties), and field changes as JSON.`
+    : 'Extract the entities, notes, status changes, relationship changes, and field changes as JSON.'
   content.push({
     type: 'text',
     text: withChanges
-      ? 'Extract the entities, notes, status changes, relationship changes, and field changes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
+      ? `${changesAsk} Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.`
       : 'Extract the entities and notes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
   })
   return content
@@ -991,6 +1014,7 @@ export interface ExtractChangesetParams {
   model: string
   effort: 'medium' | 'high'
   withChanges?: boolean // changeset v2 (backfill): also extract status/relationship changes
+  backstorySubject?: { id: string; name: string } // ADR-030 v3: whose backstory the text is
   signal?: AbortSignal
 }
 
@@ -1002,7 +1026,12 @@ export async function extractChangeset(params: ExtractChangesetParams): Promise<
     effort: params.effort,
     schema: extractionSchema(withChanges),
     system: buildExtractionSystem(withChanges),
-    content: buildExtractionUserContent(params.text, params.existing, withChanges),
+    content: buildExtractionUserContent(
+      params.text,
+      params.existing,
+      withChanges,
+      params.backstorySubject
+    ),
     // A full-session paste extracts into many entities + notes — a larger budget than the 8192 default
     // (shared with adaptive thinking) so a real-world paste doesn't truncate mid-JSON.
     maxTokens: 16384,

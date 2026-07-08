@@ -39,7 +39,7 @@ function seedEntity(p: ProposedEntity): ConfirmedEntity {
  * `apply` accepts a session override (roster → session 1; beats → the session under review) instead
  * of the app's active session.
  */
-export function useImport(opts?: { withChanges?: boolean }): {
+export function useImport(opts?: { withChanges?: boolean; backstorySubjectId?: string }): {
   status: ImportStatus
   proposal: ExtractionProposal | null
   entities: ConfirmedEntity[]
@@ -60,6 +60,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
   reset: () => void
 } {
   const withChanges = opts?.withChanges ?? false
+  const backstorySubjectId = opts?.backstorySubjectId
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [proposal, setProposal] = useState<ExtractionProposal | null>(null)
   const [entities, setEntities] = useState<ConfirmedEntity[]>([])
@@ -81,7 +82,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
       setError(null)
       setResult(null)
       ledger.import
-        .extract({ campaignId: activeCampaignId, text, withChanges })
+        .extract({ campaignId: activeCampaignId, text, withChanges, backstorySubjectId })
         .then((res) => {
           if (!res.ok) {
             setStatus('idle')
@@ -96,7 +97,9 @@ export function useImport(opts?: { withChanges?: boolean }): {
               entityRefs: n.entityRefs,
               tags: n.tags,
               confidence: n.confidence,
-              include: true
+              // A near-duplicate of an existing note (ADR-031) starts UNCHECKED — opt in to keep it.
+              include: !n.possibleDuplicate,
+              possibleDuplicate: n.possibleDuplicate
             }))
           )
           setStatusChanges(res.proposal.statusChanges.map((c) => ({ ...c, include: true })))
@@ -111,7 +114,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
           setError(String(e))
         })
     },
-    [activeCampaignId, withChanges]
+    [activeCampaignId, withChanges, backstorySubjectId]
   )
 
   const apply = useCallback(

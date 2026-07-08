@@ -15,6 +15,9 @@ export interface ExtractRequest {
   text: string
   /** Changeset v2: also extract status/relationship changes (backfill interview). Default false. */
   withChanges?: boolean
+  /** ADR-030 v3: the existing entity whose personal BACKSTORY `text` is (the main character) — the
+   *  extractor is told, so the standing ties it proposes anchor to that character. */
+  backstorySubjectId?: string
 }
 
 /** A reference to an entity in the changeset — a proposed-new one (by index) or an existing id. */
@@ -62,6 +65,9 @@ export interface ProposedNote {
   entityRefs: EntityRef[]
   tags: string[]
   confidence: NoteConfidence // epistemic weight (ADR-021); validator defaults to 'confirmed'
+  /** ADR-031: the content closely matches an EXISTING note (near-duplicate) — review defaults it OFF.
+   *  Exact-normalized duplicates never reach the proposal at all (dropped in validation). */
+  possibleDuplicate?: boolean
 }
 
 /** A validated status/lifecycle change, to be stamped at the batch's session on apply (ADR-018). */
@@ -133,6 +139,7 @@ export interface ConfirmedNote {
   tags: string[]
   confidence: NoteConfidence
   include: boolean
+  possibleDuplicate?: boolean // ADR-031: shown as a review badge; seeds include:false
 }
 
 export interface ConfirmedStatusChange {

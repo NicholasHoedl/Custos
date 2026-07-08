@@ -43,3 +43,39 @@ describe('extraction prompt — field changes (ADR-028)', () => {
     expect(content).not.toMatch(/traits: Cautious/) // but no fields
   })
 })
+
+describe('extraction prompt — status vocabulary (ADR-031 as-built)', () => {
+  it('teaches each type’s curated status presets (generated from the profiles)', () => {
+    const sys = buildExtractionSystem(false)[0].text
+    expect(sys).toMatch(/pc: Active \| Inactive \| Dead/)
+    expect(sys).toMatch(/npc: Alive \| Dead \| Missing \| Unknown/)
+    expect(sys).toMatch(/quest: Active \| Completed \| Failed \| On Hold/)
+  })
+})
+
+describe('extraction prompt — standing relationships (ADR-030 v3)', () => {
+  it('the withChanges system asks for STANDING ties and teaches the relation vocabulary', () => {
+    const sys = buildExtractionSystem(true)[0].text
+    expect(sys).toMatch(/STANDING relationship/) // not just narrated form/sever changes
+    expect(sys).toMatch(/related_to \(FAMILY/) // the family relation is glossed (the "little sister" case)
+    expect(sys).toMatch(/member_of/) // the vocabulary is spelled out, not schema-only
+    expect(sys).toMatch(/sever" ONLY for a narrated ending/i)
+    const plain = buildExtractionSystem(false)[0].text
+    expect(plain).not.toMatch(/related_to/) // the plain Import prompt carries no change vocabulary
+  })
+
+  it('names the backstory subject in the user turn so ties anchor to the character', () => {
+    const existing = [{ id: 'mc-1', name: 'Alaeric', type: 'pc' }]
+    const withSubject = textOf(
+      buildExtractionUserContent('Raised in the dock ward…', existing, true, {
+        id: 'mc-1',
+        name: 'Alaeric'
+      })
+    )
+    expect(withSubject).toMatch(/personal BACKSTORY of Alaeric/)
+    expect(withSubject).toMatch(/mc-1/)
+    expect(withSubject).toMatch(/standing ties/)
+    const without = textOf(buildExtractionUserContent('Raised in the dock ward…', existing, true))
+    expect(without).not.toMatch(/BACKSTORY of/)
+  })
+})

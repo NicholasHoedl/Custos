@@ -25,7 +25,11 @@ notes, and relationship ties**, applied **undated** — an explicit `sessionId: 
 **PRE-TRACKING** in `createEntity`/`createLink`/`updateEntity` (baselines + interval starts `NULL`, i.e.
 pre-campaign background; `undefined` keeps the live-capture latest-session fallback). Field changes are
 stripped from Step 2 (the MC's fields are Step 1's job); the re-run lock engages on either step's apply.
-(c) An **info popover** next to Suggest documents what it does + best practices.
+(c) An **info popover** next to Suggest documents what it does + best practices. (d) The extraction prompt
+now captures **STANDING relationships** the text establishes (family / membership / ownership / residence
+— with a glossed relation vocabulary incl. `related_to` = family), not just narrated form/sever changes —
+this applies to Chronicle/Transcribe too — and the backstory flow passes **`backstorySubjectId`** so the
+extractor is told whose backstory it's reading and anchors the ties to that character.
 
 **Date:** 2026-07-07
 **Deciders:** Solo developer

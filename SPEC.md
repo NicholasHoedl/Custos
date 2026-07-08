@@ -388,12 +388,20 @@ a bespoke two-column dashboard — text fields edit in place, the trait/goal/fla
 per-card popup editors, and the AI workflow is front-and-center: **Suggest** (with an info popover) sits on
 the backstory card — disabled with a hint when there's no backstory and until you change it after a run —
 and runs a **two-step review**: the profile fields, then **world material** (new people/places/factions,
-notes, and ties) extracted from the backstory via the changeset engine and added as undated,
-**pre-campaign background**). The
+notes, and **standing relationship ties** — the extractor is told whose backstory it is) extracted from
+the backstory via the changeset engine and added as undated, **pre-campaign background**). The
 sidebar shows a read-only **"Playing as X"** indicator that links to the page, and Codex marks the main
 character with a ★ that redirects there. The two persona generators are **collapsed into one canonical
 template**: the derive tool proposes only the structured fields, and the persona is (re)built from the full
 profile by the single generator — so the same character always gets one consistent brief.
+
+**Changeset dedup hardening** (ADR-031) — every extraction flow (Chronicle / Transcribe / the backstory
+Suggest) now dedups against the campaign before review: verbatim-duplicate notes are dropped, reworded
+near-duplicates arrive flagged and unchecked ("Possible duplicate"), already-recorded ties and no-op
+status/field changes never re-surface — so re-running the same text yields a near-empty changeset instead
+of accumulating duplicates. (Resolves the note-dedup follow-up deferred in ADR-018.) AI-suggested statuses
+prefer each type's curated presets and snap to their canonical form, adopting the preset's lifecycle — an
+imported "Missing" npc correctly reads as *presumed lost*.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file
