@@ -4,11 +4,12 @@ import type { RecallSource } from '@shared/recall-types'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useRecall } from '@renderer/hooks/use-recall'
-import { useSessions } from '@renderer/hooks/use-ledger'
+import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
+import { PromptStarters } from '@renderer/components/recall/PromptStarters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import {
   Banner,
@@ -26,6 +27,7 @@ export function RecallView() {
   const recall = useRecall()
   const [query, setQuery] = useState('')
   const { sessions } = useSessions(activeCampaignId)
+  const { entities } = useEntities(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
 
   if (!activeCampaignId) {
@@ -112,6 +114,7 @@ export function RecallView() {
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
+            <PromptStarters entities={entities} onUse={(q) => setQuery(q)} />
             <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
           </div>
           {streaming ? (
