@@ -42,7 +42,7 @@ export interface RecallDone {
   reason: RecallReason
 }
 
-export type RecallErrorKind = 'offline' | 'no_key' | 'no_model' | 'api' | 'unknown'
+export type RecallErrorKind = 'offline' | 'no_key' | 'bad_key' | 'no_model' | 'api' | 'unknown'
 
 export interface RecallError {
   requestId: string

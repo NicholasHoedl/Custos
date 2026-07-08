@@ -23,7 +23,7 @@ export interface RecapDone {
   reason: RecapReason
 }
 
-export type RecapErrorKind = 'offline' | 'no_key' | 'api' | 'unknown'
+export type RecapErrorKind = 'offline' | 'no_key' | 'bad_key' | 'api' | 'unknown'
 
 export interface RecapError {
   requestId: string

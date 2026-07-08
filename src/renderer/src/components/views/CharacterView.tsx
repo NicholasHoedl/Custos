@@ -6,7 +6,7 @@ import { ledger } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
-import { PaneShell, PaneHeader } from '@renderer/components/chrome'
+import { EmptyState, PaneShell, PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import {
   Select,
@@ -19,8 +19,8 @@ import { CharacterDashboard } from '@renderer/components/entities/CharacterDashb
 import { EntityForm } from '@renderer/components/entities/EntityForm'
 
 // The Character page (ADR-030): the single home for the campaign's MAIN CHARACTER. You set / re-designate
-// it here, and manage its full profile — the dashboard reuses EntityDetail (profile, persona, the
-// derive-from-backstory tool, relationships, notes, history). First item in the navbar.
+// it here, and manage its full profile — the bespoke CharacterDashboard (profile, persona, the
+// Draft-from-backstory tool, relationships, notes, history). First item in the navbar.
 export function CharacterView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const { campaigns } = useCampaigns()
@@ -32,10 +32,9 @@ export function CharacterView() {
 
   if (!activeCampaignId) {
     return (
-      <PaneShell size="reading">
-        <PaneHeader title="Character" description="Your main character — the hero you play." />
-        <p className="text-sm text-muted-foreground">Select a campaign to manage its main character.</p>
-      </PaneShell>
+      <EmptyState icon={UserRound} title="No campaign selected">
+        Choose a campaign in the sidebar to manage its main character.
+      </EmptyState>
     )
   }
 
@@ -45,7 +44,7 @@ export function CharacterView() {
       <PaneShell size="form">
         <PaneHeader
           title="Character"
-          description="Your main character is the hero you play and whose voice the AI speaks in."
+          description="Your main character is the hero you play and whose voice the Keeper speaks in."
         />
         <div className="space-y-3 rounded-lg border border-border bg-card/60 p-6 text-center">
           <UserRound className="mx-auto size-8 text-primary/70" />

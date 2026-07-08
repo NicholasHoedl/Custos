@@ -6,7 +6,8 @@ import { ledger } from '@renderer/lib/ipc'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 
-// The in-character persona for a PC (used by Recall). Generated from the character's fields; editable.
+// The in-character persona brief — the cached voice that grounds Lore, Counsel, and Converse.
+// Generated from the character's fields; hand-editable.
 export function PersonaEditor({ entityId }: { entityId: string }) {
   const [persona, setPersona] = useState<PersonaBrief | null>(null)
   const [draft, setDraft] = useState('')
@@ -92,7 +93,8 @@ export function PersonaEditor({ entityId }: { entityId: string }) {
       {!persona ? (
         <div className="rounded-md border border-dashed border-border p-3 text-center">
           <p className="text-xs text-muted-foreground">
-            Generate an in-character voice for Consult, from this character&apos;s traits and goals.
+            Generate the in-character voice that grounds Lore, Counsel, and Converse — built from this
+            character&apos;s whole profile.
           </p>
           <Button size="sm" className="mt-2" onClick={generate} disabled={busy}>
             <Sparkles className="size-3.5" />

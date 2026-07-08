@@ -42,7 +42,15 @@ import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { SceneControls } from '@renderer/components/scene/SceneControls'
-import { Banner, PaneHeader, ProgressBar, SetupCard } from '@renderer/components/chrome'
+import { reasonCopy } from '@renderer/lib/ai-copy'
+import {
+  Banner,
+  EmptyState,
+  InfoPopover,
+  PaneHeader,
+  ProgressBar,
+  SetupCard
+} from '@renderer/components/chrome'
 
 const CATEGORY_ICONS: Record<SuggestCategory, LucideIcon> = {
   quest: ScrollText,
@@ -75,15 +83,9 @@ export function SuggestView() {
 
   if (!activeCampaignId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-        <Sparkles className="size-10 text-muted-foreground/50" />
-        <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">
-            Choose a campaign in the sidebar to seek counsel.
-          </p>
-        </div>
-      </div>
+      <EmptyState icon={Sparkles} title="No campaign selected">
+        Choose a campaign in the sidebar to seek counsel.
+      </EmptyState>
     )
   }
 
@@ -109,21 +111,24 @@ export function SuggestView() {
         size="lg"
         description="In-character ideas for the table — how to react now, or where to take the story next."
         action={
-          (situation.trim().length > 0 || goal.trim().length > 0 || suggest.status !== 'idle') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => {
-                suggest.reset()
-                setSituation('')
-                setGoal('')
-              }}
-            >
-              <RotateCcw className="size-3.5" />
-              Reset
-            </Button>
-          )
+          <div className="flex items-center gap-1">
+            <CounselInfo />
+            {(situation.trim().length > 0 || goal.trim().length > 0 || suggest.status !== 'idle') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => {
+                  suggest.reset()
+                  setSituation('')
+                  setGoal('')
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+                Reset
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -133,7 +138,7 @@ export function SuggestView() {
           title={
             setupError ? 'Model download failed' : 'Finish setup: download the local search model'
           }
-          body={setupError ?? 'A one-time ~30 MB download lets Suggest find the relevant context.'}
+          body={setupError ?? 'A one-time ~30 MB download lets Counsel find the relevant context.'}
           action={
             progress?.status === 'downloading' || downloading ? (
               <ProgressBar progress={progress} />
@@ -147,8 +152,8 @@ export function SuggestView() {
       ) : !onb.keyReady ? (
         <SetupCard
           icon={<KeyRound className="size-4" />}
-          title="Add your API key to get suggestions"
-          body="Counsel uses Claude to reason in character — add a key to enable it."
+          title="Add your API key to get counsel"
+          body="The Keeper reasons in your character’s voice — add a key in Settings to enable it."
           action={
             <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
               Open Settings
@@ -158,9 +163,13 @@ export function SuggestView() {
       ) : !hasPc ? (
         <SetupCard
           icon={<Users className="size-4" />}
-          title="Select your character"
-          body="Counsel reasons as a specific PC. Pick an active character in the sidebar."
-          action={null}
+          title="Set your main character"
+          body="Counsel speaks as your main character — set one on the Character page."
+          action={
+            <Button size="sm" variant="outline" onClick={() => setActiveView('character')}>
+              Character page
+            </Button>
+          }
         />
       ) : null}
 
@@ -208,7 +217,7 @@ export function SuggestView() {
                 <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
               </div>
               <Button size="sm" onClick={submit} disabled={!canSubmit}>
-                {thinking ? 'Thinking…' : 'Counsel'}
+                {thinking ? 'Thinking…' : 'Seek counsel'}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -366,9 +375,7 @@ function DirectionsList({ suggestions }: { suggestions: StorySuggestion[] }) {
           <section key={cat} className="space-y-2">
             <div className="flex items-center gap-2">
               <Icon className="size-4 text-primary" />
-              <h3 className="font-display text-sm font-medium uppercase tracking-wide text-foreground">
-                {CATEGORY_LABELS[cat]}
-              </h3>
+              <h3 className="inscribed text-xs">{CATEGORY_LABELS[cat]}</h3>
             </div>
             <ul className="space-y-2">
               {items.map((s, i) => (
@@ -385,32 +392,38 @@ function DirectionsList({ suggestions }: { suggestions: StorySuggestion[] }) {
   )
 }
 
+function CounselInfo() {
+  return (
+    <InfoPopover label="About Counsel">
+      <p className="text-sm font-medium text-foreground">What Counsel does</p>
+      <p className="text-muted-foreground">
+        Reads your main character and the campaign and offers ideas in their voice — six tagged ways to
+        react to a moment, or story directions grounded in your open quests and the party. It reasons as
+        your character; it doesn&apos;t roll dice or decide outcomes.
+      </p>
+      <p className="text-sm font-medium text-foreground">Get the best results</p>
+      <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+        <li>Set the scene — where you are and who&apos;s present sharpens the read.</li>
+        <li>Describe a concrete moment, not a vague situation.</li>
+        <li>Name a goal to bias the options toward it.</li>
+        <li>Use “as of” to ask without spoiling what your character doesn&apos;t know yet.</li>
+      </ul>
+    </InfoPopover>
+  )
+}
+
 function FailureBanner({ reason }: { reason: SuggestFailureReason }) {
   switch (reason) {
     case 'offline':
-      return (
-        <Banner icon={<WifiOff className="size-4" />}>
-          You&apos;re offline — Counsel needs an internet connection to reason in character.
-        </Banner>
-      )
+      return <Banner icon={<WifiOff className="size-4" />}>{reasonCopy('offline')}</Banner>
     case 'no_key':
-      return (
-        <Banner icon={<KeyRound className="size-4" />}>
-          No API key — add one in Settings to enable Counsel.
-        </Banner>
-      )
+      return <Banner icon={<KeyRound className="size-4" />}>{reasonCopy('no_key')}</Banner>
+    case 'bad_key':
+      return <Banner icon={<KeyRound className="size-4" />}>{reasonCopy('bad_key')}</Banner>
     case 'no_model':
-      return (
-        <Banner icon={<Download className="size-4" />}>
-          The local search model is still downloading.
-        </Banner>
-      )
+      return <Banner icon={<Download className="size-4" />}>{reasonCopy('no_model')}</Banner>
     case 'no_pc':
-      return (
-        <Banner icon={<Users className="size-4" />}>
-          Select an active character in the sidebar first.
-        </Banner>
-      )
+      return <Banner icon={<Users className="size-4" />}>{reasonCopy('no_pc')}</Banner>
     case 'invalid':
       return (
         <Banner icon={<AlertTriangle className="size-4" />}>
@@ -420,7 +433,7 @@ function FailureBanner({ reason }: { reason: SuggestFailureReason }) {
     default:
       return (
         <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-          Something went wrong reaching Claude. Try again.
+          {reasonCopy('api')}
         </Banner>
       )
   }

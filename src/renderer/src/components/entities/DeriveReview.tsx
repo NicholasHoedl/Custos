@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Entity } from '@shared/entity-types'
-import type { DeriveProfileFailureReason } from '@shared/derive-profile-types'
 import type { UpdateEntityInput } from '@shared/ipc-types'
 import { cn } from '@renderer/lib/utils'
 import { ledger } from '@renderer/lib/ipc'
 import { plural } from '@renderer/lib/format'
+import { reasonCopy } from '@renderer/lib/ai-copy'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useDeriveProfile } from '@renderer/hooks/use-derive-profile'
 import { useImport } from '@renderer/hooks/use-import'
@@ -36,17 +36,8 @@ const ALL: Accept = {
   voiceExamples: true
 }
 
-const REASON_MESSAGE: Record<DeriveProfileFailureReason, string> = {
-  no_backstory: 'Add a backstory to this character first — the tool derives everything from it.',
-  no_key: 'Add an Anthropic API key in Settings to use AI tools.',
-  bad_key: 'Your Anthropic API key was rejected — set a valid one in Settings.',
-  offline: 'You appear to be offline. Reconnect and try again.',
-  api: 'The AI request failed. Try again in a moment.',
-  invalid: 'The AI returned nothing usable. Try again.'
-}
-
 /**
- * The "Suggest from backstory" review (ADR-029/030) — a TWO-STEP wizard:
+ * The "Draft from backstory" review (ADR-029/030) — a TWO-STEP wizard:
  *   Step 1 (Profile): the derived profile FIELDS (description / traits / goals / flaws / voice) with
  *   per-field accept toggles; Apply writes the accepted fields (entity.update) then REBUILDS the persona
  *   via the one canonical generator (persona.generate).
@@ -164,11 +155,11 @@ export function DeriveReview({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display text-xl">
             <Sparkles className="size-5 text-primary" />
-            Suggest from backstory
+            Draft from backstory
           </DialogTitle>
           <DialogDescription>
             {step === 'profile'
@@ -190,7 +181,7 @@ export function DeriveReview({
               )}
               {failure && (
                 <p className="py-10 text-center text-sm text-muted-foreground">
-                  {REASON_MESSAGE[failure]}
+                  {reasonCopy(failure)}
                 </p>
               )}
               {profile && (
@@ -253,7 +244,7 @@ export function DeriveReview({
                 Reading the backstory for people, places, and ties…
               </p>
             ) : imp.status === 'review' || imp.status === 'applying' ? (
-              <div className="flex max-h-[60vh] min-h-0 flex-col">
+              <div className="flex max-h-[60vh] min-h-0 min-w-0 flex-col">
                 <ChangesetReview
                   imp={imp}
                   campaignEntities={campaignEntities}

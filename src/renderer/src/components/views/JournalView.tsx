@@ -6,7 +6,7 @@ import { EventFeed } from '@renderer/components/capture/EventFeed'
 // The Journal is the primary at-the-table view (ADR: main character + journal-driven capture): a running
 // log of what happened, each entry turned into entities/notes/changes by Claude for inline review (see
 // EventFeed). Promoted to a top-level, default view so capture-by-writing is the main path; manual entity
-// editing lives in Capture. Full-width here, it shares the same EventFeed the Capture pane still hosts.
+// editing lives in Codex. EventFeed is the sole host of the journal (Chronicle) now.
 export function JournalView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activeSessionId = useAppStore((s) => s.activeSessionId)

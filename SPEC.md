@@ -403,6 +403,14 @@ of accumulating duplicates. (Resolves the note-dedup follow-up deferred in ADR-0
 prefer each type's curated presets and snap to their canonical form, adopting the preset's lifecycle — an
 imported "Missing" npc correctly reads as *presumed lost*.
 
+**UX consolidation** (ADR-032) — a pass after a full design audit: **Sessions** and **Transcribe** are now
+top-level views (Sessions browses sessions + their summaries and hosts the recap; Codex slims to Inscribe +
+Annals); **Consult was renamed Lore** and the Character page's derive tool **"Draft from backstory"**; the
+assistant speaks as **"the Keeper"** everywhere but Settings; failure messages, empty states, and info
+popovers are unified (Counsel gained one); **notes and relationship ties are editable in place**; and a
+handful of bugs closed (a global keyboard-shortcut leak, NPC flaws being write-only, the main-character
+search detour, a dead-end when a campaign had no session).
+
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file
 export/import. The nearest queued follow-up is an **in-character recap voice**.

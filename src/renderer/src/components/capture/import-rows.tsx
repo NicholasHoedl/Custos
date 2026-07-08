@@ -72,7 +72,7 @@ export function EntityRow({
           value={entity.name}
           onChange={(e) => onPatch({ name: e.target.value })}
           disabled={!included}
-          className="h-8 flex-1"
+          className="h-8 min-w-0 flex-1"
         />
         <Select
           value={entity.type}

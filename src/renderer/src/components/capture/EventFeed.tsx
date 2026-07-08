@@ -7,6 +7,7 @@ import { useEntities, useEvents } from '@renderer/hooks/use-ledger'
 import { useImport } from '@renderer/hooks/use-import'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { useAppStore } from '@renderer/store/app-store'
+import { useUiStore } from '@renderer/store/ui-store'
 import { formatTime } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
@@ -34,15 +35,34 @@ function applySummary(r: ApplyResult): string {
 // jot a plain sentence or two of what happened; the raw line is kept here as your log, and (with an API
 // key) Claude proposes the entities, notes, status changes, and relationship links it implies for inline
 // review, applied stamped at the current session. Internals still ride the event_log table (createEvent);
-// "journal" is the user-facing name. Manual entity/note editing (Capture) becomes the fallback path.
+// "journal" is the user-facing name (Chronicle). Manual entity/note editing lives in Codex.
 export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
+  const setActiveSession = useAppStore((s) => s.setActiveSession)
   const { events, refresh } = useEvents(sessionId)
   const { entities: campaignEntities } = useEntities(activeCampaignId)
   const { status: onb } = useOnboarding()
   const imp = useImport({ withChanges: true })
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [starting, setStarting] = useState(false)
+
+  // Start the first/next session right here — Chronicle is the default view, so a campaign with no
+  // session must not dead-end on it (ADR-032). Mirrors OnboardingChecklist.startSession.
+  async function startSession(): Promise<void> {
+    if (!activeCampaignId || starting) return
+    setStarting(true)
+    try {
+      const s = await ledger.session.create({ campaignId: activeCampaignId })
+      setActiveSession(s.id)
+      useUiStore.getState().bumpSessions()
+      toast.success(`Session ${s.number} started`)
+    } catch (err) {
+      toast.error('Could not start session', { description: String(err) })
+    } finally {
+      setStarting(false)
+    }
+  }
 
   const reviewing = imp.status === 'review' || imp.status === 'applying'
   const extracting = imp.status === 'extracting'
@@ -64,7 +84,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
       await ledger.event.create({ sessionId, content })
       setText('')
       refresh()
-      // Then, if a key is configured, let Claude propose entities/notes/changes for inline review.
+      // Then, if a key is configured, the Keeper proposes entities/notes/changes for inline review.
       if (onb.keyReady) imp.extract(content)
     } catch (err) {
       toast.error('Could not save chronicle entry', { description: String(err) })
@@ -91,7 +111,14 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto p-4">
-        {ordered.length === 0 ? (
+        {!sessionId && !restoring && activeCampaignId ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
+            <p className="text-sm text-foreground">Start a session to begin your chronicle.</p>
+            <Button size="sm" className="mt-2" onClick={() => void startSession()} disabled={starting}>
+              {starting ? 'Starting…' : 'Start session'}
+            </Button>
+          </div>
+        ) : ordered.length === 0 ? (
           <p className="text-sm text-muted-foreground">No chronicle entries yet.</p>
         ) : (
           ordered.map((ev) => (

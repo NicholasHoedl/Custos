@@ -9,22 +9,22 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 
 ## The three pillars
 
-- **Capture** — entry of entities (a full per-type profile form), notes, and links, organized per
+- **Codex** — entry of entities (a full per-type profile form), notes, and links, organized per
   campaign and session. A global hotkey / `Ctrl+K` opens the add-entity form from anywhere.
-- **Recall** — ask a natural-language question; get a cited, streamed answer synthesized from the
+- **Lore** — ask a natural-language question; get a cited, streamed answer synthesized from the
   relevant notes (semantic search over local embeddings).
-- **Suggest** — in-character ideas for the moment (six tagged options in your main character's voice) or
+- **Counsel** — in-character ideas for the moment (six tagged options in your main character's voice) or
   open-ended directions for where to take the story next.
 
 Built on top of these: the **Character page** (every campaign has one **main character** — the hero you
-play and the voice the AI speaks in; a dashboard manages their profile, persona, and voice examples, and a
-**Suggest-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties your
+play and the voice the Keeper speaks in; a dashboard manages their profile, persona, and voice examples, and
+a **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties your
 backstory implies — all review-gated), **Converse** (pick another character and get a briefing on what your
 party knows and suspects about them, plus in-character questions your character could ask to draw them
-out), the **Journal** (jot a plain line of what happened; the AI proposes the entities, notes, and
-status/relationship/field changes to review), **Chronology** (the AI reasons about *when* — reconstruct the
-world "as of session N" with no future-knowledge leak), paste-and-extract **Import** (tie an import to any
-session, or none), and session **Recap**.
+out), the **Chronicle** (jot a plain line of what happened; the Keeper proposes the entities, notes, and
+status/relationship/field changes to review), **Sessions** (browse each session with its summary and a
+"previously on…" recap), chronology throughout (the world reconstructed "as of session N" with no
+future-knowledge leak), and paste-and-extract **Transcribe** (tie an import to any session, or none).
 
 ## Stack
 

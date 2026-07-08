@@ -18,6 +18,7 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 import { ChangesetReview } from '@renderer/components/capture/ChangesetReview'
+import { reasonCopy } from '@renderer/lib/ai-copy'
 import { Banner, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
 // The target-session choice: 'active' stamps at the app's current session (the default); a session id
@@ -45,8 +46,8 @@ export function ImportView() {
       <PaneShell size="form">
         <Header />
         <SetupCard
-          title="Add your API key to import"
-          body="Import uses Claude to read your text — add a key to enable it."
+          title="Add your API key to transcribe"
+          body="The Keeper reads your text and proposes what to record — add a key in Settings to enable it."
           action={
             <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
               Open Settings
@@ -65,7 +66,7 @@ export function ImportView() {
         <Header />
         <div className="rounded-lg border border-border bg-card/60 p-4">
           <p className="text-sm text-foreground">
-            Imported <strong>{r.createdEntityIds.length}</strong>{' '}
+            Transcribed <strong>{r.createdEntityIds.length}</strong>{' '}
             {plural(r.createdEntityIds.length, 'new entity', 'new entities')}
             {r.linkedEntityIds.length > 0 && <> · linked {r.linkedEntityIds.length}</>}
             {changes > 0 && (
@@ -94,7 +95,7 @@ export function ImportView() {
             setText('')
           }}
         >
-          Import more
+          Transcribe more
         </Button>
       </PaneShell>
     )
@@ -131,7 +132,7 @@ export function ImportView() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={10}
-        placeholder="Paste session notes, a chat log, or another player's write-up… Claude proposes the entities, notes, and status/relationship changes to add."
+        placeholder="Paste session notes, a chat log, or another player's write-up… the Keeper proposes the entities, notes, and changes to record."
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs text-muted-foreground">
@@ -178,7 +179,7 @@ function SessionPicker({
               {s.title ? ` — ${s.title}` : ''}
             </SelectItem>
           ))}
-        <SelectItem value={SESSION_NONE}>no session (undated)</SelectItem>
+        <SelectItem value={SESSION_NONE}>undated (pre-campaign)</SelectItem>
       </SelectContent>
     </Select>
   )
@@ -188,7 +189,7 @@ function Header() {
   return (
     <PaneHeader
       title="Transcribe"
-      description="Paste notes from anywhere — Claude proposes the entities, notes, and status/relationship changes to add, tied to a session you choose."
+      description="Paste notes from anywhere — the Keeper proposes the entities, notes, and changes to record, tied to a session you choose."
     />
   )
 }
@@ -201,23 +202,19 @@ function ReasonBanner({ reason }: { reason: ExtractFailureReason }) {
       </Banner>
     )
   if (reason === 'no_key')
-    return <Banner icon={<KeyRound className="size-4" />}>No API key — add one in Settings.</Banner>
+    return <Banner icon={<KeyRound className="size-4" />}>{reasonCopy('no_key')}</Banner>
   if (reason === 'bad_key')
     return (
       <Banner icon={<KeyRound className="size-4" />} tone="destructive">
-        Your API key was rejected — update it in Settings.
+        {reasonCopy('bad_key')}
       </Banner>
     )
   if (reason === 'offline')
-    return (
-      <Banner icon={<WifiOff className="size-4" />}>
-        You’re offline — Import needs an internet connection.
-      </Banner>
-    )
+    return <Banner icon={<WifiOff className="size-4" />}>{reasonCopy('offline')}</Banner>
   if (reason === 'too_long')
     return (
       <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-        That’s a lot of text at once — import it in smaller chunks (a section or two at a time).
+        {reasonCopy('too_long')}
       </Banner>
     )
   return (

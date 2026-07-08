@@ -33,7 +33,8 @@ import {
   CommandList
 } from '@renderer/components/ui/command'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
-import { Banner, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
+import { reasonCopy } from '@renderer/lib/ai-copy'
+import { Banner, EmptyState, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
 // Converse (the third AI lens): pick a TARGET character; Converse briefs you on what's known/suspected
 // about them and their connections, then proposes in-character questions your active PC could ask to
@@ -52,15 +53,9 @@ export function ConverseView() {
 
   if (!activeCampaignId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-        <MessagesSquare className="size-10 text-muted-foreground/50" />
-        <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">
-            Choose a campaign in the sidebar to prepare a conversation.
-          </p>
-        </div>
-      </div>
+      <EmptyState icon={MessagesSquare} title="No campaign selected">
+        Choose a campaign in the sidebar to prepare a conversation.
+      </EmptyState>
     )
   }
 
@@ -103,7 +98,7 @@ export function ConverseView() {
         <SetupCard
           icon={<KeyRound className="size-4" />}
           title="Add your API key to converse"
-          body="Converse uses Claude to reason in character — add a key to enable it."
+          body="The Keeper reasons in your character’s voice — add a key in Settings to enable it."
           action={
             <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
               Open Settings
@@ -113,9 +108,13 @@ export function ConverseView() {
       ) : !hasPc ? (
         <SetupCard
           icon={<Users className="size-4" />}
-          title="Select your character"
-          body="Converse speaks as a specific PC. Pick an active character in the sidebar."
-          action={null}
+          title="Set your main character"
+          body="Converse speaks as your main character — set one on the Character page."
+          action={
+            <Button size="sm" variant="outline" onClick={() => setActiveView('character')}>
+              Character page
+            </Button>
+          }
         />
       ) : null}
 
@@ -136,7 +135,7 @@ export function ConverseView() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
           <Button size="sm" onClick={submit} disabled={!canSubmit}>
-            {thinking ? 'Thinking…' : 'Converse'}
+            {thinking ? 'Thinking…' : 'Prepare questions'}
           </Button>
         </div>
       </div>
@@ -305,23 +304,13 @@ function ConverseAnswer({
 function FailureBanner({ reason }: { reason: ConverseFailureReason }) {
   switch (reason) {
     case 'offline':
-      return (
-        <Banner icon={<WifiOff className="size-4" />}>
-          You&apos;re offline — Converse needs an internet connection to reason in character.
-        </Banner>
-      )
+      return <Banner icon={<WifiOff className="size-4" />}>{reasonCopy('offline')}</Banner>
     case 'no_key':
-      return (
-        <Banner icon={<KeyRound className="size-4" />}>
-          No API key — add one in Settings to enable Converse.
-        </Banner>
-      )
+      return <Banner icon={<KeyRound className="size-4" />}>{reasonCopy('no_key')}</Banner>
+    case 'bad_key':
+      return <Banner icon={<KeyRound className="size-4" />}>{reasonCopy('bad_key')}</Banner>
     case 'no_pc':
-      return (
-        <Banner icon={<Users className="size-4" />}>
-          Select an active character in the sidebar first.
-        </Banner>
-      )
+      return <Banner icon={<Users className="size-4" />}>{reasonCopy('no_pc')}</Banner>
     case 'invalid':
       return (
         <Banner icon={<AlertTriangle className="size-4" />}>
@@ -331,7 +320,7 @@ function FailureBanner({ reason }: { reason: ConverseFailureReason }) {
     default:
       return (
         <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-          Something went wrong reaching Claude. Try again.
+          {reasonCopy('api')}
         </Banner>
       )
   }

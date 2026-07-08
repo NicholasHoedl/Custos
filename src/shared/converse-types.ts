@@ -30,7 +30,14 @@ export interface ConverseQuestion {
   why: string // one line: why it's worth asking now
 }
 
-export type ConverseFailureReason = 'no_key' | 'offline' | 'no_pc' | 'invalid' | 'api' | 'unknown'
+export type ConverseFailureReason =
+  | 'no_key'
+  | 'bad_key'
+  | 'offline'
+  | 'no_pc'
+  | 'invalid'
+  | 'api'
+  | 'unknown'
 
 /**
  * The result of a Converse query. On success: a briefing (three threads) + the in-character questions.

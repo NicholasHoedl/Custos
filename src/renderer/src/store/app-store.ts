@@ -57,14 +57,11 @@ interface AppState {
   activeSessionId: string | null
   activePcId: string | null
   selectedEntityId: string | null
-  /** The session picked in the Recap pane — survives pane switches (campaign-scoped, not persisted). */
-  recapSessionId: string | null
   scene: SceneContext
   setActiveCampaign: (id: string | null) => void
   setActiveSession: (id: string | null) => void
   setActivePc: (id: string | null) => void
   setSelectedEntity: (id: string | null) => void
-  setRecapSession: (id: string | null) => void
   setSceneLocation: (id: string | null) => void
   setEmbarkedQuest: (id: string | null) => void
   setNearbyPcs: (ids: string[]) => void
@@ -79,7 +76,6 @@ export const useAppStore = create<AppState>((set) => ({
   activeSessionId: initialCampaign ? persisted(sessionKey(initialCampaign)) : null,
   activePcId: persisted(PC_KEY),
   selectedEntityId: null,
-  recapSessionId: null,
   scene: persistedScene(),
   setActiveCampaign: (id) => {
     persist(CAMPAIGN_KEY, id)
@@ -90,7 +86,6 @@ export const useAppStore = create<AppState>((set) => ({
       activeSessionId: id ? persisted(sessionKey(id)) : null, // restore this campaign's last session
       activePcId: null,
       selectedEntityId: null,
-      recapSessionId: null,
       scene: { ...EMPTY_SCENE }
     })
   },
@@ -99,7 +94,6 @@ export const useAppStore = create<AppState>((set) => ({
       if (s.activeCampaignId) persist(sessionKey(s.activeCampaignId), id)
       return { activeSessionId: id }
     }),
-  setRecapSession: (id) => set({ recapSessionId: id }),
   setActivePc: (id) =>
     set((s) => {
       persist(PC_KEY, id)

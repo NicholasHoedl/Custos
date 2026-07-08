@@ -1,24 +1,18 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { CircleDashed, Pencil, Skull, Trash2 } from 'lucide-react'
+import { Pencil, Skull, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  ENTITY_TYPE_LABELS,
-  LIFECYCLE_LABELS,
-  NOTE_CONFIDENCE_LABELS,
-  type Entity
-} from '@shared/entity-types'
+import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import type { HierarchyView } from '@shared/graph-types'
 import { ledger } from '@renderer/lib/ipc'
-import { useCampaigns, useEntity, useNotes } from '@renderer/hooks/use-ledger'
+import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { formatTimestamp } from '@renderer/lib/format'
+import { NoteList } from '@renderer/components/notes/NoteList'
 import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
 import { EntityHistory } from './EntityHistory'
-import { PersonaEditor } from './PersonaEditor'
 import { Button } from '@renderer/components/ui/button'
 import { Separator } from '@renderer/components/ui/separator'
 import {
@@ -44,7 +38,6 @@ interface EntityDetailProps {
 export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted }: EntityDetailProps) {
   const { entity, refresh: refreshEntity } = useEntity(entityId)
   const { notes, refresh: refreshNotes } = useNotes(entityId)
-  const { campaigns } = useCampaigns()
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -72,15 +65,6 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
     )
   }
 
-  async function removeNote(id: string) {
-    try {
-      await ledger.note.delete(id)
-      refreshNotes()
-    } catch (err) {
-      toast.error('Could not delete note', { description: String(err) })
-    }
-  }
-
   async function handleDelete() {
     try {
       await ledger.entity.delete(entity!.id)
@@ -94,9 +78,6 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
 
   const fallen = entity.lifecycle === 'ended'
   const presumed = entity.lifecycle === 'presumed_ended'
-  // Main-character-only depth (ADR-029): backstory, persona, and voice examples belong to the MC alone.
-  const isMainCharacter =
-    campaigns.find((c) => c.id === entity.campaignId)?.mainCharacterId === entity.id
 
   return (
     <div className="flex h-full flex-col">
@@ -167,37 +148,15 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
           <p className="text-sm leading-relaxed text-foreground/90">{entity.description}</p>
         )}
 
-        {(entity.traits.length > 0 || entity.goals.length > 0) && (
+        {(entity.traits.length > 0 || entity.goals.length > 0 || entity.flaws.length > 0) && (
           <div className="space-y-2">
             {entity.traits.length > 0 && <ChipRow label="Traits" items={entity.traits} />}
             {entity.goals.length > 0 && <ChipRow label="Goals" items={entity.goals} />}
+            {entity.flaws.length > 0 && <ChipRow label="Flaws" items={entity.flaws} />}
           </div>
         )}
 
-        <AttributesBlock entity={entity} isMainCharacter={isMainCharacter} />
-
-        {isMainCharacter && entity.voiceExamples.length > 0 && (
-          <div className="space-y-1.5">
-            <h3 className="inscribed text-xs">Voice</h3>
-            <ul className="space-y-1">
-              {entity.voiceExamples.map((v, i) => (
-                <li
-                  key={i}
-                  className="border-l-2 border-metal/40 pl-3 font-display text-sm italic text-foreground/90"
-                >
-                  “{v}”
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {entity.type === 'pc' && isMainCharacter && (
-          <>
-            <Separator />
-            <PersonaEditor entityId={entity.id} />
-          </>
-        )}
+        <AttributesBlock entity={entity} />
 
         <Separator />
 
@@ -211,36 +170,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
 
         <div className="space-y-2">
           <h3 className="inscribed text-xs">Annals</h3>
-          {notes.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No annals recorded.</p>
-          ) : (
-            <ul className="space-y-2">
-              {notes.map((n) => (
-                <li
-                  key={n.id}
-                  className="group relative rounded-md border border-border bg-card/40 p-3 pr-9"
-                >
-                  <p className="whitespace-pre-wrap text-sm text-foreground/90">{n.content}</p>
-                  <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-                    <span>{formatTimestamp(n.createdAt)}</span>
-                    {n.confidence !== 'confirmed' && (
-                      <span className="inline-flex items-center gap-1 text-metal">
-                        <CircleDashed className="size-3" />
-                        {NOTE_CONFIDENCE_LABELS[n.confidence]}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => removeNote(n.id)}
-                    className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                    aria-label="Delete note"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <NoteList notes={notes} onChanged={refreshNotes} />
         </div>
 
         {fallen && (
@@ -323,17 +253,13 @@ function renderAttrValue(field: ProfileField | undefined, value: unknown): React
 
 // Type-specific fields shown with their profile labels (list as chips), followed by any ad-hoc /
 // legacy attribute keys not owned by the profile so nothing is hidden.
-function AttributesBlock({
-  entity,
-  isMainCharacter
-}: {
-  entity: Entity
-  isMainCharacter: boolean
-}) {
+function AttributesBlock({ entity }: { entity: Entity }) {
   const prof = profileFor(entity.type)
   const known = profileKeys(entity.type)
+  // `mainCharacterOnly` fields (backstory) never show here — the MC is managed on the Character page, so
+  // EntityDetail only ever renders the cast (ADR-032).
   const shown = prof.fields.filter(
-    (f) => !isEmptyValue(entity.attributes[f.key]) && (!f.mainCharacterOnly || isMainCharacter)
+    (f) => !isEmptyValue(entity.attributes[f.key]) && !f.mainCharacterOnly
   )
   const extra = Object.entries(entity.attributes).filter(
     ([k, v]) => !known.has(k) && !isEmptyValue(v)

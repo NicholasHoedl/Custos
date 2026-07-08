@@ -19,7 +19,8 @@ export function TagInput({ value, onChange, placeholder = 'Add…', id }: TagInp
   function add() {
     const tag = draft.trim()
     if (!tag) return
-    if (!value.includes(tag)) onChange([...value, tag])
+    // Case-insensitive dedupe, aligned with ListEditDialog (ADR-032).
+    if (!value.some((v) => v.toLowerCase() === tag.toLowerCase())) onChange([...value, tag])
     setDraft('')
   }
 

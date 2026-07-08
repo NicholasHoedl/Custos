@@ -1,7 +1,8 @@
 # Ledger — project guide for coding agents
 
 Local-first desktop app for tracking a tabletop RPG campaign with a time-aware, AI-backed memory
-(Capture · Recall · Suggest · Converse · Journal, plus Chronology / Import / Recap). This file is the fast
+(Character · Chronicle · Sessions · Codex · Lore · Counsel · Converse · Transcribe — see the label↔code-name
+note below; chronology is time-aware throughout). This file is the fast
 orientation for an agent with fresh context — it complements, and does not repeat, the human docs:
 
 - [`README.md`](README.md) — stack, getting started, scripts, where your data lives.
@@ -70,7 +71,15 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
   `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,
   via the shared `confidenceTag`) get injected. Change what the model is told *here*.
-- **Three AI lenses, two shapes.** Recall (**Consult**) *streams* prose with citations; Suggest (**Counsel**)
+- **UI label ↔ code name (ADR-024/032):** the nav labels are Character · Chronicle · **Sessions** · Codex ·
+  **Lore** · **Counsel** · Converse · **Transcribe** · Settings; the code names stay `recall` (Lore),
+  `suggest` (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe). Sessions +
+  Transcribe are TOP-LEVEL views (ADR-032 promoted them out of Codex, which is now Inscribe + Annals only);
+  Previously…/recap lives in the Sessions view (`SessionsView` + `components/sessions/SessionRecap`). The
+  assistant is **"the Keeper"** in-app; "Claude"/Anthropic only in Settings + onboarding. Shared failure
+  copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes `bad_key` from `no_key`); the
+  Character page's derive tool is user-labeled **"Draft from backstory"**.
+- **Three AI lenses, two shapes.** Recall (**Lore**) *streams* prose with citations; Suggest (**Counsel**)
   and Converse (ADR-025) are *single-shot structured* — `structuredObjectCall` → a discriminated-union result,
   no stream, no citations. Converse grounds by **direct fetch** (`getEntityContext` + `listForEntity(asOf)` +
   persona), NOT retrieval, so it needs no embedding model. Add a structured lens by mirroring Suggest, not Recall.

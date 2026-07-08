@@ -5,6 +5,7 @@ import { ledger } from '@renderer/lib/ipc'
 import { Input } from '@renderer/components/ui/input'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
+import { useCampaigns } from '@renderer/hooks/use-ledger'
 
 // Campaign-scoped local search over entities + their notes (P1-09). Debounced as-you-type;
 // selecting a result opens it in the capture detail panel. Focusable via Ctrl+F.
@@ -15,6 +16,8 @@ export function SearchBox({ campaignId }: { campaignId: string }) {
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const setActiveView = useUiStore((s) => s.setActiveView)
   const searchFocusNonce = useUiStore((s) => s.searchFocusNonce)
+  const { campaigns } = useCampaigns()
+  const mainCharacterId = campaigns.find((c) => c.id === campaignId)?.mainCharacterId ?? null
 
   useEffect(() => {
     if (searchFocusNonce > 0) inputRef.current?.focus()
@@ -36,8 +39,14 @@ export function SearchBox({ campaignId }: { campaignId: string }) {
   }, [query, campaignId])
 
   function open(entityId: string) {
-    setSelectedEntity(entityId)
-    setActiveView('capture')
+    // The main character's editable home is the Character page — Codex only redirects there (ADR-032),
+    // so route MC hits straight to it instead of forcing the detour through the redirect card.
+    if (entityId === mainCharacterId) {
+      setActiveView('character')
+    } else {
+      setSelectedEntity(entityId)
+      setActiveView('capture')
+    }
     setQuery('')
     setResults([])
   }

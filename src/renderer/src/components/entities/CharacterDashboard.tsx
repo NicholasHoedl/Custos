@@ -1,12 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CircleDashed, Info, Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
+import { Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  ENTITY_TYPE_LABELS,
-  LIFECYCLE_LABELS,
-  NOTE_CONFIDENCE_LABELS,
-  type Entity
-} from '@shared/entity-types'
+import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entity-types'
 import { profileFor } from '@shared/entity-profiles'
 import { lifecycleHeuristic } from '@shared/lifecycle'
 import type { UpdateEntityInput } from '@shared/ipc-types'
@@ -14,7 +9,7 @@ import { cn } from '@renderer/lib/utils'
 import { ledger } from '@renderer/lib/ipc'
 import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
 import { useUiStore } from '@renderer/store/ui-store'
-import { formatTimestamp } from '@renderer/lib/format'
+import { NoteList } from '@renderer/components/notes/NoteList'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
@@ -29,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@renderer/components/ui/alert-dialog'
-import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
+import { InfoPopover } from '@renderer/components/chrome'
 import { StatusCombobox } from './StatusCombobox'
 import { ListEditDialog } from './ListEditDialog'
 import { PersonaEditor } from './PersonaEditor'
@@ -76,9 +71,9 @@ export function CharacterDashboard({
   const savedBackstory = String(entity.attributes.backstory ?? '').trim()
   const canSuggest = Boolean(savedBackstory) && savedBackstory !== lastDerived
   const suggestHint = !savedBackstory
-    ? 'Add a backstory below to derive traits, goals, flaws, and voice.'
+    ? 'Add a backstory below to draft traits, goals, flaws, and voice from it.'
     : savedBackstory === lastDerived
-      ? 'Derived from this backstory — edit it to run Suggest again.'
+      ? 'Drafted from this backstory — edit it to draft again.'
       : ''
 
   // ---- inline saves ----
@@ -109,15 +104,6 @@ export function CharacterDashboard({
     } catch (err) {
       toast.error('Could not save', { description: String(err) })
       refresh()
-    }
-  }
-
-  async function removeNote(id: string): Promise<void> {
-    try {
-      await ledger.note.delete(id)
-      refreshNotes()
-    } catch (err) {
-      toast.error('Could not delete note', { description: String(err) })
     }
   }
 
@@ -277,10 +263,10 @@ export function CharacterDashboard({
                     variant="outline"
                     disabled={!canSuggest}
                     onClick={() => setDeriveOpen(true)}
-                    title={suggestHint || 'Derive the profile and world material from the backstory'}
+                    title={suggestHint || 'Draft the profile and world material from the backstory'}
                   >
                     <Sparkles className="size-3.5" />
-                    Suggest
+                    Draft from backstory
                   </Button>
                 </div>
               }
@@ -290,7 +276,7 @@ export function CharacterDashboard({
                 rows={10}
                 value={String(entity.attributes.backstory ?? '')}
                 onSave={(v) => void saveAttribute('backstory', v)}
-                placeholder="Where they come from — the Suggest tool derives traits, goals, flaws, and voice from this."
+                placeholder="Where they come from — Draft from backstory turns this into traits, goals, flaws, and voice."
               />
               {suggestHint && (
                 <p className="mt-1.5 text-[11px] text-muted-foreground">{suggestHint}</p>
@@ -313,36 +299,7 @@ export function CharacterDashboard({
             <EntityHistory entityId={mainCharacterId} />
           </Card>
           <Card title="Annals">
-            {notes.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No annals recorded.</p>
-            ) : (
-              <ul className="space-y-2">
-                {notes.map((n) => (
-                  <li
-                    key={n.id}
-                    className="group relative rounded-md border border-border bg-card/40 p-3 pr-9"
-                  >
-                    <p className="whitespace-pre-wrap text-sm text-foreground/90">{n.content}</p>
-                    <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-                      <span>{formatTimestamp(n.createdAt)}</span>
-                      {n.confidence !== 'confirmed' && (
-                        <span className="inline-flex items-center gap-1 text-metal">
-                          <CircleDashed className="size-3" />
-                          {NOTE_CONFIDENCE_LABELS[n.confidence]}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => void removeNote(n.id)}
-                      className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                      aria-label="Delete note"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <NoteList notes={notes} onChanged={refreshNotes} />
           </Card>
         </div>
       </div>
@@ -489,39 +446,27 @@ function ChipList({ items }: { items: string[] }) {
   )
 }
 
-// What Suggest does + how to get good results (ADR-030 v3) — the workflow is otherwise invisible
+// What drafting does + how to get good results (ADR-030 v3) — the workflow is otherwise invisible
 // until you trip over the backstory requirement or the re-run lock.
 function SuggestInfo() {
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-muted-foreground"
-          aria-label="About Suggest"
-        >
-          <Info className="size-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-2 text-xs leading-relaxed">
-        <p className="text-sm font-medium text-foreground">What Suggest does</p>
-        <p className="text-muted-foreground">
-          Reads the backstory and proposes, in two reviewed steps: first this character&apos;s profile —
-          description, traits, goals, flaws, voice examples (the persona is rebuilt from what you accept)
-          — then world material: new people, places, and factions, notes, and relationship ties, added as
-          pre-campaign background. Nothing is written until you approve each item.
-        </p>
-        <p className="text-sm font-medium text-foreground">Get the best results</p>
-        <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
-          <li>Use real names for people, places, and groups.</li>
-          <li>State relationships outright — &ldquo;Victor was his mentor.&rdquo;</li>
-          <li>Concrete events beat vague vibes.</li>
-          <li>Show how the character speaks — it feeds the voice examples.</li>
-          <li>Edit the backstory and run again any time — Suggest unlocks when it changes.</li>
-        </ul>
-      </PopoverContent>
-    </Popover>
+    <InfoPopover label="About Draft from backstory">
+      <p className="text-sm font-medium text-foreground">What drafting does</p>
+      <p className="text-muted-foreground">
+        Reads the backstory and proposes, in two reviewed steps: first this character&apos;s profile —
+        description, traits, goals, flaws, voice examples (the persona is rebuilt from what you accept)
+        — then world material: new people, places, and factions, notes, and relationship ties, added as
+        undated pre-campaign background. Nothing is written until you approve each item.
+      </p>
+      <p className="text-sm font-medium text-foreground">Get the best results</p>
+      <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+        <li>Use real names for people, places, and groups.</li>
+        <li>State relationships outright — &ldquo;Victor was his mentor.&rdquo;</li>
+        <li>Concrete events beat vague vibes.</li>
+        <li>Show how the character speaks — it feeds the voice examples.</li>
+        <li>Edit the backstory and draft again any time — the button unlocks when it changes.</li>
+      </ul>
+    </InfoPopover>
   )
 }
 

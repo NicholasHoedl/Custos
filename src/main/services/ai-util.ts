@@ -20,11 +20,13 @@ export function isAuthError(err: unknown): boolean {
   return /invalid x-api-key|authentication_error|\b401\b/i.test(msg)
 }
 
-/** Map a thrown error to a coarse failure kind shared across the AI features. */
-export function classifyError(err: unknown): 'no_key' | 'offline' | 'api' {
+/** Map a thrown error to a coarse failure kind shared across the AI features. A present-but-REJECTED
+ *  key (401) is reported as `bad_key`, distinct from `no_key` — "add a key" vs "your key was rejected"
+ *  are different diagnoses (ADR-032). */
+export function classifyError(err: unknown): 'no_key' | 'bad_key' | 'offline' | 'api' {
   const msg = err instanceof Error ? err.message : String(err)
-  // A present-but-rejected key (401) has the same remedy as no key: set a valid one in Settings.
-  if (msg === 'no_key' || isAuthError(err)) return 'no_key'
+  if (msg === 'no_key') return 'no_key'
+  if (isAuthError(err)) return 'bad_key'
   if (/network|fetch|ENOTFOUND|ECONN|timeout|getaddrinfo/i.test(msg)) return 'offline'
   return 'api'
 }

@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
-import { KeyRound } from 'lucide-react'
+import type { ComponentType, ReactNode } from 'react'
+import { Info, KeyRound } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
+import { Button } from '@renderer/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 
 // Shared view chrome — the banner/setup-card/progress/shell/header pieces every AI pane used to copy
 // locally (they had drifted apart; consolidated in the 2026-07-02 simplification pass). Pane WIDTH is
@@ -115,6 +117,55 @@ export function SetupCard({
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
+  )
+}
+
+/** The one no-campaign/no-selection empty state (ADR-032) — the audit found three drifted shapes.
+ *  Centered icon + title + one line; the line should say where to act ("Choose a campaign in the
+ *  sidebar to …"). */
+export function EmptyState({
+  icon: IconCmp,
+  title,
+  children
+}: {
+  icon: ComponentType<{ className?: string }>
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <div className="max-w-sm space-y-2 text-center">
+        <IconCmp className="mx-auto size-8 text-muted-foreground/50" />
+        <p className="font-display text-lg font-medium text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{children}</p>
+      </div>
+    </div>
+  )
+}
+
+/** The "what does this tool do" affordance (ADR-032): an ⓘ that opens a rich explainer. One shared
+ *  shape so every AI surface can carry guidance the way the Character page's drafting tool does. */
+export function InfoPopover({
+  label,
+  children,
+  align = 'end'
+}: {
+  /** Accessible name, e.g. "About Counsel". */
+  label: string
+  children: ReactNode
+  align?: 'start' | 'center' | 'end'
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label={label}>
+          <Info className="size-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align={align} className="w-80 space-y-2 text-xs leading-relaxed">
+        {children}
+      </PopoverContent>
+    </Popover>
   )
 }
 

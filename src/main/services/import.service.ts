@@ -37,7 +37,7 @@ import { createNote, listAllNotes } from './note.service'
 import { indexEntity, indexNote } from './embedding-index.service'
 import { getSettings } from './settings.service'
 import { extractChangeset as claudeExtract, isAvailable } from './claude.service'
-import { classifyError, isAuthError, isOnline } from './ai-util'
+import { classifyError, isOnline } from './ai-util'
 import log from 'electron-log/main'
 
 const ENTITY_TYPE_SET = new Set<string>(ENTITY_TYPES)
@@ -105,7 +105,7 @@ export async function extract(
     // a big paste that exhausts the output budget mid-JSON ('truncated' → too_long), and a rejected
     // API key (401 → bad_key). Everything else falls through to the shared classifier.
     const reason: ExtractFailureReason =
-      message === 'truncated' ? 'too_long' : isAuthError(err) ? 'bad_key' : classifyError(err)
+      message === 'truncated' ? 'too_long' : classifyError(err) // classifyError yields bad_key for 401s
     return { ok: false, reason, message }
   }
 }

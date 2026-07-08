@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Info, Link2, Trash2, X } from 'lucide-react'
+import { Info, Link2, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
+import { ENTITY_TYPE_LABELS, type Entity, type EntityLink } from '@shared/entity-types'
 import { relationsForTypes, type RelationKey } from '@shared/relations'
 import { ledger } from '@renderer/lib/ipc'
 import { useRelationships } from '@renderer/hooks/use-ledger'
@@ -9,6 +9,7 @@ import { useAppStore } from '@renderer/store/app-store'
 import { EntityBadge } from './EntityBadge'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
+import { Textarea } from '@renderer/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -45,11 +46,18 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   const { relationships, refresh } = useRelationships(entity.id)
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingLink, setEditingLink] = useState<EntityLink | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   // Keyboard: press "L" (while an entity is open and you're not typing) to open the link picker.
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (dialogOpen || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'l') return
+      // Only the VISIBLE editor responds (ADR-032): MainPanel keeps every view mounted (toggling
+      // `hidden`), so this window listener would otherwise fire on an off-screen pane — opening the
+      // wrong entity's dialog, or stacking two when a Codex entity is also selected. offsetParent is
+      // null when the element (or an ancestor) is display:none.
+      if (!rootRef.current || rootRef.current.offsetParent === null) return
       const el = document.activeElement as HTMLElement | null
       const tag = el?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return
@@ -79,7 +87,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
   }
 
   return (
-    <div className="space-y-2">
+    <div ref={rootRef} className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="inscribed text-xs">Ties</h3>
         <Button
@@ -112,6 +120,18 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
                 </Tooltip>
               )}
               <div className="ml-auto flex shrink-0 items-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setEditingLink(rel.link)}
+                      className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="Edit context"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit the “why / context” note</TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -152,7 +172,80 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
           refresh()
         }}
       />
+
+      {editingLink && (
+        <TieDescriptionDialog
+          link={editingLink}
+          open
+          onOpenChange={(o) => {
+            if (!o) setEditingLink(null)
+          }}
+          onSaved={refresh}
+        />
+      )}
     </div>
+  )
+}
+
+// Edit a tie's "why / context" description (ADR-032). The relation + endpoints are immutable — changing
+// those is a sever + a new link — so only the description is editable here.
+function TieDescriptionDialog({
+  link,
+  open,
+  onOpenChange,
+  onSaved
+}: {
+  link: EntityLink
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+}) {
+  const [description, setDescription] = useState(link.description ?? '')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (open) setDescription(link.description ?? '')
+  }, [open, link])
+
+  async function submit() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await ledger.link.update(link.id, { description: description.trim() || null })
+      toast.success('Tie updated')
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      toast.error('Could not update tie', { description: String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">Edit tie</DialogTitle>
+          <DialogDescription>The why or context behind this relationship.</DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          autoFocus
+          placeholder="e.g. Met in the mines; owes them a debt."
+        />
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy}>
+            {busy ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -277,7 +370,7 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
             Cancel
           </Button>
           <Button onClick={submit} disabled={!other || !relation || busy}>
-            Add link
+            {busy ? 'Adding…' : 'Add link'}
           </Button>
         </DialogFooter>
       </DialogContent>

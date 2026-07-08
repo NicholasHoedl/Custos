@@ -3,10 +3,12 @@ import { create } from 'zustand'
 export type ViewKey =
   | 'character'
   | 'journal'
+  | 'sessions'
   | 'capture'
   | 'recall'
   | 'suggest'
   | 'converse'
+  | 'import'
   | 'settings'
 
 interface UiState {

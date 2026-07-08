@@ -12,7 +12,7 @@ import { Input } from '@renderer/components/ui/input'
 import { ProgressBar } from '@renderer/components/chrome'
 
 // Capture-first welcome (O1): guides Create campaign -> Start session (the only steps needed to
-// capture), then OFFERS the API key + search model as optional "enables Recall & Suggest" steps.
+// capture), then OFFERS the API key + search model as optional "enables Lore, Counsel & Converse" steps.
 // Never blocks capture. Steps tie off by their live signals; dismissible once a campaign exists.
 
 const DISMISS_KEY = 'ledger.onboardingDismissed'
@@ -97,7 +97,7 @@ export function OnboardingChecklist() {
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        A couple of steps to get going. Capture works right away — the AI steps are optional.
+        A couple of steps to get going. Capture works right away — the Keeper’s features are optional.
       </p>
 
       <ol className="mt-3 space-y-2.5">
@@ -128,7 +128,7 @@ export function OnboardingChecklist() {
                 onClick={createCampaign}
                 disabled={!name.trim() || !mcName.trim() || busy}
               >
-                Create
+                {busy ? 'Creating…' : 'Create'}
               </Button>
             </div>
           )}
@@ -145,7 +145,7 @@ export function OnboardingChecklist() {
           )}
         </Step>
 
-        <Step done={onb.keyReady} label="Add an API key" hint="enables Recall & Suggest">
+        <Step done={onb.keyReady} label="Add an API key" hint="enables Lore, Counsel & Converse">
           {!onb.keyReady && (
             <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
               <KeyRound className="size-3.5" />

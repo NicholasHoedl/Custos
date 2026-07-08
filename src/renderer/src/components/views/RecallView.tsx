@@ -9,8 +9,10 @@ import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
+import { reasonCopy } from '@renderer/lib/ai-copy'
 import {
   Banner,
+  EmptyState,
   PaneHeader,
   PaneShell,
   ProgressBar,
@@ -28,13 +30,9 @@ export function RecallView() {
 
   if (!activeCampaignId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-        <Search className="size-10 text-muted-foreground/50" />
-        <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">Choose a campaign in the sidebar to consult it.</p>
-        </div>
-      </div>
+      <EmptyState icon={Search} title="No campaign selected">
+        Choose a campaign in the sidebar to search its lore.
+      </EmptyState>
     )
   }
 
@@ -50,7 +48,7 @@ export function RecallView() {
   return (
     <PaneShell size="reading">
       <PaneHeader
-        title="Consult"
+        title="Lore"
         size="lg"
         description="Ask in plain language — answered from your annals."
         action={
@@ -90,7 +88,7 @@ export function RecallView() {
         <SetupCard
           icon={<KeyRound className="size-4" />}
           title="Add your API key to synthesize answers"
-          body="Without a key you'll still get the relevant notes — Claude writes the answer."
+          body="Without a key you'll still get the relevant notes — the Keeper writes the answer."
           action={
             <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
               Open Settings
@@ -137,18 +135,18 @@ export function RecallView() {
 
         {recall.reason === 'offline' && (
           <Banner icon={<WifiOff className="size-4" />}>
-            You&apos;re offline — showing the relevant notes instead of a synthesized answer.
+            {reasonCopy('offline')} Showing the relevant notes instead.
           </Banner>
         )}
         {recall.reason === 'no_key' && (
           <Banner icon={<KeyRound className="size-4" />}>
-            No API key — showing the relevant notes. Add a key in Settings to get a written answer.
+            {reasonCopy('no_key')} Showing the relevant notes instead.
           </Banner>
         )}
         {recall.error && (
           <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-            {recall.error.kind === 'no_model'
-              ? 'The search model is still downloading.'
+            {['no_model', 'no_key', 'bad_key', 'offline'].includes(recall.error.kind)
+              ? reasonCopy(recall.error.kind)
               : `Something went wrong: ${recall.error.message}`}
           </Banner>
         )}
@@ -175,7 +173,7 @@ function Sources({ sources }: { sources: RecallSource[] }) {
   }
   return (
     <div className="space-y-2 border-t border-border pt-3">
-      <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Sources</h3>
+      <h3 className="inscribed text-xs">Sources</h3>
       <ul className="space-y-1.5">
         {sources.map((s, i) => {
           // A campaign-lore note (ADR-021) belongs to no entity — show it as a non-clickable card.

@@ -113,6 +113,12 @@ export interface CreateLinkInput {
   sessionId?: string | null
 }
 
+/** Edit an existing relationship's context description (ADR-032). The relation type + endpoints are
+ *  immutable — changing those is semantically a sever + a new tie, so this touches description only. */
+export interface UpdateLinkInput {
+  description?: string | null
+}
+
 export interface EntitySearchResult {
   entityId: string
   type: EntityType
@@ -162,6 +168,8 @@ export interface LedgerApi {
   }
   link: {
     create(input: CreateLinkInput): Promise<EntityLink>
+    /** Edit a relationship's context description (ADR-032). */
+    update(id: string, patch: UpdateLinkInput): Promise<EntityLink>
     /** Sever a relationship without erasing it (chronology): closes its open interval at the session. */
     sever(id: string, sessionId?: string): Promise<void>
     delete(id: string): Promise<void>
@@ -256,6 +264,7 @@ export const IPC = {
   eventList: 'event:list',
   eventCreate: 'event:create',
   linkCreate: 'link:create',
+  linkUpdate: 'link:update',
   linkSever: 'link:sever',
   linkDelete: 'link:delete',
   linkListForEntity: 'link:listForEntity',

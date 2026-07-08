@@ -58,6 +58,7 @@ const api: LedgerApi = {
   },
   link: {
     create: (input) => ipcRenderer.invoke(IPC.linkCreate, input),
+    update: (id, patch) => ipcRenderer.invoke(IPC.linkUpdate, id, patch),
     sever: (id, sessionId) => ipcRenderer.invoke(IPC.linkSever, id, sessionId),
     delete: (id) => ipcRenderer.invoke(IPC.linkDelete, id),
     listForEntity: (entityId) => ipcRenderer.invoke(IPC.linkListForEntity, entityId)

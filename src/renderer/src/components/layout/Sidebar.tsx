@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen,
+  CalendarClock,
+  FileInput,
   MessagesSquare,
   MoreHorizontal,
   NotebookPen,
@@ -22,6 +24,10 @@ import { useCampaigns, useEntities, useSessions } from '@renderer/hooks/use-ledg
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore, type ViewKey } from '@renderer/store/ui-store'
 import { SearchBox } from '@renderer/components/capture/SearchBox'
+import {
+  DeleteSessionDialog,
+  EditSessionDialog
+} from '@renderer/components/sessions/SessionDialogs'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
@@ -60,10 +66,12 @@ import {
 const NAV: { key: ViewKey; label: string; icon: typeof ScrollText }[] = [
   { key: 'character', label: 'Character', icon: UserRound },
   { key: 'journal', label: 'Chronicle', icon: NotebookPen },
+  { key: 'sessions', label: 'Sessions', icon: CalendarClock },
   { key: 'capture', label: 'Codex', icon: ScrollText },
-  { key: 'recall', label: 'Consult', icon: Search },
+  { key: 'recall', label: 'Lore', icon: Search },
   { key: 'suggest', label: 'Counsel', icon: Sparkles },
   { key: 'converse', label: 'Converse', icon: MessagesSquare },
+  { key: 'import', label: 'Transcribe', icon: FileInput },
   { key: 'settings', label: 'Settings', icon: Settings }
 ]
 
@@ -289,7 +297,7 @@ function CreateCampaignDialog({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Every campaign has one main character — the hero you play and whose voice the AI speaks in.
+              Every campaign has one main character — the hero you play and whose voice the Keeper speaks in.
               You can flesh out their profile afterward.
             </p>
           </div>
@@ -308,7 +316,7 @@ function CreateCampaignDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={!name.trim() || !mainCharacterName.trim() || busy}>
-            Create
+            {busy ? 'Creating…' : 'Create'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -396,7 +404,7 @@ function EditCampaignDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={!name.trim() || busy}>
-            Save
+            {busy ? 'Saving…' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -488,7 +496,7 @@ function DeleteCampaignDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <Button variant="destructive" onClick={doDelete} disabled={!match || busy}>
-            Delete campaign
+            {busy ? 'Deleting…' : 'Delete campaign'}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -606,152 +614,6 @@ function SessionControl({ campaignId }: { campaignId: string }) {
   )
 }
 
-function EditSessionDialog({
-  session,
-  open,
-  onOpenChange,
-  onSaved
-}: {
-  session: Session
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSaved: () => void
-}) {
-  const [title, setTitle] = useState(session.title ?? '')
-  const [date, setDate] = useState(session.date ?? '')
-  const [summary, setSummary] = useState(session.summary ?? '')
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setTitle(session.title ?? '')
-      setDate(session.date ?? '')
-      setSummary(session.summary ?? '')
-    }
-  }, [open, session])
-
-  async function submit() {
-    if (busy) return
-    setBusy(true)
-    try {
-      await ledger.session.update(session.id, {
-        title: title.trim() || null,
-        date: date.trim() || null,
-        summary: summary.trim() || null
-      })
-      toast.success(`Session ${session.number} updated`)
-      onSaved()
-      onOpenChange(false)
-    } catch (err) {
-      toast.error('Could not update session', { description: String(err) })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">Edit session {session.number}</DialogTitle>
-          <DialogDescription>Update this session’s title, date, or summary.</DialogDescription>
-        </DialogHeader>
-        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
-          <div className="space-y-1.5">
-            <Label htmlFor="es-title">Title (optional)</Label>
-            <Input
-              id="es-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  submit()
-                }
-              }}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="es-date">Date (optional)</Label>
-            <Input
-              id="es-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="es-summary">Summary (optional)</Label>
-            <Textarea
-              id="es-summary"
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              rows={3}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={busy}>
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function DeleteSessionDialog({
-  session,
-  open,
-  onOpenChange,
-  onDeleted
-}: {
-  session: Session
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onDeleted: () => void
-}) {
-  const [busy, setBusy] = useState(false)
-
-  async function doDelete() {
-    if (busy) return
-    setBusy(true)
-    try {
-      await ledger.session.delete(session.id)
-      useUiStore.getState().bumpSessions()
-      toast.success(`Session ${session.number} deleted`)
-      onOpenChange(false)
-      onDeleted()
-    } catch (err) {
-      toast.error('Could not delete session', { description: String(err) })
-      setBusy(false)
-    }
-  }
-
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="font-display">Delete session {session.number}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This removes the session and its event-log entries. Notes captured during it are kept, but
-            they’ll no longer be linked to a session. This can’t be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <Button variant="destructive" onClick={doDelete} disabled={busy}>
-            Delete
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  )
-}
 
 // The campaign's MAIN CHARACTER (★) — its single, mandatory protagonist and the ONLY in-character lens.
 // A read-only "Playing as X" indicator (ADR-030): it locks the active-PC lens to the main character and

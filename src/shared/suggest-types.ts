@@ -177,6 +177,7 @@ export interface SuggestRequest {
 
 export type SuggestFailureReason =
   | 'no_key'
+  | 'bad_key'
   | 'no_model'
   | 'offline'
   | 'no_pc'
@@ -186,7 +187,7 @@ export type SuggestFailureReason =
 
 /**
  * The result of a Suggest query, discriminated by `mode`. Attitudes ("in the moment") mode returns
- * exactly 8 multi-tagged suggestions; directions mode returns a grouped set of story suggestions. On
+ * exactly SIX multi-tagged suggestions; directions mode returns a grouped set of story suggestions. On
  * failure, a reason the renderer can render without try/catch (mirrors RecallDone.reason).
  */
 export type SuggestResult =

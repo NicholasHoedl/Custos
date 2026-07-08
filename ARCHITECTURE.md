@@ -538,7 +538,8 @@ All communication between renderer and main process goes through typed IPC chann
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
 > Notably: the renderer groups feature panes under `components/views/` (`CharacterView`, `JournalView`,
-> `RecallView`, `SuggestView`, `ConverseView`, `RecapView`, `ImportView`, `SettingsView`, `NotesView`), with a shared
+> `SessionsView`, `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`, `ImportView` [Transcribe],
+> `SettingsView`, `NotesView` — all top-level per ADR-032; Codex slimmed to Inscribe + Annals), with a shared
 > `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
 > `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
 > `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, and `session`
@@ -735,7 +736,9 @@ These decisions are formalized as full Architecture Decision Records in [`docs/a
 > 022 (main character + journal-driven capture), 023 (post-journal capture/UI refinements),
 > 024 (grim "Ash & Ember" re-theme), 025 (Converse — in-character question lens), 026 (Counsel v2),
 > 027 (scene Counsel-only), 028 (changeset field changes), 029 (main character overhaul — mandatory
-> single lens · Voice Examples · derive-from-backstory), 030 (Character page + unified persona).
+> single lens · Voice Examples · derive-from-backstory), 030 (Character page + unified persona), 031
+> (changeset dedup hardening), 032 (UX consolidation — nav restructure · Lore/Draft/Keeper naming ·
+> shared failure copy · note/tie editability).
 
 | # | Decision | Status |
 |---|---|---|

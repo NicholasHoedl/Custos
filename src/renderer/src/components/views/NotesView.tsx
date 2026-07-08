@@ -16,7 +16,7 @@ import { useAllNotes, useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
-import { PaneHeader, PaneShell } from '@renderer/components/chrome'
+import { EmptyState, PaneHeader, PaneShell } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Badge } from '@renderer/components/ui/badge'
@@ -44,13 +44,9 @@ export function NotesView() {
 
   if (!activeCampaignId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-        <StickyNote className="size-10 text-muted-foreground/50" />
-        <div>
-          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
-          <p className="text-sm text-muted-foreground">Choose a campaign in the sidebar to keep its annals.</p>
-        </div>
-      </div>
+      <EmptyState icon={StickyNote} title="No campaign selected">
+        Choose a campaign in the sidebar to keep its annals.
+      </EmptyState>
     )
   }
   return <NotesWorkspace campaignId={activeCampaignId} />

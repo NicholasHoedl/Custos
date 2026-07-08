@@ -13,12 +13,10 @@ import {
 import { EntityForm } from '@renderer/components/entities/EntityForm'
 import { EntityDetail } from '@renderer/components/entities/EntityDetail'
 import { NotesView } from '@renderer/components/views/NotesView'
-import { RecapView } from '@renderer/components/views/RecapView'
-import { ImportView } from '@renderer/components/views/ImportView'
 
-// Master/detail capture surface: the entity browser on the left (tabs: Add entity / Notes / Recap /
-// Import), and on the right either the selected entity's detail or the active pane — including the
-// full "Add entity" profile form, which is now its own pane rather than a popup.
+// Master/detail capture surface: the entity browser on the left (Inscribe / Annals — Previously… and
+// Transcribe are top-level views now, ADR-032), and on the right either the selected entity's detail or
+// the active pane — including the full "Add entity" profile form, which is its own pane rather than a popup.
 export function CaptureView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const selectedEntityId = useAppStore((s) => s.selectedEntityId)
@@ -78,14 +76,6 @@ export function CaptureView() {
               setSelectedEntity(null)
               setCapturePanel('notes')
             }}
-            onShowRecap={() => {
-              setSelectedEntity(null)
-              setCapturePanel('recap')
-            }}
-            onShowImport={() => {
-              setSelectedEntity(null)
-              setCapturePanel('import')
-            }}
             mainCharacterId={mainCharacterId}
           />
         </div>
@@ -122,10 +112,6 @@ export function CaptureView() {
               }}
               onCancel={() => setCapturePanel('notes')}
             />
-          ) : capturePanel === 'recap' ? (
-            <RecapView key={activeCampaignId} />
-          ) : capturePanel === 'import' ? (
-            <ImportView key={activeCampaignId} />
           ) : (
             <NotesView key={activeCampaignId} />
           )}

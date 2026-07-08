@@ -64,8 +64,8 @@ export function ChangesetReview({
   const nothing = creating === 0 && linking === 0 && noting === 0 && changing === 0
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="min-w-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {imp.entities.length > 0 && (
           <Section label="Entities">
             {imp.entities.map((e) => (
@@ -165,7 +165,7 @@ export function ChangesetReview({
 function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h3>
+      <h3 className="inscribed text-xs">{label}</h3>
       {children}
     </section>
   )

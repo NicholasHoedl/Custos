@@ -11,7 +11,6 @@ import {
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import { lifecycleHeuristic } from '@shared/lifecycle'
 import { ledger } from '@renderer/lib/ipc'
-import { useCampaigns } from '@renderer/hooks/use-ledger'
 import { useUiStore } from '@renderer/store/ui-store'
 import {
   Dialog,
@@ -90,12 +89,6 @@ export function EntityForm({
   const [extraRows, setExtraRows] = useState<AttrRow[]>([])
   const [moreOpen, setMoreOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-
-  // Is the entity being edited this campaign's MAIN CHARACTER? (ADR-029) Gates the main-character-only
-  // depth — backstory, voice examples, persona. A brand-new entity is never the MC (it's designated later).
-  const { campaigns } = useCampaigns()
-  const isMainCharacter =
-    Boolean(entity) && campaigns.find((c) => c.id === campaignId)?.mainCharacterId === entity?.id
 
   // Seed the fields from the entity (edit) or empty (create). The dialog seeds each time it opens; the
   // page mounts fresh whenever it's shown, so it seeds on mount.
@@ -180,7 +173,8 @@ export function EntityForm({
       const payloadTraits = prof.traits ? traits : []
       const payloadGoals = prof.goals ? goals : []
       const payloadFlaws = prof.flaws ? flaws : []
-      const payloadVoice = isMainCharacter ? voiceExamples : [] // main-character-only (ADR-029)
+      // Voice examples are main-character-only and edited on the Character page (ADR-030/032); EntityForm
+      // never edits the MC, so just round-trip whatever the entity already had (normally none).
       const saved = entity
         ? await ledger.entity.update(entity.id, {
             name: trimmed,
@@ -188,7 +182,7 @@ export function EntityForm({
             traits: payloadTraits,
             goals: payloadGoals,
             flaws: payloadFlaws,
-            voiceExamples: payloadVoice,
+            voiceExamples,
             attributes: attrs,
             status: status.trim() || null,
             lifecycle
@@ -201,7 +195,7 @@ export function EntityForm({
             traits: payloadTraits,
             goals: payloadGoals,
             flaws: payloadFlaws,
-            voiceExamples: payloadVoice,
+            voiceExamples,
             attributes: attrs,
             status: status.trim() || undefined,
             lifecycle
@@ -382,20 +376,6 @@ export function EntityForm({
         </div>
       )}
 
-      {isMainCharacter && (
-        <div className="space-y-1.5">
-          <Label htmlFor="ef-voice">Voice examples</Label>
-          <TagInput
-            id="ef-voice"
-            value={voiceExamples}
-            onChange={setVoiceExamples}
-            placeholder="A line they'd say — press Enter"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Sample lines in their own words — these ground Counsel and Converse in your character’s voice.
-          </p>
-        </div>
-      )}
 
       {prof.status && (
         <div className="space-y-1.5">
@@ -426,9 +406,9 @@ export function EntityForm({
         </div>
       )}
 
-      {prof.fields
-        .filter((f) => !f.mainCharacterOnly || isMainCharacter)
-        .map(renderField)}
+      {/* mainCharacterOnly fields (backstory) are edited on the Character page — EntityForm never edits
+          the MC (ADR-032), so they never render here. */}
+      {prof.fields.filter((f) => !f.mainCharacterOnly).map(renderField)}
 
       <div className="space-y-2 border-t border-border pt-3">
         <Button
@@ -505,7 +485,7 @@ export function EntityForm({
             </Button>
           )}
           <Button onClick={submit} disabled={!name.trim() || busy}>
-            {editing ? 'Save' : 'Create'}
+            {busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save' : 'Create'}
           </Button>
         </div>
       </PaneShell>
@@ -534,7 +514,7 @@ export function EntityForm({
             Cancel
           </Button>
           <Button onClick={submit} disabled={!name.trim() || busy}>
-            {editing ? 'Save' : 'Create'}
+            {busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save' : 'Create'}
           </Button>
         </DialogFooter>
       </DialogContent>

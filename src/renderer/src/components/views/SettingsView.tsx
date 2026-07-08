@@ -156,9 +156,10 @@ export function SettingsView() {
       <Separator />
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-medium text-foreground">Recall model</h2>
+        <h2 className="font-display text-lg font-medium text-foreground">Lore model</h2>
         <p className="text-sm text-muted-foreground">
-          Sonnet is faster and cheaper; Opus is the highest quality.
+          Answers Lore questions and writes personas. Sonnet is faster and cheaper; Opus is the highest
+          quality.
         </p>
         <Select
           value={settings?.recallModel ?? 'claude-sonnet-4-6'}
@@ -177,10 +178,10 @@ export function SettingsView() {
       <Separator />
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-medium text-foreground">Suggest</h2>
+        <h2 className="font-display text-lg font-medium text-foreground">Counsel model</h2>
         <p className="text-sm text-muted-foreground">
-          The model and reasoning depth used to suggest in-character actions. Opus reasons best; higher
-          effort is richer but slower at the table.
+          The model and reasoning depth behind Counsel, Converse, and text extraction. Opus reasons best;
+          higher effort is richer but slower at the table.
         </p>
         <div className="flex flex-wrap gap-4">
           <div className="space-y-1.5">

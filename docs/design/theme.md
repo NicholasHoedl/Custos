@@ -34,14 +34,16 @@ rename point, compile-guarded by exhaustive typing.
 | The AI | **the Keeper** | one persona; surfaces in high-visibility copy |
 | Journal | **Chronicle** | the running log (internal table stays `event_log`) |
 | Capture (entity hub) | **Codex** | the reference collection |
-| Recall | **Consult** | consult the Keeper |
+| Recall | **Lore** | search the lore; ask the Keeper (ADR-032, was "Consult" — too close to Counsel) |
 | Suggest | **Counsel** | in-character ideas for the table |
+| Sessions | **Sessions** | browse sessions + summaries; hosts the recap (top-level, ADR-032) |
 | Settings | **Settings** (kept) | utilities are not themed |
 | Add entity | **Inscribe** | inscribe an entry into the Codex |
 | Notes | **Annals** | free-form records |
-| Recap | **Previously…** | a "previously on…" of a session |
-| Import | **Transcribe** | the Keeper copies your scattered pages |
-| Campaign | **Saga** | renamed everywhere in user copy (incl. Settings' export) |
+| Recap | **Previously…** | a "previously on…" of a session (lives in Sessions, ADR-032) |
+| Import | **Transcribe** | the Keeper copies your scattered pages (top-level, ADR-032) |
+| Campaign | **Campaign** (kept) | the ADR-024 "Saga" rename was reverted (ADR-029) |
+| Draft (derive tool) | **Draft from backstory** | turns a backstory into profile + world (ADR-032) |
 | Session | **Session** (kept) | — |
 | Main character / PC | **Main character / Player Character** (kept) | "Champion" shipped, then reverted at the user's request |
 | Scene | **Scene** (kept) | already a story term |
@@ -128,7 +130,7 @@ two ember entries, and a third struck through in blood — the Fallen motif. Ras
 ## The Keeper's voice (as shipped — restrained)
 
 Targeted, not pervasive. Where it lands:
-- Empty / idle states, lightly — e.g. Consult idle: *"The Keeper's answer appears here, drawn from your
+- Empty / idle states, lightly — e.g. Lore idle: *"The Keeper's answer appears here, drawn from your
   annals."*; empty Chronicle: *"No chronicle entries yet."*
 - Key toasts: *"Chronicle entry recorded"*, *"Main character set"* / *"cleared"*, *"Saga created"*.
 - The Fallen footer (above).

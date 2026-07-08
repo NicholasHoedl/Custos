@@ -30,10 +30,11 @@ function isOpenQuestStatus(status: string | null): boolean {
   return !status || !['completed', 'failed'].includes(status.toLowerCase())
 }
 
-// The "current scene" cluster: the scene mode, where the party is, the time, who's present, who they're
-// facing, and the quest in progress. These feed the optional `scene` payload into Recall and Suggest
-// (see use-recall / use-suggest). Collapsible to save room; each entity-backed selector hides when its
-// list is empty. Collapsing only hides the controls — the selected scene (in app-store) stays active.
+// The "current scene" cluster: the scene mode, where the party is, who's present, who they're facing, and
+// the quest in progress. These feed the optional `scene` payload into COUNSEL only (ADR-027 made the scene
+// Counsel-only; Lore/Recall does not read it — see use-suggest). Collapsible to save room; each
+// entity-backed selector hides when its list is empty. Collapsing only hides the controls — the selected
+// scene (in app-store) stays active.
 export function SceneControls({ campaignId }: { campaignId: string }) {
   const [open, setOpen] = useState(true)
   const scene = useAppStore((s) => s.scene)

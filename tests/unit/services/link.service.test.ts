@@ -10,7 +10,8 @@ import {
   createLink,
   deleteLink,
   listForEntity,
-  severLink
+  severLink,
+  updateLink
 } from '../../../src/main/services/link.service'
 import { makeTestDb } from '../../helpers/test-db'
 
@@ -35,6 +36,23 @@ describe('link.service', () => {
       relation: 'located_in'
     })
     expect(l.relation).toBe('located_in')
+  })
+
+  it('updates a tie’s description in place (ADR-032), leaving the interval untouched', () => {
+    const l = createLink(ctx, {
+      campaignId,
+      fromEntityId: aldric.id,
+      toEntityId: inn.id,
+      relation: 'located_in',
+      description: 'Rents a room upstairs.'
+    })
+    const updated = updateLink(ctx, l.id, { description: 'Owns the place outright.' })
+    expect(updated.description).toBe('Owns the place outright.')
+    expect(updated.startSessionNumber).toBe(l.startSessionNumber) // interval unchanged
+    // Clearing to empty normalizes to null.
+    expect(updateLink(ctx, l.id, { description: '   ' }).description).toBeNull()
+    // A missing link throws rather than silently succeeding.
+    expect(() => updateLink(ctx, 'nope', { description: 'x' })).toThrow()
   })
 
   it('rejects a relation not allowed between the two types', () => {

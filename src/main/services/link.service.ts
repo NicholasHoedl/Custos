@@ -1,7 +1,7 @@
 import { and, eq, isNull, or } from 'drizzle-orm'
 import type { Entity, EntityLink } from '@shared/entity-types'
 import type { RelationKey } from '@shared/relations'
-import type { CreateLinkInput, HierarchyKind } from '@shared/ipc-types'
+import type { CreateLinkInput, HierarchyKind, UpdateLinkInput } from '@shared/ipc-types'
 import type {
   ContextNeighbor,
   EntityContext,
@@ -120,6 +120,23 @@ export function severLink(ctx: DbContext, id: string, sessionId?: string): void 
     .set({ endSessionNumber: n })
     .where(eq(schema.entityLink.id, id))
     .run()
+}
+
+/** Edit a relationship's context description (ADR-032). Endpoints + relation are immutable here — those
+ *  are a sever + re-create. Throws if the link is gone. */
+export function updateLink(ctx: DbContext, id: string, patch: UpdateLinkInput): EntityLink {
+  const row = ctx.drizzle.select().from(schema.entityLink).where(eq(schema.entityLink.id, id)).get()
+  if (!row) throw new Error('Relationship not found')
+  if (patch.description !== undefined) {
+    const description = patch.description?.trim() || null
+    ctx.drizzle
+      .update(schema.entityLink)
+      .set({ description })
+      .where(eq(schema.entityLink.id, id))
+      .run()
+    return rowToLink({ ...row, description })
+  }
+  return rowToLink(row)
 }
 
 export function deleteLink(ctx: DbContext, id: string): void {
