@@ -45,6 +45,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [031](031-changeset-dedup-hardening.md) | Changeset dedup hardening: near-duplicate notes, already-live ties, no-op changes | Accepted | 2026-07-08 |
 | [032](032-ux-consolidation.md) | UX consolidation: nav restructure (Sessions/Transcribe), naming (Lore, Draft, Keeper voice), shared failure copy, note/tie editability | Accepted | 2026-07-08 |
 | [033](033-tie-enrichment.md) | Tie enrichment: per-direction disposition + epistemic confidence (+ AI-populated descriptions), migration 0010 | Accepted | 2026-07-08 |
+| [034](034-converse-questions-only.md) | Converse v2: questions-only tagged spread (talk WITH a character) + as-of notes clamp; revises ADR-025 output | Accepted | 2026-07-08 |
 
 ## Status legend
 

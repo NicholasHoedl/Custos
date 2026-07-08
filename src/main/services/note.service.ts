@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import type { Note } from '@shared/entity-types'
 import type { CreateNoteInput, UpdateNoteInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
@@ -22,13 +22,26 @@ function entityIdsFor(ctx: DbContext, noteIds: string[]): Map<string, string[]> 
   return map
 }
 
-/** Notes associated with one entity (newest first), each carrying its full set of entity ids. */
-export function listNotesForEntity(ctx: DbContext, entityId: string): Note[] {
+/**
+ * Notes associated with one entity (newest first), each carrying its full set of entity ids. Chronology
+ * (ADR-017/034): pass `asOf` to clamp to notes the party could have taken by session N — a note is kept
+ * when its session number ≤ N OR it has no session (null = pre-tracking baseline, always included, like
+ * `stateAsOf`/`isIntervalLiveAt`). The session leftJoin is harmless when `asOf` is unset (no filter).
+ */
+export function listNotesForEntity(ctx: DbContext, entityId: string, asOf?: number): Note[] {
   const rows = ctx.drizzle
     .select({ note: schema.note })
     .from(schema.noteEntity)
     .innerJoin(schema.note, eq(schema.noteEntity.noteId, schema.note.id))
-    .where(eq(schema.noteEntity.entityId, entityId))
+    .leftJoin(schema.session, eq(schema.note.sessionId, schema.session.id))
+    .where(
+      asOf === undefined
+        ? eq(schema.noteEntity.entityId, entityId)
+        : and(
+            eq(schema.noteEntity.entityId, entityId),
+            or(isNull(schema.note.sessionId), lte(schema.session.number, asOf))
+          )
+    )
     .orderBy(desc(schema.note.createdAt))
     .all()
     .map((r) => r.note)

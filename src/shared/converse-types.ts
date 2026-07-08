@@ -1,33 +1,115 @@
-// Shared types for Converse: the request/response contract for the in-character "question" lens — the
-// third AI sibling to Consult (Recall, factual answers) and Counsel (Suggest, action ideas). Given the
-// asking PC and a TARGET entity, Converse returns a short briefing about the target plus in-character
-// questions the PC could ask to draw them out. Like Suggest, it's single-shot (request/response, not
-// streaming) and returns a structured result (ADR-008, ADR-009).
+// Shared types for Converse: the in-character "question" lens — the third AI sibling to Consult (Recall,
+// factual answers) and Counsel (Suggest, action ideas). You Converse WITH a character (an NPC or a fellow
+// PC — the person across the table), and Converse returns a spread of tagged, in-character QUESTIONS the
+// asking PC could ask to draw them out. There is NO briefing — the questions are the whole product; the
+// service reasons over what the party knows/suspects/doesn't internally and emits only the questions
+// (ADR-034). Like Suggest, it's single-shot (request/response, not streaming) and structured (ADR-008/009).
 
 export interface ConverseRequest {
   campaignId: string
   /** The asker — the in-character POV. Requires an active PC (+ persona), like Suggest/Counsel. */
   pcId: string
-  /** The entity to brief on and draw out (any type — NPC/PC/etc.). */
+  /** Who the PC is talking WITH — the target character (an npc or pc; never the asking PC itself). */
   targetId: string
-  /** Optional free-text nudge that steers the questions toward a thread. */
+  /** Optional "thread": what to dig into (a third party, a topic, a rumor). Blank = draw them out generally. */
   focus?: string
-  /** Chronology (ADR-017): reconstruct "as of" this session NUMBER (state + ties clamped ≤ N). */
+  /** Chronology (ADR-017): reconstruct "as of" this session NUMBER (notes + state + ties clamped ≤ N). */
   asOfSession?: number
 }
 
-/** The briefing: three labelled threads assembled about the target. Each entry is one short line. */
-export interface ConverseBriefing {
-  known: string[] // solid, confirmed facts
-  openSuspected: string[] // rumored/suspected/uncertain threads + gaps — the things worth asking about
-  connections: string[] // notable ties (the target's 1-hop neighbourhood)
+// The question-type taxonomy (ADR-034). Each suggestion gets ONE tag naming the KIND of question. The
+// model only emits `tag`; the aim (lore vs character) and trust cost are static UI enrichment derived from
+// CONVERSE_TAG_META below — they order the spread (rapport → sensitive) and label each card.
+export const CONVERSE_TAGS = [
+  'open-probe',
+  'rapport',
+  'backstory-dig',
+  'feelings',
+  'motivation',
+  'opinion',
+  'lore',
+  'rumor-test',
+  'callback',
+  'secret-seeking',
+  'leading',
+  'challenge',
+  'flatter',
+  'empathetic-disclosure'
+] as const
+
+export type ConverseTag = (typeof CONVERSE_TAGS)[number]
+
+/** What a question chiefly goes after: world/plot ('lore'), the target's inner life ('character'), or both. */
+export type ConverseAim = 'lore' | 'character' | 'both'
+
+/** Social capital a question spends or builds — the funnel axis (rapport → sensitive). */
+export type ConverseCost = 'builds' | 'low' | 'med' | 'high'
+
+export interface ConverseTagMeta {
+  label: string
+  aim: ConverseAim
+  cost: ConverseCost
 }
 
-/** One in-character question the asking PC could pose: the line, the thread it opens, and why to ask. */
+/** Static per-tag metadata: display label + the aim/cost the UI shows and orders by (the model never
+ *  emits these). Cost reflects the KIND of question, not the specific phrasing. */
+export const CONVERSE_TAG_META: Record<ConverseTag, ConverseTagMeta> = {
+  'open-probe': { label: 'Open Probe', aim: 'lore', cost: 'low' },
+  rapport: { label: 'Rapport', aim: 'character', cost: 'builds' },
+  'backstory-dig': { label: 'Backstory', aim: 'character', cost: 'low' },
+  feelings: { label: 'Feelings', aim: 'character', cost: 'med' },
+  motivation: { label: 'Motivation', aim: 'character', cost: 'med' },
+  opinion: { label: 'Opinion', aim: 'both', cost: 'med' },
+  lore: { label: 'Lore', aim: 'lore', cost: 'low' },
+  'rumor-test': { label: 'Rumor Test', aim: 'lore', cost: 'low' },
+  callback: { label: 'Callback', aim: 'both', cost: 'low' },
+  'secret-seeking': { label: 'Secret-Seeking', aim: 'both', cost: 'high' },
+  leading: { label: 'Leading', aim: 'both', cost: 'high' },
+  challenge: { label: 'Challenge', aim: 'both', cost: 'high' },
+  flatter: { label: 'Flatter', aim: 'both', cost: 'low' },
+  'empathetic-disclosure': { label: 'Empathetic Disclosure', aim: 'character', cost: 'builds' }
+}
+
+/** Funnel order for sorting a spread cheap → costly (rapport-building first, sensitive probes last). */
+export const CONVERSE_COST_ORDER: Record<ConverseCost, number> = {
+  builds: 0,
+  low: 1,
+  med: 2,
+  high: 3
+}
+
+/** Human labels for the cost badge (UI). */
+export const CONVERSE_COST_LABELS: Record<ConverseCost, string> = {
+  builds: 'Builds trust',
+  low: 'Low cost',
+  med: 'Medium cost',
+  high: 'High cost'
+}
+
+/** Human labels for the aim badge (UI). */
+export const CONVERSE_AIM_LABELS: Record<ConverseAim, string> = {
+  lore: 'Lore',
+  character: 'Character',
+  both: 'Lore + Character'
+}
+
+/** Display label for a tag — the curated CONVERSE_TAG_META label, with a title-case fallback (mirrors
+ *  suggest-types `tagLabel`) so an unknown/legacy slug still renders sensibly. */
+export function converseTagLabel(tag: string): string {
+  const meta = (CONVERSE_TAG_META as Record<string, ConverseTagMeta>)[tag]
+  if (meta) return meta.label
+  return tag
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('-')
+}
+
+/** One in-character question the asking PC could pose: the line (in the PC's voice), its type TAG, and a
+ *  short "read" — what the PC suspects / why ask now / what gap it opens (the thing that makes it intentional). */
 export interface ConverseQuestion {
-  question: string // phrased in the asker PC's voice
-  targetsThread: string // the thread/gap it aims to open
-  why: string // one line: why it's worth asking now
+  question: string
+  tag: ConverseTag
+  read: string
 }
 
 export type ConverseFailureReason =
@@ -40,10 +122,10 @@ export type ConverseFailureReason =
   | 'unknown'
 
 /**
- * The result of a Converse query. On success: a briefing (three threads) + the in-character questions.
- * On failure: a reason the renderer can render without try/catch (mirrors SuggestResult). There is no
+ * The result of a Converse query. On success: the spread of in-character questions (each tagged). On
+ * failure: a reason the renderer can render without try/catch (mirrors SuggestResult). There is no
  * 'no_model' reason — Converse grounds by DIRECT FETCH, not semantic search, so it needs no local model.
  */
 export type ConverseResult =
-  | { ok: true; briefing: ConverseBriefing; questions: ConverseQuestion[] }
+  | { ok: true; questions: ConverseQuestion[] }
   | { ok: false; reason: ConverseFailureReason; message?: string }

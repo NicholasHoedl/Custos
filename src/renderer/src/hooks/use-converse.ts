@@ -15,11 +15,11 @@ const IDLE: ConverseState = { status: 'idle', result: null, error: null }
 
 /**
  * Drives a single-shot Converse request (no streaming, mirrors useSuggest). Reads the active campaign +
- * asking PC from the app store; the caller supplies the target entity and an optional focus. Grounding
- * is direct-fetch, so no embedding model is needed (only an API key).
+ * asking PC from the app store; the caller supplies the target character and an optional thread to dig
+ * into. Grounding is direct-fetch, so no embedding model is needed (only an API key).
  */
 export function useConverse(): ConverseState & {
-  ask: (targetId: string, focus: string, asOfSession?: number) => void
+  ask: (targetId: string, thread: string, asOfSession?: number) => void
   reset: () => void
 } {
   const [state, setState] = useState<ConverseState>(IDLE)
@@ -29,7 +29,7 @@ export function useConverse(): ConverseState & {
   const reqRef = useRef(0)
 
   const ask = useCallback(
-    (targetId: string, focus: string, asOfSession?: number) => {
+    (targetId: string, thread: string, asOfSession?: number) => {
       if (!activeCampaignId || !activePcId || !targetId) return
       const token = ++reqRef.current
       setState({ status: 'thinking', result: null, error: null })
@@ -38,7 +38,7 @@ export function useConverse(): ConverseState & {
           campaignId: activeCampaignId,
           pcId: activePcId,
           targetId,
-          focus: focus.trim() || undefined,
+          focus: thread.trim() || undefined,
           asOfSession
         })
         .then((result) => {

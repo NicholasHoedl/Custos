@@ -9,11 +9,15 @@ import {
   Users,
   WifiOff
 } from 'lucide-react'
-import { ENTITY_TYPES, ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
-import type {
-  ConverseBriefing,
-  ConverseFailureReason,
-  ConverseQuestion
+import { ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
+import {
+  CONVERSE_AIM_LABELS,
+  CONVERSE_COST_LABELS,
+  CONVERSE_COST_ORDER,
+  CONVERSE_TAG_META,
+  converseTagLabel,
+  type ConverseFailureReason,
+  type ConverseQuestion
 } from '@shared/converse-types'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
@@ -36,9 +40,12 @@ import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { Banner, EmptyState, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
-// Converse (the third AI lens): pick a TARGET character; Converse briefs you on what's known/suspected
-// about them and their connections, then proposes in-character questions your active PC could ask to
-// draw them out. Single-shot, grounded by direct fetch — mirrors Counsel's shell (no model needed).
+// You talk WITH a character (an NPC or a fellow PC), never a place/faction/item.
+const CHARACTER_TYPES = ['npc', 'pc'] as const
+
+// Converse (the third AI lens): pick a character to talk WITH; Converse proposes a spread of tagged,
+// in-character QUESTIONS your active PC could ask to draw them out — funnel-ordered from rapport to
+// sensitive. Single-shot, grounded by direct fetch — mirrors Counsel's shell (no model needed). ADR-034.
 export function ConverseView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
@@ -48,7 +55,7 @@ export function ConverseView() {
   const { entities } = useEntities(activeCampaignId)
   const { sessions } = useSessions(activeCampaignId)
   const [targetId, setTargetId] = useState<string | null>(null)
-  const [focus, setFocus] = useState('')
+  const [thread, setThread] = useState('')
   const [asOf, setAsOf] = useState<number | null>(null)
 
   if (!activeCampaignId) {
@@ -59,6 +66,10 @@ export function ConverseView() {
     )
   }
 
+  // Who you can talk WITH: the campaign's NPCs and fellow PCs, never the asking character itself.
+  const targets = entities.filter(
+    (e) => (e.type === 'npc' || e.type === 'pc') && e.id !== activePcId
+  )
   const hasPc = Boolean(activePcId)
   const thinking = converse.status === 'thinking'
   const canSubmit = onb.keyReady && hasPc && !thinking && Boolean(targetId)
@@ -66,7 +77,7 @@ export function ConverseView() {
 
   function submit() {
     if (!canSubmit || !targetId) return
-    converse.ask(targetId, focus, asOf ?? undefined)
+    converse.ask(targetId, thread, asOf ?? undefined)
   }
 
   return (
@@ -74,7 +85,7 @@ export function ConverseView() {
       <PaneHeader
         title="Converse"
         size="lg"
-        description="Prepare to draw a character out — what's known and suspected about them, then questions to ask in character."
+        description="Prepare to draw a character out — a spread of questions to ask them, in your character’s voice."
         action={
           (Boolean(targetId) || converse.status !== 'idle') && (
             <Button
@@ -84,7 +95,7 @@ export function ConverseView() {
               onClick={() => {
                 converse.reset()
                 setTargetId(null)
-                setFocus('')
+                setThread('')
               }}
             >
               <RotateCcw className="size-3.5" />
@@ -119,12 +130,12 @@ export function ConverseView() {
       ) : null}
 
       <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-        <TargetPicker entities={entities} value={targetId} onChange={setTargetId} />
+        <TargetPicker targets={targets} value={targetId} onChange={setTargetId} />
         <Textarea
-          value={focus}
-          onChange={(e) => setFocus(e.target.value)}
+          value={thread}
+          onChange={(e) => setThread(e.target.value)}
           rows={2}
-          placeholder="Optional — a thread to steer toward, e.g. their ties to the Redbrands, or why they were at the mine."
+          placeholder="Optional — a thread to dig into: a person, a topic, a rumor. Leave blank to draw them out generally."
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
               e.preventDefault()
@@ -143,15 +154,15 @@ export function ConverseView() {
       <div className="flex-1 space-y-4 overflow-y-auto">
         {converse.status === 'idle' && (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            Pick who your character wants to draw out. You&apos;ll get a briefing on them, then questions
-            to ask — in your character&apos;s voice.
+            Pick who your character wants to talk with. You&apos;ll get a spread of questions to ask —
+            in your character&apos;s voice, from safe openers to pointed probes.
           </p>
         )}
 
         {thinking && (
           <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
             <MessagesSquare className="size-4 animate-pulse text-primary" />
-            Weighing what you know about {target?.name ?? 'them'}…
+            Weighing what to ask {target?.name ?? 'them'}…
           </div>
         )}
 
@@ -166,32 +177,28 @@ export function ConverseView() {
         )}
 
         {converse.status === 'done' && converse.result?.ok && (
-          <ConverseAnswer
-            briefing={converse.result.briefing}
-            questions={converse.result.questions}
-            targetName={target?.name ?? 'them'}
-          />
+          <QuestionSpread questions={converse.result.questions} />
         )}
       </div>
     </PaneShell>
   )
 }
 
-// A single-select combobox over ALL campaign entities, grouped by type (adapts SceneControls' picker).
+// A single-select combobox over the campaign's characters (NPCs + fellow PCs), grouped by type.
 function TargetPicker({
-  entities,
+  targets,
   value,
   onChange
 }: {
-  entities: Entity[]
+  targets: Entity[]
   value: string | null
   onChange: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const chosen = entities.find((e) => e.id === value) ?? null
-  const groups = ENTITY_TYPES.map((type) => ({
+  const chosen = targets.find((e) => e.id === value) ?? null
+  const groups = CHARACTER_TYPES.map((type) => ({
     type,
-    items: entities.filter((e) => e.type === type)
+    items: targets.filter((e) => e.type === type)
   })).filter((g) => g.items.length > 0)
 
   return (
@@ -201,20 +208,20 @@ function TargetPicker({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          disabled={entities.length === 0}
+          disabled={targets.length === 0}
           className="w-full justify-between font-normal"
         >
           <span className={cn(!chosen && 'text-muted-foreground')}>
-            {chosen ? chosen.name : 'Choose who to draw out…'}
+            {chosen ? chosen.name : 'Choose who to talk with…'}
           </span>
           <ChevronsUpDown className="size-4 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
-          <CommandInput placeholder="Search characters, places, things…" />
+          <CommandInput placeholder="Search characters…" />
           <CommandList>
-            <CommandEmpty>No matches.</CommandEmpty>
+            <CommandEmpty>No other characters yet.</CommandEmpty>
             {groups.map((g) => (
               <CommandGroup key={g.type} heading={ENTITY_TYPE_LABELS[g.type]}>
                 {g.items.map((e) => (
@@ -239,64 +246,41 @@ function TargetPicker({
   )
 }
 
-function ConverseAnswer({
-  briefing,
-  questions,
-  targetName
-}: {
-  briefing: ConverseBriefing
-  questions: ConverseQuestion[]
-  targetName: string
-}) {
-  const groups = [
-    { label: 'Known', items: briefing.known },
-    { label: 'Open & suspected', items: briefing.openSuspected },
-    { label: 'Connections', items: briefing.connections }
-  ].filter((g) => g.items.length > 0)
-
+// The question spread, funnel-ordered by trust cost (rapport-builders first, sensitive probes last).
+function QuestionSpread({ questions }: { questions: ConverseQuestion[] }) {
+  const ordered = [...questions].sort(
+    (a, b) =>
+      CONVERSE_COST_ORDER[CONVERSE_TAG_META[a.tag].cost] -
+      CONVERSE_COST_ORDER[CONVERSE_TAG_META[b.tag].cost]
+  )
   return (
-    <div className="space-y-5">
-      <div className="space-y-3">
-        {groups.map((g) => (
-          <section key={g.label} className="space-y-1.5">
-            <h3 className="inscribed text-xs">{g.label}</h3>
-            <ul className="space-y-1.5">
-              {g.items.map((it, i) => (
-                <li
-                  key={i}
-                  className="rounded-lg border border-border bg-card/60 px-3 py-2 text-sm text-foreground/90"
-                >
-                  {it}
-                </li>
-              ))}
-            </ul>
-          </section>
+    <div className="@container">
+      <div className="grid gap-3 @lg:grid-cols-2">
+        {ordered.map((q) => (
+          <QuestionCard key={q.tag} q={q} />
         ))}
-        {briefing.known.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Little is confirmed about {targetName} — the questions below go after what&apos;s unknown.
-          </p>
-        )}
       </div>
+    </div>
+  )
+}
 
-      {questions.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="inscribed text-xs">Questions to ask</h3>
-          <div className="space-y-3">
-            {questions.map((q, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card/60 p-4">
-                {q.targetsThread && <p className="inscribed mb-1.5 text-[11px]">{q.targetsThread}</p>}
-                <p className="text-[15px] leading-relaxed text-foreground/90">{q.question}</p>
-                {q.why && (
-                  <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">
-                    {q.why}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+function QuestionCard({ q }: { q: ConverseQuestion }) {
+  const meta = CONVERSE_TAG_META[q.tag]
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-card/60 p-4">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="rounded-md bg-primary/15 px-2 py-0.5 font-display text-sm font-medium text-primary">
+          {converseTagLabel(q.tag)}
+        </span>
+        <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+          {CONVERSE_AIM_LABELS[meta.aim]}
+        </span>
+        <span className="ml-auto text-[11px] text-muted-foreground">
+          {CONVERSE_COST_LABELS[meta.cost]}
+        </span>
+      </div>
+      <p className="text-[15px] leading-relaxed text-foreground/90">{q.question}</p>
+      <p className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">{q.read}</p>
     </div>
   )
 }
@@ -314,7 +298,7 @@ function FailureBanner({ reason }: { reason: ConverseFailureReason }) {
     case 'invalid':
       return (
         <Banner icon={<AlertTriangle className="size-4" />}>
-          Couldn&apos;t put together a clear briefing — try again, or narrow the focus.
+          Couldn&apos;t put together questions — try again, or narrow the thread.
         </Banner>
       )
     default:

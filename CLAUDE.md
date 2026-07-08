@@ -85,9 +85,16 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes `bad_key` from `no_key`); the
   Character page's derive tool is user-labeled **"Draft from backstory"**.
 - **Three AI lenses, two shapes.** Recall (**Lore**) *streams* prose with citations; Suggest (**Counsel**)
-  and Converse (ADR-025) are *single-shot structured* — `structuredObjectCall` → a discriminated-union result,
-  no stream, no citations. Converse grounds by **direct fetch** (`getEntityContext` + `listForEntity(asOf)` +
-  persona), NOT retrieval, so it needs no embedding model. Add a structured lens by mirroring Suggest, not Recall.
+  and Converse (ADR-025, reshaped by **ADR-034**) are *single-shot structured* — `structuredArrayCall` → a
+  discriminated-union result, no stream, no citations. Converse now emits **questions ONLY** (no briefing): a
+  spread of tagged, in-character questions to ask a character you talk WITH (`npc`/`pc` targets, never self;
+  the optional `focus`/"thread" is the *about*). Each is `{ question, tag, read }` over the 14-tag
+  `CONVERSE_TAGS` taxonomy; a static `CONVERSE_TAG_META` (aim + trust-cost) drives the renderer's funnel
+  ordering + badges (the model emits only the tag). `validateConverse` mirrors Counsel's `validateMoment`
+  (distinct tags, floor 4 / cap 6, retry-once). Converse grounds by **direct fetch** (`getEntityContext` +
+  `listForEntity(asOf)` + persona), NOT retrieval, so it needs no embedding model — and `getEntityContext`/
+  `listNotesForEntity` now take an **`asOf`** that clamps the target's notes to session ≤ N (null-session =
+  pre-tracking baseline, always kept), closing an as-of leak. Add a structured lens by mirroring Suggest, not Recall.
 - **Counsel v2 (ADR-026):** each "in the moment" option carries a `pillar` / `mechanic` (5e check + ability,
   no failure outcome — the DM's call) / `teamwork` field (all validated in `suggest.service` `validateMoment`);
   an optional `goal` biases the spread. The **scene** (`SceneControls`) grounds **Counsel only** now

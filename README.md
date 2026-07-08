@@ -19,9 +19,9 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 Built on top of these: the **Character page** (every campaign has one **main character** — the hero you
 play and the voice the Keeper speaks in; a dashboard manages their profile, persona, and voice examples, and
 a **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties your
-backstory implies — all review-gated), **Converse** (pick another character and get a briefing on what your
-party knows and suspects about them, plus in-character questions your character could ask to draw them
-out), the **Chronicle** (jot a plain line of what happened; the Keeper proposes the entities, notes, and
+backstory implies — all review-gated), **Converse** (pick a character to talk *with* — an NPC or a fellow
+party member — and get a spread of tagged, in-character questions to draw them out, from safe openers to
+pointed probes; name a thread to steer them), the **Chronicle** (jot a plain line of what happened; the Keeper proposes the entities, notes, and
 status/relationship/field changes to review), **Sessions** (browse each session with its summary and a
 "previously on…" recap), chronology throughout (the world reconstructed "as of session N" with no
 future-knowledge leak), and paste-and-extract **Transcribe** (tie an import to any session, or none).

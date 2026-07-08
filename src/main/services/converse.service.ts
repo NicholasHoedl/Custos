@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm'
-import type {
-  ConverseBriefing,
-  ConverseFailureReason,
-  ConverseQuestion,
-  ConverseRequest,
-  ConverseResult
+import {
+  CONVERSE_TAGS,
+  type ConverseFailureReason,
+  type ConverseQuestion,
+  type ConverseRequest,
+  type ConverseResult,
+  type ConverseTag
 } from '@shared/converse-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
@@ -26,55 +27,37 @@ function fail(reason: ConverseFailureReason): ConverseResult {
   return { ok: false, reason }
 }
 
+const TAG_SET = new Set<string>(CONVERSE_TAGS)
+// A spread wants variety, not padding: at most 6 questions, and at least 4 must survive to be usable.
+const CONVERSE_CAP = 6
+const CONVERSE_FLOOR = 4
+
 /**
- * Coerce the model's raw output to clean briefing lists + questions (the JSON schema can't enforce
- * shape/length). Returns null ONLY when the whole result is empty (no briefing content AND no questions)
- * — a target the party knows little about legitimately yields an all-questions result, which is the point.
+ * Enforce what the JSON schema can't (ADR-034): a spread of questions with DISTINCT tags and a non-empty
+ * question + read. Mirrors suggest's validateMoment — drops entries with an unknown tag, empty text, or a
+ * repeated tag; caps at 6. Returns null if fewer than 4 usable distinct-tag questions survive (the caller
+ * then retries once, then fails). Distinct tags keep the spread varied instead of six shades of one probe.
  */
-function validateConverse(raw: {
-  briefing?: unknown
-  questions?: unknown
-}): { briefing: ConverseBriefing; questions: ConverseQuestion[] } | null {
-  const strList = (v: unknown): string[] =>
-    Array.isArray(v)
-      ? v
-          .filter((x): x is string => typeof x === 'string')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : []
-  const b = (raw.briefing ?? {}) as Record<string, unknown>
-  const briefing: ConverseBriefing = {
-    known: strList(b.known),
-    openSuspected: strList(b.openSuspected),
-    connections: strList(b.connections)
+function validateConverse(raw: ConverseQuestion[]): ConverseQuestion[] | null {
+  const seen = new Set<string>()
+  const clean: ConverseQuestion[] = []
+  for (const q of raw) {
+    if (!q || typeof q.tag !== 'string' || !TAG_SET.has(q.tag)) continue
+    if (typeof q.question !== 'string' || !q.question.trim()) continue
+    if (typeof q.read !== 'string' || !q.read.trim()) continue
+    if (seen.has(q.tag)) continue
+    seen.add(q.tag)
+    clean.push({ question: q.question.trim(), tag: q.tag as ConverseTag, read: q.read.trim() })
+    if (clean.length === CONVERSE_CAP) break
   }
-  const questions: ConverseQuestion[] = []
-  if (Array.isArray(raw.questions)) {
-    for (const q of raw.questions) {
-      if (!q || typeof q !== 'object') continue
-      const qq = q as Record<string, unknown>
-      const question = typeof qq.question === 'string' ? qq.question.trim() : ''
-      if (!question) continue // a question with no text is useless; drop it
-      questions.push({
-        question,
-        targetsThread: typeof qq.targetsThread === 'string' ? qq.targetsThread.trim() : '',
-        why: typeof qq.why === 'string' ? qq.why.trim() : ''
-      })
-    }
-  }
-  const empty =
-    questions.length === 0 &&
-    briefing.known.length === 0 &&
-    briefing.openSuspected.length === 0 &&
-    briefing.connections.length === 0
-  return empty ? null : { briefing, questions }
+  return clean.length >= CONVERSE_FLOOR ? clean : null
 }
 
 /**
  * Run a Converse query: resolve the asking PC + persona → gather the TARGET's grounding by DIRECT FETCH
- * (notes via getEntityContext; connections + the PC↔target tie via listForEntity, which is as-of-correct;
- * state via resolveEntityState) → ask Claude (structured, single-shot) for a briefing + in-character
- * questions → validate (retry once). Returns a discriminated ConverseResult so the renderer can show
+ * (notes via getEntityContext, as-of-clamped; connections + the PC↔target tie via listForEntity, which is
+ * as-of-correct; state via resolveEntityState) → ask Claude (structured, single-shot) for a spread of
+ * tagged in-character questions → validate (retry once). Returns a discriminated ConverseResult so the renderer can show
  * offline / no-key / no-PC states without try/catch (ADR-008, ADR-009). No embedding model: direct fetch.
  */
 export async function converse(
@@ -91,6 +74,10 @@ export async function converse(
     if (!pc || pc.type !== 'pc') return fail('no_pc')
     const target = getEntity(ctx, targetId)
     if (!target || target.campaignId !== campaignId) return fail('invalid')
+    // You talk WITH a character — an NPC or a fellow PC (ADR-034) — never a place/faction/item/quest, and
+    // never the asking PC itself. The renderer's picker enforces this too; the service is the backstop.
+    if (target.type !== 'npc' && target.type !== 'pc') return fail('invalid')
+    if (target.id === pcId) return fail('invalid')
     // Key + online BEFORE persona regen, since generatePersona also needs the key.
     if (!isAvailable()) return fail('no_key')
     if (!(await isOnline())) return fail('offline')
@@ -121,7 +108,7 @@ export async function converse(
 
     // Target grounding — DIRECT FETCH (no semantic search). getEntityContext gives the target's notes;
     // connections + the asker↔target tie come from listForEntity (as-of-correct via isIntervalLiveAt).
-    const targetCtx = getEntityContext(ctx, targetId, 1)
+    const targetCtx = getEntityContext(ctx, targetId, 1, asOf)
     const targetState = resolveEntityState(ctx, target, asOf)
     const connections = formatRelationships(
       [{ name: target.name, views: listForEntity(ctx, targetId, asOf) }],
@@ -143,7 +130,7 @@ export async function converse(
           })()
 
     const { suggestModel, suggestEffort } = getSettings()
-    const callOnce = (): Promise<{ briefing: unknown; questions: unknown }> =>
+    const callOnce = (): Promise<ConverseQuestion[]> =>
       claudeConverse({
         target: {
           name: target.name,
@@ -165,11 +152,11 @@ export async function converse(
         effort: suggestEffort,
         signal
       })
-    // One retry: the model occasionally returns malformed structured output.
+    // One retry: the model occasionally returns too few or duplicate-tag questions.
     let out = validateConverse(await callOnce())
     if (!out) out = validateConverse(await callOnce())
     if (!out) return fail('invalid')
-    return { ok: true, briefing: out.briefing, questions: out.questions }
+    return { ok: true, questions: out }
   } catch (err) {
     if (signal.aborted) return fail('unknown')
     return {

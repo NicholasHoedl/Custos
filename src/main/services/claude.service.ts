@@ -7,6 +7,7 @@ import {
   type MomentSuggestion,
   type StorySuggestion
 } from '@shared/suggest-types'
+import { CONVERSE_TAGS, type ConverseQuestion } from '@shared/converse-types'
 import type { RelationshipView } from '@shared/graph-types'
 import {
   ENTITY_TYPES,
@@ -1242,40 +1243,38 @@ export async function suggestDirections(params: SuggestDirectionsParams): Promis
 
 // ---- Converse prompt (in-character questions) ----
 
-const CONVERSE_INSTRUCTIONS = `You help a tabletop RPG player prepare to TALK to another character in a campaign — to draw out their backstory, goals, and secrets, IN CHARACTER. You'll be given a brief on how this player character (PC) thinks and what they value, then everything the party has discovered about the TARGET of the conversation: notes (some confirmed, some only rumored or suspected), the target's known connections, and how the PC relates to them.
+const CONVERSE_INSTRUCTIONS = `You help a tabletop RPG player prepare to TALK to another character — an NPC or a fellow player character — and draw them out, IN CHARACTER. You'll be given a brief on how the asking player character (PC) thinks and what they value, then everything the party has discovered about the person they're talking WITH: notes (some confirmed, some only rumored or suspected), that character's known connections, and how the PC relates to them (including how each side FEELS about the other). There may be a THREAD — a specific person, topic, or rumor the PC wants to dig into; if there is none, draw the character out generally.
 
-Produce TWO things: a short BRIEFING, then in-character QUESTIONS the PC could ask.
+Your job: write a SPREAD of in-character QUESTIONS the PC could actually SAY to this character to open them up. Output ONLY questions — no briefing, no summary, no preamble. Each question carries ONE type TAG and a short READ.
 
-DISCOVERED-ONLY. Everything you are given is what the party has learned in play. Treat CONFIRMED notes as solid. A note marked (rumored) is hearsay; (suspected) is the party's own hunch — these are UNCERTAIN leads, not facts. Invent nothing beyond what you're given. Thin or missing knowledge is normal and IMPORTANT: it is exactly what the questions should go after.
+ASK THE GAP, NOT THE KNOWN. Reason silently over what the party has: what is CONFIRMED, what is only (rumored)/(suspected), and what is conspicuously MISSING (unknown backstory, motives, loyalties, feelings). Then aim every question at a gap or an uncertain lead — never at something already confirmed (you would be asking what you already know). Turn a confirmed fact into a CALLBACK that cracks open the next layer; put a rumor or hunch to them to confirm, deny, or complicate; open the blank spaces with a broad probe.
 
-BRIEFING — three short lists, one line per entry:
-- known: what is actually CONFIRMED about the target. If little is confirmed, keep this short — that's fine and expected.
-- openSuspected: the rumors, hunches, contradictions, and GAPS — what you don't yet know but want to. This is where the questions come from. Draw it from the (rumored)/(suspected) notes and from what's conspicuously absent (unknown goals, backstory, motives, loyalties).
-- connections: notable ties — the people, factions, places, quests, or items the target is linked to that a conversation could probe.
+EACH QUESTION HAS:
+- question — one thing the PC could say, in THIS character's voice (honor the brief's diction and attitude, and how the PC feels about them: a question can be warm, blunt, guarded, sly, or cold depending on who is asking and their standing).
+- tag — ONE type from the vocabulary below.
+- read — a short "read": what the PC suspects, why ask it now, or what gap it means to open. This is the INTENT behind the line (a beat of insight) — NOT a restatement of the question.
 
-QUESTIONS — four to six things the character could actually SAY to the target, phrased in THIS character's voice: honor the brief's diction, attitude, and the PC's relationship to the target (a question can be warm, blunt, guarded, or sly depending on who they are and how they feel). Aim each question at an OPEN thread or gap from the briefing — never at something already confirmed (you would be asking what you already know). For each: the question itself, the THREAD it means to open, and one line on WHY it's worth asking now.
+THE TAG VOCABULARY — grouped by how much social capital the question spends:
+- Builds trust: rapport (safe, personal small-talk that warms the room), empathetic-disclosure (share a matching wound or truth first, so honesty is reciprocated).
+- Low cost: open-probe (a broad, un-leading opener that just gets them talking), lore (history, customs, places, factions — the setting itself), rumor-test (put a known rumor to them to confirm or deny), backstory-dig (excavate their past and how they got here), callback (anchor to something already known to open its next layer), flatter (elevate them so they WANT to reveal).
+- Medium cost: feelings (name or ask their emotional state — needs a read of them first), motivation (what they truly want or fear), opinion (their read on a THIRD party — trust, grudges, alliances).
+- High cost: secret-seeking (go after hidden information or test a suspected lie's seams), leading (presume the answer to pressure a confession), challenge (force or threat to compel an answer).
 
-GROUND IT. Point every question at a real thread from the material. Respect the current state — if the target is marked [ended]/[presumed ended], or you're reconstructing an earlier session, phrase the briefing and questions accordingly.`
+FUNNEL THE SPREAD. Range across the costs — open with at least one builds/low question, and reserve the high-cost probes for when they are earned. Do NOT hand a stranger a secret-seeking or challenge line: gauge STANDING from the PC's tie and how each side feels (a sworn friend or a bitter enemy can push where an acquaintance cannot). Mix the aims too — some questions chase the world and its lore, others the character's inner life. Keep every tag distinct across the spread.
+
+FOLLOW THE THREAD. When a thread is given, point most questions at it — their ties to it, what they know of it, how they feel about it — while still varying the type and cost. With no thread, spread across their backstory, motives, feelings, connections, and any open rumors.
+
+GROUND IT. Everything you treat as fact — who they are tied to, what is resolved, what is only suspected — comes from the notes, connections, tie, and state you are given; invent nothing. Respect the current state: if they are marked [ended]/[presumed ended], or you are reconstructing an earlier session, ask only what the PC could know then, and phrase accordingly.`
 
 /**
- * The structured-output schema for Converse: a briefing (three string lists) + questions. JSON Schema
- * can't bound array length, so `converse.service` validates (and tolerates an empty briefing — a target
- * we know little about legitimately yields an all-questions result). Every object: additionalProperties:false.
+ * The structured-output schema for Converse (ADR-034): a spread of tagged questions, nothing else. JSON
+ * Schema can't bound array length or enforce tag uniqueness, so `converse.service` validates (distinct
+ * tags, floor/cap). The `tag` enum + required fields ARE enforced here. Every object: additionalProperties:false.
  */
 const CONVERSE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    briefing: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        known: { type: 'array', items: { type: 'string' } },
-        openSuspected: { type: 'array', items: { type: 'string' } },
-        connections: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['known', 'openSuspected', 'connections']
-    },
     questions: {
       type: 'array',
       items: {
@@ -1283,14 +1282,14 @@ const CONVERSE_SCHEMA = {
         additionalProperties: false,
         properties: {
           question: { type: 'string' },
-          targetsThread: { type: 'string' },
-          why: { type: 'string' }
+          tag: { type: 'string', enum: [...CONVERSE_TAGS] },
+          read: { type: 'string' }
         },
-        required: ['question', 'targetsThread', 'why']
+        required: ['question', 'tag', 'read']
       }
     }
   },
-  required: ['briefing', 'questions']
+  required: ['questions']
 }
 
 /** System prompt for Converse — reuses the shared campaign + persona blocks (persona cached last). */
@@ -1301,7 +1300,8 @@ export function buildConverseSystem(ctx: SuggestContext): Anthropic.TextBlockPar
 /**
  * The volatile user turn for Converse (PLAIN TEXT, no citations): who the PC is preparing to speak with
  * (+ the session anchor), the party's confidence-tagged notes on them, their connections, the PC's own
- * tie to them, an optional focus, then the ask. Each block only when it has content.
+ * tie to them, an optional thread to dig into, then the ask. Each block only when it has content. The
+ * grounding is unchanged from the briefing era (ADR-025); only the OUTPUT shrank to questions-only (ADR-034).
  */
 export function buildConverseUserContent(p: {
   target: {
@@ -1371,12 +1371,12 @@ export function buildConverseUserContent(p: {
   if (p.focus?.trim()) {
     content.push({
       type: 'text',
-      text: `Focus — steer the briefing and questions toward this: ${p.focus.trim()}`
+      text: `Thread — what ${p.pcName} wants to dig into (aim most questions here): ${p.focus.trim()}`
     })
   }
   content.push({
     type: 'text',
-    text: `Write the briefing (known / suspected / connections) and the in-character questions ${p.pcName} could ask to draw ${p.target.name} out.`
+    text: `Write only the in-character questions ${p.pcName} could ask to draw ${p.target.name} out — each with its tag and a short read.`
   })
   return content
 }
@@ -1403,9 +1403,10 @@ export interface ConverseParams {
   signal?: AbortSignal
 }
 
-/** Converse call: a briefing + in-character questions. Returns the raw parsed object (caller validates). */
-export async function converse(params: ConverseParams): Promise<{ briefing: unknown; questions: unknown }> {
-  return structuredObjectCall<{ briefing: unknown; questions: unknown }>({
+/** Converse call: a spread of tagged in-character questions. Returns the raw array (caller validates
+ *  distinct tags + floor/cap). */
+export async function converse(params: ConverseParams): Promise<ConverseQuestion[]> {
+  return structuredArrayCall<ConverseQuestion>({
     model: params.model,
     effort: params.effort,
     schema: CONVERSE_SCHEMA,
@@ -1420,6 +1421,7 @@ export async function converse(params: ConverseParams): Promise<{ briefing: unkn
       asOf: params.asOf,
       pcName: params.context.pcName ?? 'you'
     }),
+    arrayKey: 'questions',
     signal: params.signal
   })
 }

@@ -240,12 +240,19 @@ export function getHierarchy(ctx: DbContext, entityId: string, kind: HierarchyKi
 
 /**
  * The Phase-2 RAG seam: the seed entity + its notes + its 1..depth-hop neighborhood, each neighbor
- * carrying the edge relation/description. De-duplicated and node-capped. Keep this signature stable.
+ * carrying the edge relation/description. De-duplicated and node-capped. Chronology (ADR-017/034): pass
+ * `asOf` to clamp the seed's notes to what was known by session N (Converse's as-of reconstruction);
+ * omit it for the live view. The optional trailing param keeps existing callers unchanged.
  */
-export function getEntityContext(ctx: DbContext, entityId: string, depth = 1): EntityContext {
+export function getEntityContext(
+  ctx: DbContext,
+  entityId: string,
+  depth = 1,
+  asOf?: number
+): EntityContext {
   const root = getEntity(ctx, entityId)
   if (!root) throw new Error(`Entity ${entityId} not found`)
-  const notes = listNotesForEntity(ctx, entityId)
+  const notes = listNotesForEntity(ctx, entityId, asOf)
   const visited = new Set<string>([entityId])
   const neighbors: ContextNeighbor[] = []
   let frontier: string[] = [entityId]

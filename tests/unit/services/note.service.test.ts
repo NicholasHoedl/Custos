@@ -118,4 +118,21 @@ describe('note.service (note ↔ many entities)', () => {
     const got = notes.find((n) => n.id === first.id)!
     expect([...got.entityIds].sort()).toEqual([a, b].sort())
   })
+
+  it('listNotesForEntity clamps to the as-of session, always keeping null-session (pre-tracking) notes', () => {
+    const s1 = createSession(ctx, { campaignId }).id // number 1
+    const s2 = createSession(ctx, { campaignId }).id // number 2
+    createNote(ctx, { campaignId, entityIds: [a], content: 'baseline' }) // null session = pre-tracking
+    createNote(ctx, { campaignId, entityIds: [a], content: 'from s1', sessionId: s1 })
+    createNote(ctx, { campaignId, entityIds: [a], content: 'from s2', sessionId: s2 })
+
+    // As of session 1: the pre-tracking baseline + session-1 note, never the later session-2 note.
+    expect(listNotesForEntity(ctx, a, 1).map((n) => n.content).sort()).toEqual(['baseline', 'from s1'])
+    // No as-of: the live view returns everything.
+    expect(listNotesForEntity(ctx, a).map((n) => n.content).sort()).toEqual([
+      'baseline',
+      'from s1',
+      'from s2'
+    ])
+  })
 })

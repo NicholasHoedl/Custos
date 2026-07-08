@@ -34,9 +34,10 @@ describe('converse prompt assembly', () => {
     const text = sys.map((b) => b.text).join('\n')
     expect(text).toContain('Phandelver')
     expect(text).toContain('THE-CHARACTER-BRIEF')
-    // The Converse instructions (a briefing + questions), NOT the Suggest prompt.
-    expect(text).toContain('BRIEFING')
+    // The Converse instructions (questions-only tagged spread, ADR-034), NOT the Suggest prompt.
     expect(text).toContain('QUESTIONS')
+    expect(text).toContain('secret-seeking') // a tag from the question vocabulary
+    expect(text).toContain('FUNNEL') // the funnel/trust-cost spread rule
     expect(text).toContain('elf wizard') // race/class stated for prompt parity
     // The cacheable breakpoint is on the last (persona) block.
     expect(sys[sys.length - 1].cache_control).toEqual({ type: 'ephemeral' })
@@ -74,9 +75,9 @@ describe('converse prompt assembly', () => {
     expect(all).toContain('(rumored)') // the rumored note is tagged so the model hedges it
     expect(all).toContain('Tresendar Manor') // connections block
     expect(all).toContain('Vargas enemy_of Glasstaff') // the asker↔target tie
-    expect(all).toContain('his debts') // the focus block
+    expect(all).toContain('his debts') // the thread block
     // Ends with the explicit ask, naming the target.
-    expect(texts[texts.length - 1]).toContain('Write the briefing')
+    expect(texts[texts.length - 1]).toContain('Write only the in-character questions')
     expect(texts[texts.length - 1]).toContain('Glasstaff')
   })
 
@@ -105,7 +106,7 @@ describe('converse prompt assembly', () => {
     })
     expect(content).toHaveLength(2)
     expect((content[0] as { text: string }).text).toContain('Glasstaff')
-    expect((content[1] as { text: string }).text).toContain('Write the briefing')
+    expect((content[1] as { text: string }).text).toContain('Write only the in-character questions')
   })
 
   it("renders the target's recorded nature (traits / goals / flaws) as a fact block", () => {
