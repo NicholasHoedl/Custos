@@ -23,6 +23,7 @@ import type {
   RecallRequest
 } from './recall-types'
 import type { ConverseRequest, ConverseResult } from './converse-types'
+import type { DeriveProfileRequest, DeriveProfileResult } from './derive-profile-types'
 import type { SuggestRequest, SuggestResult } from './suggest-types'
 import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
 import type { ApplyResult, ConfirmedChangeset, ExtractRequest, ExtractResult } from './import-types'
@@ -32,6 +33,10 @@ import type { CampaignExportResult } from './export-types'
 export interface CreateCampaignInput {
   name: string
   description?: string
+  /** ADR-029: the campaign's mandatory main character. When set, createCampaign also creates this pc
+   *  entity and points main_character_id at it (atomically). The New Campaign dialog always sends it;
+   *  omitted only by internal/legacy callers (which yield a grandfathered null-MC campaign). */
+  mainCharacterName?: string
 }
 export interface UpdateCampaignInput {
   name?: string
@@ -55,6 +60,7 @@ export interface CreateEntityInput {
   traits?: string[]
   goals?: string[]
   flaws?: string[]
+  voiceExamples?: string[] // main-character-only (ADR-029); ignored for other entities
   attributes?: Record<string, unknown>
   status?: string
   lifecycle?: Lifecycle // chronology: defaults to the status heuristic when omitted
@@ -66,6 +72,7 @@ export interface UpdateEntityInput {
   traits?: string[]
   goals?: string[]
   flaws?: string[]
+  voiceExamples?: string[] // main-character-only (ADR-029)
   attributes?: Record<string, unknown>
   status?: string | null
   lifecycle?: Lifecycle
@@ -180,6 +187,10 @@ export interface LedgerApi {
   converse: {
     query(input: ConverseRequest): Promise<ConverseResult>
   }
+  deriveProfile: {
+    /** Derive a main character's profile fields from their backstory, for review (ADR-029). */
+    query(input: DeriveProfileRequest): Promise<DeriveProfileResult>
+  }
   recap: {
     generate(input: RecapRequest): Promise<{ requestId: string }>
     cancel(requestId: string): Promise<void>
@@ -256,6 +267,7 @@ export const IPC = {
   recapCancel: 'recap:cancel',
   suggestQuery: 'suggest:query',
   converseQuery: 'converse:query',
+  deriveProfileQuery: 'derive-profile:query',
   importExtract: 'import:extract',
   importApply: 'import:apply',
   personaGet: 'persona:get',

@@ -217,7 +217,7 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-lg">Link {entity.name}</DialogTitle>
-          <DialogDescription>Connect this entity to another in the saga.</DialogDescription>
+          <DialogDescription>Connect this entity to another in the campaign.</DialogDescription>
         </DialogHeader>
 
         {!other ? (

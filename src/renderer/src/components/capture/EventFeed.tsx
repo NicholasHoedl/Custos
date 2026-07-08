@@ -23,8 +23,8 @@ function applySummary(r: ApplyResult): string {
   const parts = [
     r.createdEntityIds.length > 0 && `${r.createdEntityIds.length} new`,
     r.linkedEntityIds.length > 0 && `${r.linkedEntityIds.length} linked`,
-    r.statusChangesApplied + r.relationshipChangesApplied > 0 &&
-      `${r.statusChangesApplied + r.relationshipChangesApplied} changes`,
+    r.statusChangesApplied + r.relationshipChangesApplied + r.fieldChangesApplied > 0 &&
+      `${r.statusChangesApplied + r.relationshipChangesApplied + r.fieldChangesApplied} changes`,
     r.createdNoteIds.length > 0 && `${r.createdNoteIds.length} notes`
   ].filter(Boolean) as string[]
   return parts.length > 0 ? parts.join(' · ') : 'No new changes'

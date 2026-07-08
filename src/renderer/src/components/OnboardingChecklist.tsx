@@ -25,6 +25,7 @@ export function OnboardingChecklist() {
   const { status: onb, progress, downloading, download } = useOnboarding()
   const { sessions } = useSessions(activeCampaignId)
   const [name, setName] = useState('')
+  const [mcName, setMcName] = useState('')
   const [busy, setBusy] = useState(false)
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === '1')
 
@@ -42,16 +43,19 @@ export function OnboardingChecklist() {
 
   async function createCampaign() {
     const n = name.trim()
-    if (!n || busy) return
+    const mc = mcName.trim()
+    // Every campaign is created WITH its mandatory main character (ADR-029).
+    if (!n || !mc || busy) return
     setBusy(true)
     try {
-      const c = await ledger.campaign.create({ name: n })
-      setActiveCampaign(c.id)
+      const c = await ledger.campaign.create({ name: n, mainCharacterName: mc })
+      setActiveCampaign(c.id) // the Sidebar's MainCharacterBadge reseeds the lens from the new MC
       useUiStore.getState().bumpCampaigns()
       setName('')
-      toast.success('Saga created', { description: n })
+      setMcName('')
+      toast.success('Campaign created', { description: n })
     } catch (err) {
-      toast.error('Could not create saga', { description: String(err) })
+      toast.error('Could not create campaign', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -97,23 +101,33 @@ export function OnboardingChecklist() {
       </p>
 
       <ol className="mt-3 space-y-2.5">
-        <Step done={hasCampaign} label="Create a saga">
+        <Step done={hasCampaign} label="Create a campaign">
           {!hasCampaign && (
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                placeholder="Campaign name…"
+                autoFocus
+                className="h-8"
+              />
+              <Input
+                value={mcName}
+                onChange={(e) => setMcName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
                     createCampaign()
                   }
                 }}
-                placeholder="Saga name…"
-                autoFocus
-                className="h-8 flex-1"
+                placeholder="Main character's name…"
+                className="h-8"
               />
-              <Button size="sm" onClick={createCampaign} disabled={!name.trim() || busy}>
+              <Button
+                size="sm"
+                onClick={createCampaign}
+                disabled={!name.trim() || !mcName.trim() || busy}
+              >
                 Create
               </Button>
             </div>
@@ -127,7 +141,7 @@ export function OnboardingChecklist() {
             </Button>
           )}
           {!hasCampaign && (
-            <span className="text-xs text-muted-foreground">Create a saga first.</span>
+            <span className="text-xs text-muted-foreground">Create a campaign first.</span>
           )}
         </Step>
 

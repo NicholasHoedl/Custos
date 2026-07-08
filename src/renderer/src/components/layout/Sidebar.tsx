@@ -11,7 +11,8 @@ import {
   Settings,
   Sparkles,
   Star,
-  Trash2
+  Trash2,
+  UserRound
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign, Session } from '@shared/entity-types'
@@ -57,6 +58,7 @@ import {
 } from '@renderer/components/ui/dropdown-menu'
 
 const NAV: { key: ViewKey; label: string; icon: typeof ScrollText }[] = [
+  { key: 'character', label: 'Character', icon: UserRound },
   { key: 'journal', label: 'Chronicle', icon: NotebookPen },
   { key: 'capture', label: 'Codex', icon: ScrollText },
   { key: 'recall', label: 'Consult', icon: Search },
@@ -82,7 +84,7 @@ export function Sidebar() {
       <div className="space-y-2 px-3">
         <CampaignSelector />
         {activeCampaignId && <SessionControl campaignId={activeCampaignId} />}
-        {activeCampaignId && <ActivePcSelector campaignId={activeCampaignId} />}
+        {activeCampaignId && <MainCharacterBadge campaignId={activeCampaignId} />}
         {activeCampaignId && <SearchBox campaignId={activeCampaignId} />}
       </div>
 
@@ -135,7 +137,7 @@ function CampaignSelector() {
     <div className="flex items-center gap-1.5">
       <Select value={activeCampaignId ?? ''} onValueChange={(v) => setActiveCampaign(v)}>
         <SelectTrigger className="min-w-0 flex-1">
-          <SelectValue placeholder="Select a saga" />
+          <SelectValue placeholder="Select a campaign" />
         </SelectTrigger>
         <SelectContent>
           {campaigns.map((c) => (
@@ -148,7 +150,7 @@ function CampaignSelector() {
       {activeCampaign && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" aria-label="Saga actions">
+            <Button variant="outline" size="icon" aria-label="Campaign actions">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -168,7 +170,7 @@ function CampaignSelector() {
         variant="outline"
         size="icon"
         onClick={() => setCreateOpen(true)}
-        aria-label="New saga"
+        aria-label="New campaign"
       >
         <Plus className="size-4" />
       </Button>
@@ -213,31 +215,37 @@ function CreateCampaignDialog({
   onCreated: (campaign: Campaign) => void
 }) {
   const [name, setName] = useState('')
+  const [mainCharacterName, setMainCharacterName] = useState('')
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (open) {
       setName('')
+      setMainCharacterName('')
       setDescription('')
     }
   }, [open])
 
   async function submit() {
     const trimmed = name.trim()
-    if (!trimmed || busy) return
+    const mcName = mainCharacterName.trim()
+    // A campaign is created WITH its mandatory main character (ADR-029) — both fields are required.
+    if (!trimmed || !mcName || busy) return
     setBusy(true)
     try {
       const campaign = await ledger.campaign.create({
         name: trimmed,
-        description: description.trim() || undefined
+        description: description.trim() || undefined,
+        mainCharacterName: mcName
       })
       useUiStore.getState().bumpCampaigns()
-      toast.success('Saga created', { description: trimmed })
+      toast.success('Campaign created', { description: trimmed })
+      // The MainCharacterBadge reseeds the active-PC lens from the new campaign's main character.
       onCreated(campaign)
       onOpenChange(false)
     } catch (err) {
-      toast.error('Could not create saga', { description: String(err) })
+      toast.error('Could not create campaign', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -247,10 +255,10 @@ function CreateCampaignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">New saga</DialogTitle>
-          <DialogDescription>Start a new saga to track its story.</DialogDescription>
+          <DialogTitle className="font-display text-xl">New campaign</DialogTitle>
+          <DialogDescription>Start a new campaign to track its story.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
           <div className="space-y-1.5">
             <Label htmlFor="cc-name">Name</Label>
             <Input
@@ -267,6 +275,25 @@ function CreateCampaignDialog({
             />
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="cc-mc">Main character</Label>
+            <Input
+              id="cc-mc"
+              value={mainCharacterName}
+              onChange={(e) => setMainCharacterName(e.target.value)}
+              placeholder="Your player character's name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submit()
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Every campaign has one main character — the hero you play and whose voice the AI speaks in.
+              You can flesh out their profile afterward.
+            </p>
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="cc-desc">Description (optional)</Label>
             <Textarea
               id="cc-desc"
@@ -280,7 +307,7 @@ function CreateCampaignDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={submit} disabled={!name.trim() || busy}>
+          <Button onClick={submit} disabled={!name.trim() || !mainCharacterName.trim() || busy}>
             Create
           </Button>
         </DialogFooter>
@@ -321,11 +348,11 @@ function EditCampaignDialog({
         name: trimmed,
         description: description.trim() || null
       })
-      toast.success('Saga updated', { description: trimmed })
+      toast.success('Campaign updated', { description: trimmed })
       onSaved()
       onOpenChange(false)
     } catch (err) {
-      toast.error('Could not update saga', { description: String(err) })
+      toast.error('Could not update campaign', { description: String(err) })
     } finally {
       setBusy(false)
     }
@@ -335,10 +362,10 @@ function EditCampaignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Edit saga</DialogTitle>
-          <DialogDescription>Rename this saga or update its description.</DialogDescription>
+          <DialogTitle className="font-display text-xl">Edit campaign</DialogTitle>
+          <DialogDescription>Rename this campaign or update its description.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
           <div className="space-y-1.5">
             <Label htmlFor="ec-name">Name</Label>
             <Input
@@ -418,11 +445,11 @@ function DeleteCampaignDialog({
     try {
       await ledger.campaign.delete(campaign.id)
       useUiStore.getState().bumpCampaigns()
-      toast.success('Saga deleted', { description: campaign.name })
+      toast.success('Campaign deleted', { description: campaign.name })
       onOpenChange(false)
       onDeleted()
     } catch (err) {
-      toast.error('Could not delete saga', { description: String(err) })
+      toast.error('Could not delete campaign', { description: String(err) })
       setBusy(false) // keep the dialog open so the typed confirmation isn't lost
     }
   }
@@ -433,7 +460,7 @@ function DeleteCampaignDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="font-display">Delete {campaign.name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the entire saga
+            This permanently deletes the entire campaign
             {counts
               ? ` — all ${counts.entities} ${counts.entities === 1 ? 'entity' : 'entities'}, ${counts.sessions} ${counts.sessions === 1 ? 'session' : 'sessions'}, and every note, relationship, and AI persona within it`
               : ', including all its entities, notes, relationships, sessions, and AI personas'}
@@ -461,7 +488,7 @@ function DeleteCampaignDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <Button variant="destructive" onClick={doDelete} disabled={!match || busy}>
-            Delete saga
+            Delete campaign
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -629,7 +656,7 @@ function EditSessionDialog({
           <DialogTitle className="font-display text-xl">Edit session {session.number}</DialogTitle>
           <DialogDescription>Update this session’s title, date, or summary.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
           <div className="space-y-1.5">
             <Label htmlFor="es-title">Title (optional)</Label>
             <Input
@@ -726,69 +753,47 @@ function DeleteSessionDialog({
   )
 }
 
-// The active-character selector, plus the campaign's MAIN CHARACTER (★). The main character is the
-// persisted default lens: it seeds the active PC whenever none is set (first load, or after a campaign
-// switch clears it), so Recall/Suggest open in that character's voice without re-picking. A manual pick
-// still overrides and persists — seeding only fills a gap. The ★ toggle sets/clears it on the campaign.
-function ActivePcSelector({ campaignId }: { campaignId: string }) {
+// The campaign's MAIN CHARACTER (★) — its single, mandatory protagonist and the ONLY in-character lens.
+// A read-only "Playing as X" indicator (ADR-030): it locks the active-PC lens to the main character and
+// navigates to the Character page (where the MC is actually set + managed). There is no picker here.
+function MainCharacterBadge({ campaignId }: { campaignId: string }) {
   const { entities: pcs } = useEntities(campaignId, 'pc')
   const { campaigns } = useCampaigns()
   const activePcId = useAppStore((s) => s.activePcId)
   const setActivePc = useAppStore((s) => s.setActivePc)
+  const setActiveView = useUiStore((s) => s.setActiveView)
 
-  const mainCharacterId = campaigns.find((c) => c.id === campaignId)?.mainCharacterId ?? null
+  const campaign = campaigns.find((c) => c.id === campaignId)
+  const mainCharacterId = campaign?.mainCharacterId ?? null
+  const mc = mainCharacterId != null ? pcs.find((p) => p.id === mainCharacterId) : undefined
 
-  // Seed the active PC from the main character when none is set (and the MC is a real PC in this
-  // campaign). Setting activePcId flips the `!activePcId` guard, so this fills the gap once, no loop.
+  // The main character IS the lens: once the CAMPAIGN is loaded, lock the active PC to its
+  // main_character_id (null when unset). Keyed off the campaign — NOT the pc list — so a slow entities
+  // load can't transiently clear the lens; the FK self-nulls if the MC pc is deleted. Converges (guarded).
   useEffect(() => {
-    if (!activePcId && mainCharacterId && pcs.some((p) => p.id === mainCharacterId)) {
-      setActivePc(mainCharacterId)
-    }
-  }, [activePcId, mainCharacterId, pcs, setActivePc])
-
-  if (pcs.length === 0) return null
-
-  const activeIsMain = Boolean(activePcId) && activePcId === mainCharacterId
-
-  async function setMain(id: string | null): Promise<void> {
-    try {
-      await ledger.campaign.update(campaignId, { mainCharacterId: id })
-      useUiStore.getState().bumpCampaigns()
-      toast.success(id ? 'Main character set' : 'Main character cleared')
-    } catch (err) {
-      toast.error('Could not set main character', { description: String(err) })
-    }
-  }
+    if (!campaign) return // campaigns not loaded yet — don't touch the lens
+    if (activePcId !== mainCharacterId) setActivePc(mainCharacterId)
+  }, [campaign, mainCharacterId, activePcId, setActivePc])
 
   return (
-    <div className="flex items-center gap-1.5">
-      <Select value={activePcId ?? ''} onValueChange={setActivePc}>
-        <SelectTrigger className="min-w-0 flex-1">
-          <SelectValue placeholder="Active character" />
-        </SelectTrigger>
-        <SelectContent>
-          {pcs.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              <span className="flex items-center gap-1.5">
-                {p.name}
-                {p.id === mainCharacterId && (
-                  <Star className="size-3 fill-primary text-primary" aria-label="Main character" />
-                )}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button
-        variant="outline"
-        size="icon"
-        aria-label={activeIsMain ? 'Clear main character' : 'Set as main character'}
-        title={activeIsMain ? 'Main character (click to clear)' : 'Set active character as main'}
-        disabled={!activePcId}
-        onClick={() => void setMain(activeIsMain ? null : activePcId)}
-      >
-        <Star className={cn('size-4', activeIsMain && 'fill-primary text-primary')} />
-      </Button>
-    </div>
+    <button
+      type="button"
+      onClick={() => setActiveView('character')}
+      title="Manage your main character"
+      className="flex w-full items-center gap-1.5 rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/40 hover:bg-muted/60"
+    >
+      <Star
+        className={cn('size-4 shrink-0', mc ? 'fill-primary text-primary' : 'text-muted-foreground')}
+        aria-hidden
+      />
+      {mc ? (
+        <span className="min-w-0 flex-1 truncate">
+          <span className="text-muted-foreground">Playing as </span>
+          <span className="font-medium text-foreground">{mc.name}</span>
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">Set a main character</span>
+      )}
+    </button>
   )
 }

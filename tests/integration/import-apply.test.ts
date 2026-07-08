@@ -257,3 +257,52 @@ describe('import.service — applyChangeset v2 (backfill changes, ADR-018)', () 
     expect(stateAsOf(ctx, npc.id, 5)).toEqual({ lifecycle: 'active', status: 'Busy' })
   })
 })
+
+describe('import.service — applyChangeset field changes (ADR-028)', () => {
+  it('applies add/cut/alter to lists + attributes, compounding within the batch; skips excluded + missing', () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const glasstaff = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Glasstaff',
+      traits: ['Cautious'],
+      flaws: []
+    })
+    const nothic = createEntity(ctx, {
+      campaignId,
+      type: 'creature',
+      name: 'Nothic',
+      attributes: { weakness: 'daylight', abilities: ['Rotting Gaze'] }
+    })
+    const ex = (entityId: string) => ({ kind: 'existing' as const, entityId })
+
+    const result = applyChangeset(ctx, store, {
+      campaignId,
+      sessionId: null,
+      entities: [],
+      notes: [],
+      fieldChanges: [
+        { entityRef: ex(glasstaff.id), field: 'traits', op: 'add', value: 'Reckless', oldValue: null, include: true },
+        { entityRef: ex(glasstaff.id), field: 'traits', op: 'alter', value: 'Wary', oldValue: 'Cautious', include: true }, // compounds
+        { entityRef: ex(glasstaff.id), field: 'flaws', op: 'add', value: 'Greedy', oldValue: null, include: true },
+        { entityRef: ex(nothic.id), field: 'weakness', op: 'alter', value: 'fire', oldValue: null, include: true }, // scalar set
+        { entityRef: ex(nothic.id), field: 'abilities', op: 'add', value: 'Reality Warp', oldValue: null, include: true },
+        { entityRef: ex(nothic.id), field: 'abilities', op: 'cut', value: null, oldValue: 'Rotting Gaze', include: true }, // compounds
+        { entityRef: ex(glasstaff.id), field: 'traits', op: 'add', value: 'Excluded', oldValue: null, include: false }, // not applied
+        { entityRef: ex('does-not-exist'), field: 'traits', op: 'add', value: 'X', oldValue: null, include: true } // skipped
+      ]
+    })
+
+    expect(result.fieldChangesApplied).toBe(6)
+    expect(result.skipped.some((s) => s.kind === 'change' && /field change/.test(s.reason))).toBe(true)
+
+    const g = getEntity(ctx, glasstaff.id)!
+    expect(g.traits).toEqual(['Wary', 'Reckless']) // Cautious→Wary after Reckless appended (re-read compounds)
+    expect(g.flaws).toEqual(['Greedy'])
+    const n = getEntity(ctx, nothic.id)!
+    expect(n.attributes.weakness).toBe('fire')
+    expect(n.attributes.abilities).toEqual(['Reality Warp']) // Rotting Gaze cut after Reality Warp added
+  })
+})

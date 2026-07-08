@@ -13,6 +13,7 @@ export interface ProfileField {
   kind: FieldKind
   options?: readonly string[] // required when kind === 'select'
   placeholder?: string
+  mainCharacterOnly?: boolean // (ADR-029) rendered/editable only when the entity is the campaign's main character
 }
 
 /** A curated status option and the coarse lifecycle it implies (ADR-017). Picking it sets BOTH the
@@ -50,7 +51,8 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
         key: 'backstory',
         label: 'Backstory',
         kind: 'textarea',
-        placeholder: 'Background, origins, and past experiences that shape who they are'
+        placeholder: 'Background, origins, and past experiences that shape who they are',
+        mainCharacterOnly: true // (ADR-029) only the main character carries a backstory
       }
     ]
   },

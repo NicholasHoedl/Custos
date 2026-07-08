@@ -20,5 +20,5 @@ test.afterAll(async () => {
 // 4-card path requires a real API key + network and is covered by the manual harness, not e2e.
 test('Counsel nav opens the real Counsel view', async () => {
   await page.getByRole('button', { name: 'Counsel' }).click()
-  await expect(page.getByText('Choose a saga in the sidebar to seek counsel.')).toBeVisible()
+  await expect(page.getByText('Choose a campaign in the sidebar to seek counsel.')).toBeVisible()
 })

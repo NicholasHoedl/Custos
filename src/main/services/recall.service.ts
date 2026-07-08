@@ -132,7 +132,8 @@ export async function ask(
       campaignName: campaign?.name ?? 'the campaign',
       campaignDescription: campaign?.description ?? null,
       pcName: pc?.name ?? null,
-      persona
+      persona,
+      voiceExamples: pc?.voiceExamples
     }
 
     // For each retrieved entity gather (a) its relationships — ownership/alliances/etc. that live in

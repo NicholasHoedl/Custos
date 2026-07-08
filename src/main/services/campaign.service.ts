@@ -3,6 +3,7 @@ import type { Campaign } from '@shared/entity-types'
 import type { CreateCampaignInput, UpdateCampaignInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
+import { createEntity } from './entity.service'
 import { newId, now, rowToCampaign } from './serialize'
 
 export function listCampaigns(ctx: DbContext): Campaign[] {
@@ -19,18 +20,38 @@ export function getCampaign(ctx: DbContext, id: string): Campaign | null {
   return r ? rowToCampaign(r) : null
 }
 
+// Creating a campaign optionally creates its MANDATORY main character (ADR-029) in the same transaction:
+// the campaign row, then a `pc` entity named `mainCharacterName`, then `main_character_id` pointed at it.
+// The New Campaign dialog always sends a name; internal/legacy callers omit it (a grandfathered null-MC
+// campaign). The entity insert sees the just-inserted campaign row within the txn, so its FK is satisfied.
 export function createCampaign(ctx: DbContext, input: CreateCampaignInput): Campaign {
   const ts = now()
-  const row = {
-    id: newId(),
-    name: input.name.trim(),
-    description: input.description ?? null,
-    mainCharacterId: null,
-    createdAt: ts,
-    updatedAt: ts
-  }
-  ctx.drizzle.insert(schema.campaign).values(row).run()
-  return rowToCampaign(row)
+  const id = newId()
+  const mcName = input.mainCharacterName?.trim()
+  ctx.drizzle.transaction(() => {
+    ctx.drizzle
+      .insert(schema.campaign)
+      .values({
+        id,
+        name: input.name.trim(),
+        description: input.description ?? null,
+        mainCharacterId: null,
+        createdAt: ts,
+        updatedAt: ts
+      })
+      .run()
+    if (mcName) {
+      const mc = createEntity(ctx, { campaignId: id, type: 'pc', name: mcName })
+      ctx.drizzle
+        .update(schema.campaign)
+        .set({ mainCharacterId: mc.id, updatedAt: now() })
+        .where(eq(schema.campaign.id, id))
+        .run()
+    }
+  })
+  const c = getCampaign(ctx, id)
+  if (!c) throw new Error(`Campaign ${id} not found`)
+  return c
 }
 
 // A main-character pointer must reference a pc entity that lives in THIS campaign (or be null to clear).

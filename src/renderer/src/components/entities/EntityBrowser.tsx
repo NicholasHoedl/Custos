@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookText, FileInput, Plus, Search, Skull, StickyNote } from 'lucide-react'
+import { BookText, FileInput, Plus, Search, Skull, Star, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -31,6 +31,8 @@ interface EntityBrowserProps {
   onShowRecap: () => void
   /** Clear the selection and show the import pane in the detail pane. */
   onShowImport: () => void
+  /** The campaign's main character id — its row gets a ★ and redirects to the Character page (ADR-030). */
+  mainCharacterId?: string | null
 }
 
 // Master list of all entities in the campaign, filtered client-side by type (chips, with live counts)
@@ -46,7 +48,8 @@ export function EntityBrowser({
   onShowAddEntity,
   onShowNotes,
   onShowRecap,
-  onShowImport
+  onShowImport,
+  mainCharacterId
 }: EntityBrowserProps) {
   const [query, setQuery] = useState('')
 
@@ -162,6 +165,7 @@ export function EntityBrowser({
               key={entity.id}
               entity={entity}
               selected={entity.id === selectedId}
+              isMain={entity.id === mainCharacterId}
               onClick={() => onSelect(entity.id)}
             />
           ))
@@ -174,10 +178,12 @@ export function EntityBrowser({
 function EntityCard({
   entity,
   selected,
+  isMain,
   onClick
 }: {
   entity: Entity
   selected: boolean
+  isMain: boolean
   onClick: () => void
 }) {
   const fallen = entity.lifecycle === 'ended'
@@ -201,6 +207,9 @@ function EntityCard({
         >
           {entity.name}
         </span>
+        {isMain && (
+          <Star className="size-3 shrink-0 fill-primary text-primary" aria-label="Main character" />
+        )}
         {fallen && <Skull className="size-3 shrink-0 text-blood" aria-label="Fallen" />}
         {presumed && <Skull className="size-3 shrink-0 text-blood/50" aria-label="Presumed lost" />}
         <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">

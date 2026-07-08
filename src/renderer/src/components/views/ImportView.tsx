@@ -59,7 +59,7 @@ export function ImportView() {
 
   if (imp.status === 'done' && imp.result) {
     const r = imp.result
-    const changes = r.statusChangesApplied + r.relationshipChangesApplied
+    const changes = r.statusChangesApplied + r.relationshipChangesApplied + r.fieldChangesApplied
     return (
       <PaneShell size="form">
         <Header />

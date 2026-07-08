@@ -47,8 +47,8 @@ export function NotesView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <StickyNote className="size-10 text-muted-foreground/50" />
         <div>
-          <p className="font-display text-lg font-medium text-foreground">No saga selected</p>
-          <p className="text-sm text-muted-foreground">Choose a saga in the sidebar to keep its annals.</p>
+          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
+          <p className="text-sm text-muted-foreground">Choose a campaign in the sidebar to keep its annals.</p>
         </div>
       </div>
     )
@@ -188,7 +188,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
             {editingId
               ? 'Editing a note'
               : selectedIds.length === 0
-                ? 'No entities tagged — saves as saga lore'
+                ? 'No entities tagged — saves as campaign lore'
                 : ' '}
           </span>
           <div className="flex items-center gap-2">
@@ -204,7 +204,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
         </div>
         {entities.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            No entities yet — notes save as saga lore. Add people, places, and things in the Codex to
+            No entities yet — notes save as campaign lore. Add people, places, and things in the Codex to
             tag them.
           </p>
         )}

@@ -55,9 +55,9 @@ export function ConverseView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <MessagesSquare className="size-10 text-muted-foreground/50" />
         <div>
-          <p className="font-display text-lg font-medium text-foreground">No saga selected</p>
+          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
           <p className="text-sm text-muted-foreground">
-            Choose a saga in the sidebar to prepare a conversation.
+            Choose a campaign in the sidebar to prepare a conversation.
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { cn } from '@renderer/lib/utils'
 import { useUiStore, type ViewKey } from '@renderer/store/ui-store'
+import { CharacterView } from '@renderer/components/views/CharacterView'
 import { JournalView } from '@renderer/components/views/JournalView'
 import { CaptureView } from '@renderer/components/views/CaptureView'
 import { RecallView } from '@renderer/components/views/RecallView'
@@ -12,6 +13,7 @@ import { SettingsView } from '@renderer/components/views/SettingsView'
 // All views stay MOUNTED and we toggle visibility, so each one keeps its state (query, streamed
 // answer, scroll position, in-flight requests) when the user navigates away and comes back.
 const VIEWS: { key: ViewKey; Component: ComponentType }[] = [
+  { key: 'character', Component: CharacterView },
   { key: 'journal', Component: JournalView },
   { key: 'capture', Component: CaptureView },
   { key: 'recall', Component: RecallView },

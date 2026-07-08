@@ -264,5 +264,54 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
     if (!res2.ok) return
     expect(res2.proposal.statusChanges).toEqual([])
     expect(res2.proposal.relationshipChanges).toEqual([])
+    expect(res2.proposal.fieldChanges).toEqual([])
+  })
+})
+
+describe('import.service — changeset v2 field changes (ADR-028)', () => {
+  it('validates field changes: add/cut/alter on lists + attributes; drops #index, off-profile, unmatched', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const glasstaff = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Glasstaff',
+      traits: ['Cautious'],
+      goals: ['Guard the manor']
+    })
+    const nothic = createEntity(ctx, {
+      campaignId,
+      type: 'creature',
+      name: 'Nothic',
+      attributes: { weakness: 'daylight', abilities: ['Rotting Gaze'] }
+    })
+    extractFn.mockResolvedValue({
+      entities: [{ type: 'npc', name: 'A Newcomer' }], // makes '#0' a real proposed (new) ref
+      notes: [],
+      statusChanges: [],
+      relationshipChanges: [],
+      fieldChanges: [
+        { entityRef: glasstaff.id, field: 'traits', op: 'add', value: 'Reckless', oldValue: '' }, // keep
+        { entityRef: glasstaff.id, field: 'traits', op: 'alter', value: 'Wary', oldValue: 'Cautious' }, // keep
+        { entityRef: glasstaff.id, field: 'traits', op: 'cut', value: '', oldValue: 'Nonexistent' }, // drop: unmatched
+        { entityRef: glasstaff.id, field: 'flaws', op: 'add', value: 'Greedy', oldValue: '' }, // keep: npc has flaws
+        { entityRef: nothic.id, field: 'goals', op: 'add', value: 'Escape', oldValue: '' }, // drop: creature has no goals
+        { entityRef: nothic.id, field: 'weakness', op: 'alter', value: 'fire', oldValue: '' }, // keep: scalar set
+        { entityRef: nothic.id, field: 'abilities', op: 'add', value: 'Reality Warp', oldValue: '' }, // keep: list add
+        { entityRef: nothic.id, field: 'abilities', op: 'cut', value: '', oldValue: 'Missing' }, // drop: unmatched item
+        { entityRef: '#0', field: 'traits', op: 'add', value: 'Brave', oldValue: '' } // drop: existing-only
+      ]
+    })
+
+    const res = await extract(ctx, { campaignId, text: 'Glasstaff and the Nothic', withChanges: true }, sig())
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.proposal.fieldChanges).toEqual([
+      { entityRef: { kind: 'existing', entityId: glasstaff.id }, field: 'traits', op: 'add', value: 'Reckless', oldValue: null },
+      { entityRef: { kind: 'existing', entityId: glasstaff.id }, field: 'traits', op: 'alter', value: 'Wary', oldValue: 'Cautious' },
+      { entityRef: { kind: 'existing', entityId: glasstaff.id }, field: 'flaws', op: 'add', value: 'Greedy', oldValue: null },
+      { entityRef: { kind: 'existing', entityId: nothic.id }, field: 'weakness', op: 'alter', value: 'fire', oldValue: null },
+      { entityRef: { kind: 'existing', entityId: nothic.id }, field: 'abilities', op: 'add', value: 'Reality Warp', oldValue: null }
+    ])
   })
 })

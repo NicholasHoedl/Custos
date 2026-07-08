@@ -64,6 +64,13 @@
       "when": 1783450334496,
       "tag": "0008_high_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783475532404,
+      "tag": "0009_superb_shatterstar",
+      "breakpoints": true
     }
   ]
 }

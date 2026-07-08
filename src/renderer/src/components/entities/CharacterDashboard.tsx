@@ -1,0 +1,505 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { CircleDashed, Skull, Sparkles, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  ENTITY_TYPE_LABELS,
+  LIFECYCLE_LABELS,
+  NOTE_CONFIDENCE_LABELS,
+  type Entity
+} from '@shared/entity-types'
+import { profileFor } from '@shared/entity-profiles'
+import { lifecycleHeuristic } from '@shared/lifecycle'
+import type { UpdateEntityInput } from '@shared/ipc-types'
+import { cn } from '@renderer/lib/utils'
+import { ledger } from '@renderer/lib/ipc'
+import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
+import { useUiStore } from '@renderer/store/ui-store'
+import { formatTimestamp } from '@renderer/lib/format'
+import { Button } from '@renderer/components/ui/button'
+import { Input } from '@renderer/components/ui/input'
+import { Textarea } from '@renderer/components/ui/textarea'
+import { Label } from '@renderer/components/ui/label'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@renderer/components/ui/alert-dialog'
+import { TagInput } from './TagInput'
+import { StatusCombobox } from './StatusCombobox'
+import { PersonaEditor } from './PersonaEditor'
+import { RelationshipEditor } from './RelationshipEditor'
+import { EntityHistory } from './EntityHistory'
+import { DeriveReview } from './DeriveReview'
+
+// The main character's DASHBOARD (ADR-030, as-built ADR-030 refinement): a bespoke, two-column,
+// inline-editing surface — a "character sheet" (identity + traits/goals/flaws/voice) beside "story &
+// voice" (backstory + Suggest, persona, ties), with history + notes below. Everything saves in place
+// (silent; error-toast only). Replaces the reused EntityDetail on the Character page; EntityDetail still
+// serves Codex. Loads its own copy of the entity so it can refetch after each inline save.
+export function CharacterDashboard({
+  mainCharacterId,
+  allEntities,
+  onDeleted
+}: {
+  mainCharacterId: string
+  allEntities: Entity[]
+  onDeleted: () => void
+}) {
+  const { entity, refresh } = useEntity(mainCharacterId)
+  const { notes, refresh: refreshNotes } = useNotes(mainCharacterId)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deriveOpen, setDeriveOpen] = useState(false)
+  const [personaKey, setPersonaKey] = useState(0) // bump to remount PersonaEditor after a save/derive
+  // Session guard (ADR-030): the backstory text the profile was last derived from. Null on load, so a
+  // fresh launch re-enables Suggest; set after a successful derive; cleared-by-comparison when the
+  // backstory is edited. NOT persisted.
+  const [lastDerived, setLastDerived] = useState<string | null>(null)
+
+  if (!entity) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading…</div>
+    )
+  }
+
+  const prof = profileFor('pc')
+  const fallen = entity.lifecycle === 'ended'
+  const presumed = entity.lifecycle === 'presumed_ended'
+  const savedBackstory = String(entity.attributes.backstory ?? '').trim()
+  const canSuggest = Boolean(savedBackstory) && savedBackstory !== lastDerived
+  const suggestHint = !savedBackstory
+    ? 'Add a backstory below to derive traits, goals, flaws, and voice.'
+    : savedBackstory === lastDerived
+      ? 'Derived from this backstory — edit it to run Suggest again.'
+      : ''
+
+  // ---- inline saves ----
+  // Promoted fields (name/description/traits/goals/flaws/voiceExamples/status/lifecycle) are top-level.
+  async function savePromoted(patch: UpdateEntityInput): Promise<void> {
+    try {
+      await ledger.entity.update(mainCharacterId, patch)
+      useUiStore.getState().bumpEntities()
+      refresh()
+      setPersonaKey((k) => k + 1)
+    } catch (err) {
+      toast.error('Could not save', { description: String(err) })
+      refresh() // revert the optimistic control value
+    }
+  }
+  // Attributes REPLACE wholesale — re-read fresh so a concurrent attribute edit isn't clobbered.
+  async function saveAttribute(key: string, value: string): Promise<void> {
+    try {
+      const cur = await ledger.entity.get(mainCharacterId)
+      if (!cur) return
+      const attributes = { ...cur.attributes }
+      if (value.trim()) attributes[key] = value.trim()
+      else delete attributes[key]
+      await ledger.entity.update(mainCharacterId, { attributes })
+      useUiStore.getState().bumpEntities()
+      refresh()
+      setPersonaKey((k) => k + 1)
+    } catch (err) {
+      toast.error('Could not save', { description: String(err) })
+      refresh()
+    }
+  }
+
+  async function removeNote(id: string): Promise<void> {
+    try {
+      await ledger.note.delete(id)
+      refreshNotes()
+    } catch (err) {
+      toast.error('Could not delete note', { description: String(err) })
+    }
+  }
+
+  async function handleDelete(): Promise<void> {
+    try {
+      await ledger.entity.delete(mainCharacterId)
+      useUiStore.getState().bumpEntities()
+      toast.success('Deleted', { description: entity!.name })
+      onDeleted()
+    } catch (err) {
+      toast.error('Could not delete', { description: String(err) })
+    }
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Header: name + type/status + Delete (editing is inline; no Edit dialog here). */}
+      <div className="flex items-start justify-between gap-3 border-b border-border p-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
+              {ENTITY_TYPE_LABELS.pc}
+            </span>
+            {entity.status && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {entity.status}
+              </span>
+            )}
+            {(fallen || presumed) && (
+              <span className="inscribed text-[11px] text-blood">{LIFECYCLE_LABELS[entity.lifecycle]}</span>
+            )}
+          </div>
+          <h2
+            className={cn(
+              'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
+              fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
+              presumed && 'italic text-foreground/60'
+            )}
+          >
+            {entity.name}
+            {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
+            {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
+          </h2>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDeleteOpen(true)}
+          className="shrink-0 text-muted-foreground hover:border-destructive/50 hover:text-destructive"
+        >
+          <Trash2 className="size-3.5" />
+          Delete
+        </Button>
+      </div>
+
+      {/* Body: two columns (container-query) + a full-width secondary section below. */}
+      <div className="@container flex-1 overflow-y-auto p-4">
+        <div className="grid gap-4 @3xl:grid-cols-2">
+          {/* LEFT — the sheet */}
+          <div className="min-w-0 space-y-4">
+            <Card title="Identity">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Ancestry">
+                  <InlineText
+                    value={String(entity.attributes.ancestry ?? '')}
+                    onSave={(v) => void saveAttribute('ancestry', v)}
+                    placeholder="e.g. Half-elf"
+                  />
+                </Field>
+                <Field label="Class">
+                  <InlineText
+                    value={String(entity.attributes.class ?? '')}
+                    onSave={(v) => void saveAttribute('class', v)}
+                    placeholder="e.g. Rogue"
+                  />
+                </Field>
+                <Field label="Level">
+                  <InlineText
+                    value={String(entity.attributes.level ?? '')}
+                    onSave={(v) => void saveAttribute('level', v)}
+                    placeholder="1"
+                  />
+                </Field>
+                <Field label="Player">
+                  <InlineText
+                    value={String(entity.attributes.player ?? '')}
+                    onSave={(v) => void saveAttribute('player', v)}
+                    placeholder="Who runs them?"
+                  />
+                </Field>
+              </div>
+              <Field label="Status">
+                <StatusCombobox
+                  value={entity.status ?? ''}
+                  options={prof.status ?? []}
+                  onChange={(v, lc) =>
+                    void savePromoted({
+                      status: v.trim() || null,
+                      lifecycle: lc ?? lifecycleHeuristic(v.trim() || null)
+                    })
+                  }
+                />
+                {(fallen || presumed) && (
+                  <label className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 accent-primary"
+                      checked={presumed}
+                      onChange={(e) =>
+                        void savePromoted({ lifecycle: e.target.checked ? 'presumed_ended' : 'ended' })
+                      }
+                    />
+                    Presumed / unconfirmed
+                  </label>
+                )}
+              </Field>
+              <Field label="Description">
+                <InlineText
+                  multiline
+                  rows={3}
+                  value={entity.description ?? ''}
+                  onSave={(v) => void savePromoted({ description: v.trim() || null })}
+                  placeholder="Who they are in a line or two."
+                />
+              </Field>
+            </Card>
+
+            <Card title="Traits">
+              <ListField
+                value={entity.traits}
+                onSave={(v) => savePromoted({ traits: v })}
+                placeholder="Add a trait — e.g. gruff"
+              />
+            </Card>
+            <Card title="Goals">
+              <ListField
+                value={entity.goals}
+                onSave={(v) => savePromoted({ goals: v })}
+                placeholder="Add a goal — e.g. protect the town"
+              />
+            </Card>
+            <Card title="Flaws">
+              <ListField
+                value={entity.flaws}
+                onSave={(v) => savePromoted({ flaws: v })}
+                placeholder="A vice, fear, or weakness"
+              />
+            </Card>
+            <Card title="Voice examples">
+              <ListField
+                value={entity.voiceExamples}
+                onSave={(v) => savePromoted({ voiceExamples: v })}
+                placeholder="A line they'd say"
+              />
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Sample lines in their own words — these ground Counsel and Converse.
+              </p>
+            </Card>
+          </div>
+
+          {/* RIGHT — story & voice */}
+          <div className="min-w-0 space-y-4">
+            <Card
+              title="Backstory"
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canSuggest}
+                  onClick={() => setDeriveOpen(true)}
+                  title={suggestHint || 'Derive traits, goals, flaws, and voice from the backstory'}
+                >
+                  <Sparkles className="size-3.5" />
+                  Suggest
+                </Button>
+              }
+            >
+              <InlineText
+                multiline
+                rows={10}
+                value={String(entity.attributes.backstory ?? '')}
+                onSave={(v) => void saveAttribute('backstory', v)}
+                placeholder="Where they come from — the Suggest tool derives traits, goals, flaws, and voice from this."
+              />
+              {suggestHint && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">{suggestHint}</p>
+              )}
+            </Card>
+
+            <Card>
+              <PersonaEditor key={personaKey} entityId={mainCharacterId} />
+            </Card>
+
+            <Card>
+              <RelationshipEditor entity={entity} allEntities={allEntities} />
+            </Card>
+          </div>
+        </div>
+
+        {/* Full-width secondary: history + notes */}
+        <div className="mt-4 space-y-4">
+          <Card>
+            <EntityHistory entityId={mainCharacterId} />
+          </Card>
+          <Card title="Annals">
+            {notes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No annals recorded.</p>
+            ) : (
+              <ul className="space-y-2">
+                {notes.map((n) => (
+                  <li
+                    key={n.id}
+                    className="group relative rounded-md border border-border bg-card/40 p-3 pr-9"
+                  >
+                    <p className="whitespace-pre-wrap text-sm text-foreground/90">{n.content}</p>
+                    <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                      <span>{formatTimestamp(n.createdAt)}</span>
+                      {n.confidence !== 'confirmed' && (
+                        <span className="inline-flex items-center gap-1 text-metal">
+                          <CircleDashed className="size-3" />
+                          {NOTE_CONFIDENCE_LABELS[n.confidence]}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => void removeNote(n.id)}
+                      className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                      aria-label="Delete note"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">Delete {entity.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes your main character
+              {notes.length > 0 && `, its ${notes.length} note${notes.length === 1 ? '' : 's'}`}, and all
+              of its relationships. The campaign will need a new main character. This can’t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDelete()}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <DeriveReview
+        pcId={mainCharacterId}
+        open={deriveOpen}
+        onOpenChange={setDeriveOpen}
+        onApplied={() => {
+          setLastDerived(savedBackstory) // lock Suggest until the backstory changes
+          refresh()
+          setPersonaKey((k) => k + 1)
+        }}
+      />
+    </div>
+  )
+}
+
+// A titled panel. Persona/Ties/History render their own headings, so those cards pass no title.
+function Card({
+  title,
+  action,
+  children
+}: {
+  title?: string
+  action?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card/40 p-4">
+      {(title || action) && (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {title ? <h3 className="inscribed text-xs">{title}</h3> : <span />}
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
+// Traits/goals/flaws/voice: optimistic local state so rapid chip edits build from the latest list (not a
+// stale controlled prop), ORDERED saves (a promise chain) so they can't land out of order, and a
+// pending-guard on the sync so an in-flight refetch can't clobber a still-uncommitted edit. Fixes a
+// rapid-edit save race the plain controlled TagInput had.
+function ListField({
+  value,
+  onSave,
+  placeholder
+}: {
+  value: string[]
+  onSave: (next: string[]) => Promise<void>
+  placeholder?: string
+}) {
+  const [items, setItems] = useState(value)
+  const pending = useRef(0)
+  const chain = useRef<Promise<void>>(Promise.resolve())
+  useEffect(() => {
+    if (pending.current === 0) setItems(value) // only re-sync when no local edit is in flight
+  }, [value])
+  function change(next: string[]): void {
+    setItems(next)
+    pending.current += 1
+    chain.current = chain.current
+      .then(() => onSave(next))
+      .finally(() => {
+        pending.current -= 1
+      })
+  }
+  return <TagInput value={items} onChange={change} placeholder={placeholder} />
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-3 space-y-1 first:mt-0">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  )
+}
+
+// An inline text/textarea that holds a local draft and saves on blur. Synced from the saved `value`, so an
+// external refresh (e.g. after a derive) flows in without clobbering an in-progress edit (the draft only
+// re-syncs when the SAVED value actually changes).
+function InlineText({
+  value,
+  onSave,
+  placeholder,
+  multiline,
+  rows
+}: {
+  value: string
+  onSave: (next: string) => void
+  placeholder?: string
+  multiline?: boolean
+  rows?: number
+}) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+  const commit = (): void => {
+    if (draft !== value) onSave(draft)
+  }
+  if (multiline) {
+    return (
+      <Textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        rows={rows}
+        placeholder={placeholder}
+        className="text-sm"
+      />
+    )
+  }
+  return (
+    <Input
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          e.currentTarget.blur()
+        }
+      }}
+      placeholder={placeholder}
+      className="h-8"
+    />
+  )
+}

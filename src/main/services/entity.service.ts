@@ -46,6 +46,7 @@ export function createEntity(ctx: DbContext, input: CreateEntityInput): Entity {
     traits: serializeArray(input.traits),
     goals: serializeArray(input.goals),
     flaws: serializeArray(input.flaws),
+    voiceExamples: serializeArray(input.voiceExamples),
     attributes: serializeObject(input.attributes),
     status,
     lifecycle,
@@ -75,6 +76,7 @@ export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInpu
   if (patch.traits !== undefined) set.traits = serializeArray(patch.traits)
   if (patch.goals !== undefined) set.goals = serializeArray(patch.goals)
   if (patch.flaws !== undefined) set.flaws = serializeArray(patch.flaws)
+  if (patch.voiceExamples !== undefined) set.voiceExamples = serializeArray(patch.voiceExamples)
   if (patch.attributes !== undefined) set.attributes = serializeObject(patch.attributes)
 
   // Chronology: append a stamped history row iff status OR lifecycle actually changed.

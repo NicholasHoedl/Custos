@@ -9,18 +9,23 @@ import {
 import type {
   ApplyResult,
   ConfirmedChangeset,
+  ConfirmedFieldChange,
   EntityRef,
   ExtractFailureReason,
   ExtractionProposal,
   ExtractRequest,
   ExtractResult,
+  FieldChangeOp,
   ProposedEntity,
+  ProposedFieldChange,
   ProposedNote,
   ProposedRelationshipChange,
   ProposedStatusChange,
   RawExtraction
 } from '@shared/import-types'
 import { isRelationAllowed, isRelationKey } from '@shared/relations'
+import { profileFor } from '@shared/entity-profiles'
+import type { UpdateEntityInput } from '@shared/ipc-types'
 import type { DbContext } from './db-context'
 import type { VectorStore } from './vector-store.service'
 import { FUZZY_THRESHOLD, nameMatchScore } from './vector-store.service'
@@ -57,7 +62,15 @@ export async function extract(
     const { suggestModel, suggestEffort } = getSettings()
     const raw = await claudeExtract({
       text,
-      existing: existing.map((e) => ({ id: e.id, name: e.name, type: e.type })),
+      existing: existing.map((e) => ({
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        traits: e.traits,
+        goals: e.goals,
+        flaws: e.flaws,
+        attributes: e.attributes
+      })),
       model: suggestModel,
       effort: suggestEffort,
       withChanges: req.withChanges,
@@ -68,7 +81,8 @@ export async function extract(
       proposal.entities.length === 0 &&
       proposal.notes.length === 0 &&
       proposal.statusChanges.length === 0 &&
-      proposal.relationshipChanges.length === 0
+      proposal.relationshipChanges.length === 0 &&
+      proposal.fieldChanges.length === 0
     ) {
       return { ok: false, reason: 'empty' }
     }
@@ -254,11 +268,60 @@ function validateExtraction(raw: RawExtraction, existing: Entity[]): ExtractionP
     relationshipChanges.push({ fromRef, toRef, relation: rc.relation, action: rc.action })
   }
 
-  return { entities, notes, statusChanges, relationshipChanges }
+  // 8) Field changes: add/cut/alter a promoted list (traits/goals/flaws) or a type attribute on an
+  //    EXISTING entity. A #index (proposed) ref is dropped — a new entity carries its fields already.
+  //    For a LIST cut/alter, oldValue must match a CURRENT item (no silent no-ops); "" coerces to null.
+  const fieldChanges: ProposedFieldChange[] = []
+  const seenField = new Set<string>()
+  for (const fc of raw.fieldChanges ?? []) {
+    if (!fc || typeof fc.entityRef !== 'string') continue
+    const ref = resolveRef(fc.entityRef)
+    if (!ref || ref.kind !== 'existing') continue
+    const ent = existing.find((e) => e.id === ref.entityId)
+    if (!ent) continue
+    const field = strOrUndef(fc.field)
+    if (!field) continue
+    const op = fc.op
+    if (op !== 'add' && op !== 'cut' && op !== 'alter') continue
+    const value = strOrUndef(fc.value) ?? null
+    const oldValue = strOrUndef(fc.oldValue) ?? null
+
+    const isPromoted = field === 'traits' || field === 'goals' || field === 'flaws'
+    if (isPromoted && !profileFor(ent.type)[field as 'traits' | 'goals' | 'flaws']) continue
+    const profField = isPromoted ? null : profileFor(ent.type).fields.find((f) => f.key === field)
+    const isList = isPromoted || profField?.kind === 'list'
+    const current: string[] = isPromoted
+      ? ent[field as 'traits' | 'goals' | 'flaws']
+      : isList
+        ? attrStringArray(ent.attributes[field])
+        : []
+
+    if (op === 'add') {
+      if (!value) continue
+      if (isList && current.includes(value)) continue // already present
+    } else if (op === 'cut') {
+      if (isList && !current.includes(oldValue ?? value ?? '')) continue // must name a real item
+    } else {
+      // alter
+      if (!value) continue
+      if (isList && !(oldValue && current.includes(oldValue))) continue // must reference a real item
+    }
+
+    const key = `${ref.entityId}:${field}:${op}:${value ?? ''}:${oldValue ?? ''}`
+    if (seenField.has(key)) continue
+    seenField.add(key)
+    fieldChanges.push({ entityRef: ref, field, op, value, oldValue })
+  }
+
+  return { entities, notes, statusChanges, relationshipChanges, fieldChanges }
 }
 
 function strOrUndef(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined
+}
+
+function attrStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
 }
 
 /**
@@ -279,6 +342,7 @@ export function applyChangeset(
     createdNoteIds: [],
     statusChangesApplied: 0,
     relationshipChangesApplied: 0,
+    fieldChangesApplied: 0,
     skipped: []
   }
   const idByIndex = new Map<number, string>()
@@ -377,6 +441,26 @@ export function applyChangeset(
       }
     }
 
+    // Field changes: add/cut/alter a trait/goal/flaw or a type attribute on an EXISTING entity. NOT
+    // chronology-versioned (that's status/lifecycle + relationships) → a plain updateEntity, no history row.
+    // Re-reads the entity per change so several edits to the same field compound (the txn sees its writes).
+    for (const fc of payload.fieldChanges ?? []) {
+      if (!fc.include) continue
+      const id = resolve(fc.entityRef)
+      const ent = id ? getEntity(ctx, id) : null
+      if (!id || !ent) {
+        result.skipped.push({ kind: 'change', reason: 'a field change had no valid target' })
+        continue
+      }
+      const patch = fieldChangePatch(ent, fc)
+      if (!patch) {
+        result.skipped.push({ kind: 'change', reason: `could not apply the ${fc.field} change` })
+        continue
+      }
+      updateEntity(ctx, id, patch)
+      result.fieldChangesApplied++
+    }
+
     for (const cn of payload.notes) {
       if (!cn.include) continue
       const entityIds: string[] = []
@@ -404,4 +488,49 @@ export function applyChangeset(
   for (const id of result.createdEntityIds) indexEntity(ctx, store, id)
   for (const id of result.createdNoteIds) indexNote(ctx, store, id)
   return result
+}
+
+/** Apply one add/cut/alter to a string list. Returns null (→ skip) when the op can't proceed. */
+function applyListOp(
+  arr: string[],
+  op: FieldChangeOp,
+  value: string | null,
+  oldValue: string | null
+): string[] | null {
+  if (op === 'add') return value && !arr.includes(value) ? [...arr, value] : arr
+  if (op === 'cut') {
+    const item = oldValue ?? value
+    return item ? arr.filter((x) => x !== item) : null
+  }
+  // alter: swap the exact old item for the new text (both required, old must exist)
+  if (!oldValue || !value || !arr.includes(oldValue)) return null
+  return arr.map((x) => (x === oldValue ? value : x))
+}
+
+/** Compute the updateEntity patch for a confirmed field change (list op on traits/goals/flaws or a
+ *  list-kind attribute; set/clear for a scalar attribute). Returns null when the change can't apply. */
+function fieldChangePatch(ent: Entity, fc: ConfirmedFieldChange): UpdateEntityInput | null {
+  if (fc.field === 'traits' || fc.field === 'goals' || fc.field === 'flaws') {
+    const next = applyListOp(ent[fc.field], fc.op, fc.value, fc.oldValue)
+    if (!next) return null
+    const patch: UpdateEntityInput = {}
+    if (fc.field === 'traits') patch.traits = next
+    else if (fc.field === 'goals') patch.goals = next
+    else patch.flaws = next
+    return patch
+  }
+  // A type-specific attribute: list-kind (per the profile) → list op; otherwise a scalar set/clear.
+  const profField = profileFor(ent.type).fields.find((f) => f.key === fc.field)
+  const attrs = { ...ent.attributes }
+  if (profField?.kind === 'list') {
+    const next = applyListOp(attrStringArray(attrs[fc.field]), fc.op, fc.value, fc.oldValue)
+    if (!next) return null
+    attrs[fc.field] = next
+  } else if (fc.op === 'cut') {
+    delete attrs[fc.field]
+  } else {
+    if (!fc.value) return null
+    attrs[fc.field] = fc.value
+  }
+  return { attributes: attrs }
 }

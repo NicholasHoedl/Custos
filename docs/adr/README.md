@@ -39,6 +39,9 @@ ADR that supersedes the old one (don't edit the old one).
 | [025](025-converse-in-character-questions.md) | Converse: an in-character question lens (single-shot structured, direct-fetch grounding) | Accepted | 2026-07-07 |
 | [026](026-counsel-v2-mechanics-flaws.md) | Counsel v2: mechanical layer, pillar/teamwork diversity, flaws, and surfacing entity data | Accepted | 2026-07-07 |
 | [027](027-scene-counsel-only.md) | Scene is Counsel-only; Consult is a scene-free out-of-character notes narrator (drops Time of Day) | Accepted | 2026-07-07 |
+| [028](028-changeset-field-changes.md) | Changeset field changes: add/cut/alter to existing entities' traits/goals/flaws & attributes | Accepted | 2026-07-07 |
+| [029](029-main-character-overhaul.md) | Main character overhaul: mandatory single-lens protagonist, main-char-only depth, Voice Examples & derive-from-backstory | Accepted | 2026-07-07 |
+| [030](030-character-page-unified-persona.md) | Character page (first-in-nav home for the main character) + unified single-canonical persona generator | Accepted | 2026-07-07 |
 
 ## Status legend
 

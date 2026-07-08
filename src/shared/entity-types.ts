@@ -91,6 +91,7 @@ export interface Entity {
   traits: string[] // promoted (Suggest reads these)
   goals: string[] // promoted
   flaws: string[] // promoted (ADR-026): a vice/fear/weakness — the richest roleplay hook
+  voiceExamples: string[] // promoted (ADR-029): main-character-only sample lines; grounds Counsel/Converse voice
   attributes: Record<string, unknown> // open bag of type-specific fields
   status: string | null
   lifecycle: Lifecycle // chronology: coarse state the AI trusts; free-text `status` stays for nuance

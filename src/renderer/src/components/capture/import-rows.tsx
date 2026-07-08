@@ -1,4 +1,4 @@
-import { ArrowRight, Check, CircleDashed, Link2, Skull, Unlink } from 'lucide-react'
+import { ArrowRight, Check, CircleDashed, Link2, Minus, Plus, Skull, Unlink } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
@@ -12,6 +12,7 @@ import {
 } from '@shared/entity-types'
 import type {
   ConfirmedEntity,
+  ConfirmedFieldChange,
   ConfirmedNote,
   ConfirmedRelationshipChange,
   ConfirmedStatusChange,
@@ -382,6 +383,78 @@ export function RelationshipChangeRow({
       </div>
     </div>
   )
+}
+
+// An edit to one existing entity's field (a trait/goal/flaw or a type attribute), shown as the op's
+// diff: add = an ember "＋ value" chip · cut = a struck blood chip · alter = old → new (like a status
+// diff). The field is labelled (Trait / Goal / Flaw / the attribute key); not chronology-versioned.
+export function FieldChangeRow({
+  change,
+  refName,
+  onToggle
+}: {
+  change: ConfirmedFieldChange
+  refName: (r: EntityRef) => string
+  onToggle: () => void
+}) {
+  const { op, value, oldValue } = change
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-3',
+        change.include ? 'border-border bg-card/60' : 'border-dashed border-border/60 opacity-60'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <Toggle on={change.include} onClick={onToggle} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-[15px] text-foreground">{refName(change.entityRef)}</span>
+            <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              {fieldLabel(change.field)}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {op === 'add' && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary">
+                <Plus className="size-3.5" />
+                {value}
+              </span>
+            )}
+            {op === 'cut' && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-destructive/15 px-2 py-1 text-xs font-medium text-destructive">
+                <Minus className="size-3.5" />
+                <span className="line-through">{oldValue ?? value ?? 'cleared'}</span>
+              </span>
+            )}
+            {op === 'alter' && (
+              <>
+                {oldValue && (
+                  <>
+                    <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground line-through">
+                      {oldValue}
+                    </span>
+                    <ArrowRight className="size-4 text-muted-foreground" />
+                  </>
+                )}
+                <span className="rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary">
+                  {value}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// A promoted list reads as its singular ("Trait"); an attribute key is title-cased ("Weakness").
+function fieldLabel(field: string): string {
+  if (field === 'traits') return 'Trait'
+  if (field === 'goals') return 'Goal'
+  if (field === 'flaws') return 'Flaw'
+  return field.charAt(0).toUpperCase() + field.slice(1)
 }
 
 export function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {

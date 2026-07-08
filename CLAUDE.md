@@ -33,7 +33,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **9 migrations (0000–0008)**.
+  `.sql`, keep `_journal.json` + the snapshot. Currently **10 migrations (0000–0009)**.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -47,6 +47,15 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   Recall "Sources" list handle null-entity chunks. But paste-and-extract **Import deliberately still
   requires ≥1 entity per note** (an untagged extracted note is noise); don't "relax" the extraction
   prompt to allow untagged notes.
+- **Changeset field changes are existing-only + un-versioned** (ADR-028). Chronicle/Transcribe extraction
+  (`withChanges`) proposes a fourth change kind — add/cut/alter to an *existing* entity's
+  `traits`/`goals`/`flaws` or a per-type attribute — alongside status/relationship changes. Apply is a
+  plain `updateEntity` inside the batch txn (NO status-history row; NOT chronology-versioned) that
+  re-reads per change and recomputes the whole list/object (updateEntity REPLACES), so intra-batch edits
+  to one field compound. `validateExtraction` drops `#index` (new) refs, off-profile fields
+  (`profileFor`), and list cut/alter whose `oldValue` doesn't match a current item;
+  `buildExtractionUserContent` surfaces current fields ONLY for text-mentioned entities and ONLY when
+  `withChanges`. **No migration** (reuses existing columns).
 - **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` /
   `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
   `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,
@@ -61,6 +70,27 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (ADR-027) — Recall is scene-free. **`flaws`** is a promoted entity field (like `traits`/`goals` — schema/serialize/entity.service)
   that feeds the persona. **Entity embeddings now index `traits`/`goals`/`flaws` + salient attributes**
   (`embedding-index.ts` `entityText`); editing that function re-embeds ALL entities on next launch.
+- **Main character = the mandatory single lens (ADR-029).** Each campaign has ONE `pc` main character
+  (`campaign.main_character_id`), created WITH the campaign (`createCampaign({mainCharacterName})`, atomic).
+  There is **no active-PC switcher** — the store's `activePcId` is locked to the MC (the `MainCharacterBadge`
+  in the Sidebar is now a read-only "Playing as X" that keeps the lock + links to the Character page), so all
+  in-character lenses speak as it. **Backstory + persona + `voice_examples` are main-character-only** — gated
+  in EntityForm/EntityDetail by `entity.id === campaign.mainCharacterId` (the `ProfileField.mainCharacterOnly`
+  flag hides backstory for other PCs). **Voice examples** (promoted column, **migration 0009**; NOT embedded)
+  feed persona generation + a cached "Voice examples" block after the persona in `suggestSystemBlocks`
+  (Counsel/Converse) + `buildSystem` (Recall) via `voiceExamplesBlock`. Grandfathered null-MC campaigns show
+  "Set a main character". (Campaign wording reverted from the ADR-024 "Saga".)
+- **Character page + ONE persona generator (ADR-030).** The main character is managed on a dedicated
+  **Character page** (`views/CharacterView.tsx`, FIRST in the nav; a bespoke two-column inline-editing
+  `CharacterDashboard.tsx` — NOT an `EntityDetail` reuse — with silent autosave [attributes re-read fresh
+  before writing since updateEntity REPLACES], and a backstory-coupled Suggest guard; plus a
+  picker to set/re-designate it). Codex still lists the MC (★) but selecting it shows a redirect card to the
+  Character page (`CaptureView`), so the persona/derive UI lives only there. **Persona is ONE canonical
+  generator** (`PERSONA_SYSTEM` via `persona.service` `generatePersona`): the **derive-from-backstory** tool
+  (`derive-profile.service` + `DeriveReview`) proposes ONLY the fields (description/traits/goals/flaws/voice)
+  for per-field approval; on apply `DeriveReview` does `entity.update(fields)` then `persona.generate`
+  (best-effort) — it no longer emits its own persona. `PersonaEditor` (generate/regenerate/edit) is the only
+  persona surface; `updatePersona` clears `stale` + re-syncs the source hash so a saved brief sticks.
 - **Live-DB safety:** SQLite runs in WAL. Never let a second process write `ledger.db` while the app is
   open — close it first. Real failures land in `%APPDATA%\Ledger\logs\main.log` (electron-log); Import
   maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`.

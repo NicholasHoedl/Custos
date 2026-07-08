@@ -73,7 +73,7 @@ AI semantic search over the user's notes. Natural-language queries return synthe
 
 ### Pillar 3: Suggest
 
-> **As shipped (ADR-016; see §10):** Suggest returns **8 tagged options** from a ~62-tag vocabulary
+> **As shipped (ADR-016, tuned to 6 in ADR-026-era; see §10):** Suggest returns **6 tagged options** from a ~62-tag vocabulary
 > (one primary disposition + ≤2 secondary tags), plus an open-ended "what's next" **directions** mode.
 > The 4-of-7-attitudes design described below is the original MVP model, kept here as the historical
 > record.
@@ -273,10 +273,10 @@ subsystem lives in the linked ADR (older additions are captured in git history).
   in the campaign's open quests + the party, alongside the original in-the-moment mode.
 - **In-the-moment overhaul** — the 7 fixed attitudes were replaced by a ~62-tag vocabulary
   (disposition tags + the PC's own race/class); each option carries 1 primary + up to 2 secondary
-  tags, and the mode now returns **8** options with distinct primary tags.
+  tags, and the mode now returns **6** options with distinct primary tags.
 
 **Counsel v2** (ADR-026) — the "in the moment" lens now speaks the *game*, not just the fiction: each of the
-eight options carries a **pillar** (combat/social/exploration), a **mechanic** (the 5e check + ability + what
+six options carries a **pillar** (combat/social/exploration), a **mechanic** (the 5e check + ability + what
 it's opposed by — no DCs, and no failure outcome since the DM adjudicates failure), and an optional
 **teamwork** play naming a present ally; the prompt requires
 pillar spread, a **flaw-driven** option, capability-awareness, and scene-stakes calibration, and an optional
@@ -306,8 +306,9 @@ session, grounded in that session's journal entries + notes, and saves it to the
 supersedes the "automated session summarization" non-goal listed in §4.
 
 **Paste-and-Extract Import** (ADR-014; extended in ADR-018/023) — a Capture pane that turns pasted text —
-session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes, and
-status/relationship changes**, applied in one transaction and **tied to a session you choose** (the
+session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes,
+status/relationship changes, and field changes** (add/cut/alter to an existing entity's
+traits/goals/flaws & attributes, ADR-028), applied in one transaction and **tied to a session you choose** (the
 current one, a specific past session, or undated). (Distinct from the still-deferred campaign *file*
 export/import in §4 — this is text ingestion, not save-file portability.)
 
@@ -340,9 +341,9 @@ toggle by the character selector). "Session beats" are re-themed as the **Journa
 default view and the primary at-the-table capture surface: you jot a plain sentence of what happened,
 the raw line is kept as your log, and (with an API key) Claude proposes the entities, notes, status
 changes, and relationship links it implies, reviewed inline and applied **stamped at the current
-session**. It reuses the Import changeset-v2 engine (ADR-014/018) verbatim; manual entity/note
-editing (in Capture) becomes the fallback. (A per-character *knowledge horizon* and field-level entity
-edits are noted as future work.)
+session**. It reuses the Import changeset-v2 engine (ADR-014/018) verbatim — which now also proposes
+**field changes** to existing entities (ADR-028); manual entity/note editing (in Capture) becomes the
+fallback. (A per-character *knowledge horizon* is noted as future work.)
 
 **Capture & UI refinements** (ADR-023) — a cleanup pass after the Journal landed: **Quick-add** (the
 name→type→note bar) is replaced by the full **Add entity** profile form (opened from the entity browser,
@@ -364,6 +365,32 @@ an evocative-but-clear glossary (the AI is *the Keeper*; Recall / Suggest / Capt
 surface as *Consult / Counsel / Codex / Chronicle / Transcribe*) and a **death motif** that turns the
 lifecycle + note-confidence model into the visual language — a Fallen entity's name is struck through with a
 blood skull. Labels + tokens only, **no migration**; full as-built reference in `docs/design/theme.md`.
+
+**Changeset field changes** (ADR-028) — Chronicle/Transcribe extraction gained a fourth reviewed change
+kind: **add / cut / alter** to an existing entity's **traits, goals, flaws, and per-type attributes** (a
+creature's weakness learned, a faction's alignment revealed), each a toggle-able diff row applied in the
+same transaction as the batch's other changes. Existing entities only, not chronology-versioned, **no
+migration**; the extractor is shown a mentioned entity's current fields so a cut/alter copies the exact item.
+
+**Main character overhaul** (ADR-029) — the main character became the campaign's **mandatory, singular
+protagonist and sole in-character lens**: it is created *with* the campaign (the New Campaign dialog and the
+onboarding checklist both require a name), the free active-PC switcher is gone (a main-character badge locks
+the lens to it and lets you re-designate it), and **backstory + persona + a new Voice Examples field are
+main-character-only** (other PCs keep traits/goals/flaws). **Voice Examples** — sample lines the character
+speaks (a promoted column, migration 0009) — ground Counsel & Converse by feeding persona generation and a
+cached voice block in the in-character prompts. A **derive-from-backstory** AI tool proposes
+description/traits/goals/flaws/voice from a written backstory for **per-field approval**. The ADR-024
+"Saga" wording is reverted to **Campaign**.
+
+**Character page + unified persona** (ADR-030) — a dedicated **Character** page (first in the navbar) is now
+the single home for the main character: set/re-designate it there and manage its full profile (the dashboard
+a bespoke two-column, inline-editing dashboard — everything visible + edits in place, with the AI workflow
+front-and-center: the **Suggest** action sits on the backstory card, disabled with a hint when there's no
+backstory and until you change it after a run). The
+sidebar shows a read-only **"Playing as X"** indicator that links to the page, and Codex marks the main
+character with a ★ that redirects there. The two persona generators are **collapsed into one canonical
+template**: the derive tool proposes only the structured fields, and the persona is (re)built from the full
+profile by the single generator — so the same character always gets one consistent brief.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, image/map attachments, and campaign file

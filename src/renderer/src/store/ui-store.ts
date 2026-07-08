@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 
-export type ViewKey = 'journal' | 'capture' | 'recall' | 'suggest' | 'converse' | 'settings'
+export type ViewKey =
+  | 'character'
+  | 'journal'
+  | 'capture'
+  | 'recall'
+  | 'suggest'
+  | 'converse'
+  | 'settings'
 
 interface UiState {
   activeView: ViewKey

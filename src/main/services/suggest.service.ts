@@ -45,9 +45,9 @@ function fail(reason: SuggestFailureReason): SuggestResult {
 }
 
 /**
- * Enforce the rules the JSON schema can't: exactly 8 suggestions with DISTINCT primary tags and
+ * Enforce the rules the JSON schema can't: exactly 6 suggestions with DISTINCT primary tags and
  * non-empty action + rationale. Secondary tags are cleaned (valid enum, deduped, ≤2, never equal to the
- * primary). Drops malformed/duplicate-primary entries and trims extras; returns null if fewer than 8
+ * primary). Drops malformed/duplicate-primary entries and trims extras; returns null if fewer than 6
  * valid distinct-primary suggestions survive (caller then retries / fails).
  */
 function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
@@ -80,9 +80,9 @@ function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
       teamwork: typeof r.teamwork === 'string' && r.teamwork.trim() ? r.teamwork.trim() : null,
       rationale: r.rationale.trim()
     })
-    if (clean.length === 8) break
+    if (clean.length === 6) break
   }
-  return clean.length === 8 ? clean : null
+  return clean.length === 6 ? clean : null
 }
 
 const CATEGORY_SET = new Set<string>(SUGGEST_CATEGORIES)
@@ -121,7 +121,7 @@ function validateDirections(suggestions: StorySuggestion[]): StorySuggestion[] |
 /**
  * Run a Suggest query: resolve the PC + persona (regenerating a stale brief) → embed the situation →
  * vector search + fuzzy name match → gather relationships/state → ask Claude (structured, single-shot)
- * for 8 tagged actions → validate (retry once). Returns a discriminated SuggestResult so the
+ * for 6 tagged actions → validate (retry once). Returns a discriminated SuggestResult so the
  * renderer can show offline / no-key / no-PC states without try/catch (ADR-008, ADR-009).
  */
 export async function suggest(
@@ -177,7 +177,8 @@ export async function suggest(
       pcName: pc.name,
       pcRace: attrStr('ancestry'),
       pcClass: attrStr('class'),
-      persona: persona.brief
+      persona: persona.brief,
+      voiceExamples: pc.voiceExamples
     }
 
     // Per retrieved entity: its relationships (ownership/alliances from entity_link, invisible to
@@ -278,7 +279,7 @@ export async function suggest(
         effort: suggestEffort,
         signal
       })
-    // One retry: the model occasionally returns fewer than 8 or a duplicate primary tag.
+    // One retry: the model occasionally returns fewer than 6 or a duplicate primary tag.
     let recs = validateMoment(await callOnce())
     if (!recs) recs = validateMoment(await callOnce())
     if (!recs) return fail('invalid')

@@ -41,6 +41,7 @@ Rules:
 - Translate the character's traits, goals, flaws, and description into CONCRETE specifics — named people, real habits, exact diction — never vague adjectives.
 - If a Backstory is provided, mine it for the Stakes (named people, places, and grudges from the character's past) and let it shape the Voice — this is where a character's history makes them sound unlike anyone else.
 - Make the Voice section sharp enough that two different characters could never produce interchangeable text. This is the most important part of the brief.
+- If Voice examples (sample lines) are provided, treat them as GROUND TRUTH for the Voice section — distil their diction, rhythm, and attitude; do not invent a voice that contradicts them.
 - Use only the provided data. Invent no biography or events beyond what is given.
 - Keep the whole brief under ~220 words. Understated, not theatrical. Output only the brief.`
 
@@ -60,6 +61,7 @@ function sourceText(e: Entity): string {
     e.traits.join(','),
     e.goals.join(','),
     e.flaws.join(','),
+    e.voiceExamples.join(','),
     e.status ?? ''
   ].join('\n')
 }
@@ -81,6 +83,10 @@ function personaUserPrompt(e: Entity): string {
   if (e.traits.length) lines.push(`Traits: ${e.traits.join(', ')}`)
   if (e.goals.length) lines.push(`Goals: ${e.goals.join(', ')}`)
   if (e.flaws.length) lines.push(`Flaws: ${e.flaws.join(', ')}`)
+  if (e.voiceExamples.length)
+    lines.push(
+      `Voice examples — actual lines this character might say:\n${e.voiceExamples.map((v) => `- "${v}"`).join('\n')}`
+    )
   if (e.status) lines.push(`Status: ${e.status}`)
   return `Write the character brief for this player character:\n\n${lines.join('\n')}`
 }
@@ -136,19 +142,20 @@ export async function generatePersona(ctx: DbContext, entityId: string): Promise
 
 export function updatePersona(ctx: DbContext, entityId: string, brief: string): PersonaBrief {
   const ts = now()
+  const e = getEntity(ctx, entityId)
+  const hash = e ? sourceHash(e) : ''
   const existing = ctx.drizzle
     .select()
     .from(schema.pcPersona)
     .where(eq(schema.pcPersona.entityId, entityId))
     .get()
   if (!existing) {
-    const e = getEntity(ctx, entityId)
     const row: PersonaRow = {
       entityId,
       brief,
       edited: 1,
       stale: 0,
-      sourceHash: e ? sourceHash(e) : '',
+      sourceHash: hash,
       model: null,
       createdAt: ts,
       updatedAt: ts
@@ -156,12 +163,15 @@ export function updatePersona(ctx: DbContext, entityId: string, brief: string): 
     ctx.drizzle.insert(schema.pcPersona).values(row).run()
     return toBrief(row)
   }
+  // A saved brief is user-owned AND in sync with the current fields: clear `stale` and refresh the source
+  // hash so it isn't immediately regenerated away — this matters when the derive tool (ADR-029) applies
+  // new fields (which flags the old brief stale) and the approved brief in the same breath.
   ctx.drizzle
     .update(schema.pcPersona)
-    .set({ brief, edited: 1, updatedAt: ts })
+    .set({ brief, edited: 1, stale: 0, sourceHash: hash, updatedAt: ts })
     .where(eq(schema.pcPersona.entityId, entityId))
     .run()
-  return toBrief({ ...existing, brief, edited: 1, updatedAt: ts })
+  return toBrief({ ...existing, brief, edited: 1, stale: 0, sourceHash: hash, updatedAt: ts })
 }
 
 /** Flag the brief stale when the PC's source fields changed since generation. */

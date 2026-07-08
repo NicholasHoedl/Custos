@@ -78,9 +78,9 @@ export function SuggestView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <Sparkles className="size-10 text-muted-foreground/50" />
         <div>
-          <p className="font-display text-lg font-medium text-foreground">No saga selected</p>
+          <p className="font-display text-lg font-medium text-foreground">No campaign selected</p>
           <p className="text-sm text-muted-foreground">
-            Choose a saga in the sidebar to seek counsel.
+            Choose a campaign in the sidebar to seek counsel.
           </p>
         </div>
       </div>
@@ -213,7 +213,7 @@ export function SuggestView() {
             </div>
             <p className="text-xs text-muted-foreground">
               {mode === 'attitudes'
-                ? 'Eight tagged ways to react to this moment, in your character’s voice.'
+                ? 'Six tagged ways to react to this moment, in your character’s voice.'
                 : 'Ways to move the story forward — grounded in your open quests and the party.'}
             </p>
           </div>
@@ -224,7 +224,7 @@ export function SuggestView() {
           {suggest.status === 'idle' && (
             <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
               {mode === 'attitudes'
-                ? 'Eight tagged options will appear here, drawn from who your character is and what’s happened.'
+                ? 'Six tagged options will appear here, drawn from who your character is and what’s happened.'
                 : 'Story directions will appear here — grouped by kind, drawn from your open quests, the party, and where you are.'}
             </p>
           )}

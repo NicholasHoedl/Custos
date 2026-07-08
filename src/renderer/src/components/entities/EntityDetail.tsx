@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { CircleDashed, Pencil, Skull, Trash2 } from 'lucide-react'
+import { CircleDashed, Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPE_LABELS,
@@ -11,7 +11,7 @@ import { cn } from '@renderer/lib/utils'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import type { HierarchyView } from '@shared/graph-types'
 import { ledger } from '@renderer/lib/ipc'
-import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
+import { useCampaigns, useEntity, useNotes } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
@@ -19,6 +19,7 @@ import { EntityForm } from './EntityForm'
 import { RelationshipEditor } from './RelationshipEditor'
 import { EntityHistory } from './EntityHistory'
 import { PersonaEditor } from './PersonaEditor'
+import { DeriveReview } from './DeriveReview'
 import { Button } from '@renderer/components/ui/button'
 import { Separator } from '@renderer/components/ui/separator'
 import {
@@ -44,9 +45,12 @@ interface EntityDetailProps {
 export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted }: EntityDetailProps) {
   const { entity, refresh: refreshEntity } = useEntity(entityId)
   const { notes, refresh: refreshNotes } = useNotes(entityId)
+  const { campaigns } = useCampaigns()
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deriveOpen, setDeriveOpen] = useState(false)
+  const [personaKey, setPersonaKey] = useState(0) // bump to remount PersonaEditor after a derive apply
   const [hierarchy, setHierarchy] = useState<HierarchyView | null>(null)
 
   const isHierarchical = entity?.type === 'location' || entity?.type === 'faction'
@@ -93,6 +97,9 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
 
   const fallen = entity.lifecycle === 'ended'
   const presumed = entity.lifecycle === 'presumed_ended'
+  // Main-character-only depth (ADR-029): backstory, persona, and voice examples belong to the MC alone.
+  const isMainCharacter =
+    campaigns.find((c) => c.id === entity.campaignId)?.mainCharacterId === entity.id
 
   return (
     <div className="flex h-full flex-col">
@@ -140,6 +147,17 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {isMainCharacter && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeriveOpen(true)}
+              title="Suggest traits, goals, flaws, voice, and persona from this character's backstory"
+            >
+              <Sparkles className="size-3.5" />
+              Suggest
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="size-3.5" />
             Edit
@@ -168,12 +186,28 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
           </div>
         )}
 
-        <AttributesBlock entity={entity} />
+        <AttributesBlock entity={entity} isMainCharacter={isMainCharacter} />
 
-        {entity.type === 'pc' && (
+        {isMainCharacter && entity.voiceExamples.length > 0 && (
+          <div className="space-y-1.5">
+            <h3 className="inscribed text-xs">Voice</h3>
+            <ul className="space-y-1">
+              {entity.voiceExamples.map((v, i) => (
+                <li
+                  key={i}
+                  className="border-l-2 border-metal/40 pl-3 font-display text-sm italic text-foreground/90"
+                >
+                  “{v}”
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {entity.type === 'pc' && isMainCharacter && (
           <>
             <Separator />
-            <PersonaEditor entityId={entity.id} />
+            <PersonaEditor key={personaKey} entityId={entity.id} />
           </>
         )}
 
@@ -239,6 +273,19 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
         }}
       />
 
+      {isMainCharacter && (
+        <DeriveReview
+          pcId={entity.id}
+          open={deriveOpen}
+          onOpenChange={setDeriveOpen}
+          onApplied={() => {
+            refreshEntity()
+            onEntityChanged()
+            setPersonaKey((k) => k + 1)
+          }}
+        />
+      )}
+
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -301,10 +348,18 @@ function renderAttrValue(field: ProfileField | undefined, value: unknown): React
 
 // Type-specific fields shown with their profile labels (list as chips), followed by any ad-hoc /
 // legacy attribute keys not owned by the profile so nothing is hidden.
-function AttributesBlock({ entity }: { entity: Entity }) {
+function AttributesBlock({
+  entity,
+  isMainCharacter
+}: {
+  entity: Entity
+  isMainCharacter: boolean
+}) {
   const prof = profileFor(entity.type)
   const known = profileKeys(entity.type)
-  const shown = prof.fields.filter((f) => !isEmptyValue(entity.attributes[f.key]))
+  const shown = prof.fields.filter(
+    (f) => !isEmptyValue(entity.attributes[f.key]) && (!f.mainCharacterOnly || isMainCharacter)
+  )
   const extra = Object.entries(entity.attributes).filter(
     ([k, v]) => !known.has(k) && !isEmptyValue(v)
   )

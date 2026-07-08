@@ -110,40 +110,31 @@ beforeEach(() => {
 })
 
 describe('suggest.service — in-the-moment mode', () => {
-  // eight valid, distinct primary tags — the happy-path response shape
-  const EIGHT = [
-    'religious',
-    'hostile',
-    'cunning',
-    'friendly',
-    'protective',
-    'merciful',
-    'honorable',
-    'bold'
-  ]
+  // six valid, distinct primary tags — the happy-path response shape
+  const SIX = ['religious', 'hostile', 'cunning', 'friendly', 'protective', 'merciful']
 
-  it('returns 8 distinct-primary suggestions on a valid response', async () => {
+  it('returns 6 distinct-primary suggestions on a valid response', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue(EIGHT.map((t) => rec(t)))
+    claudeSuggestFn.mockResolvedValue(SIX.map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     if (res.ok && res.mode === 'attitudes')
-      expect(res.recommendations.map((r) => r.primaryTag)).toEqual(EIGHT)
+      expect(res.recommendations.map((r) => r.primaryTag)).toEqual(SIX)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(1)
   })
 
-  it('trims a 9+ response down to the first 8 distinct primaries', async () => {
+  it('trims a 7+ response down to the first 6 distinct primaries', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue([...EIGHT, 'selfish'].map((t) => rec(t)))
+    claudeSuggestFn.mockResolvedValue([...SIX, 'selfish'].map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(8)
+    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(6)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(1)
   })
 
-  it('retries once, then fails with reason "invalid" when distinct primaries < 8', async () => {
+  it('retries once, then fails with reason "invalid" when distinct primaries < 6', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    // a duplicate and an invalid tag drop out, leaving only 7 distinct → short of 8
+    // a duplicate and an invalid tag drop out, leaving only 5 distinct → short of 6
     claudeSuggestFn.mockResolvedValue([
       rec('religious'),
       rec('religious'), // duplicate primary → dropped
@@ -151,8 +142,6 @@ describe('suggest.service — in-the-moment mode', () => {
       rec('cunning'),
       rec('friendly'),
       rec('protective'),
-      rec('merciful'),
-      rec('honorable'),
       rec('') // invalid primary → dropped
     ])
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
@@ -165,7 +154,7 @@ describe('suggest.service — in-the-moment mode', () => {
     const { ctx, store, campaignId, pc } = setup()
     claudeSuggestFn
       .mockResolvedValueOnce([rec('religious'), rec('hostile')])
-      .mockResolvedValueOnce(EIGHT.map((t) => rec(t)))
+      .mockResolvedValueOnce(SIX.map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(2)
@@ -180,10 +169,9 @@ describe('suggest.service — in-the-moment mode', () => {
       rec('cunning'),
       rec('friendly'),
       rec('protective'),
-      rec('merciful'),
-      rec('honorable')
+      rec('merciful')
     ])
-    // six valid distinct survive (< 8) → invalid both attempts
+    // five valid distinct survive (< 6) → invalid both attempts
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toBe('invalid')
@@ -228,7 +216,7 @@ describe('suggest.service — in-the-moment mode', () => {
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     if (res.ok && res.mode === 'attitudes') {
-      expect(res.recommendations).toHaveLength(8)
+      expect(res.recommendations).toHaveLength(6)
       expect(res.recommendations.some((r) => r.primaryTag === 'hostile')).toBe(false)
       expect(res.recommendations.some((r) => r.primaryTag === 'cunning')).toBe(false)
       expect(res.recommendations.find((r) => r.primaryTag === 'religious')?.teamwork).toBeNull()

@@ -4,7 +4,7 @@
 **Date:** 2026-06-25 · **Last currency review:** 2026-07-01
 **Status:** Implemented — this is the original MVP architecture plan. Several subsystems have since
 evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
-store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest uses a **multi-tag, 8-option**
+store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest uses a **multi-tag, 6-option**
 model, not 4-of-7 fixed attitudes (ADR-016); **notes are many-to-many** via `note_entity` (SPEC §10);
 retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); post-MVP features (current
 scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10; a
@@ -229,6 +229,7 @@ Entity
   traits       TEXT (JSON array of strings — used heavily for PC in Suggest)
   goals        TEXT (JSON array of strings — for NPC / PC)
   flaws        TEXT (JSON array of strings — a vice/fear/weakness for PC/NPC/faction; feeds persona + Counsel, ADR-026)
+  voice_examples TEXT (JSON array of strings — MAIN-CHARACTER-ONLY sample lines; grounds Counsel/Converse voice, ADR-029)
   status       TEXT ('active' | 'inactive' | 'dead' | 'resolved' | ...) — free-text
   lifecycle    TEXT ('active' | 'ended' | 'presumed_ended' | 'unknown') NOT NULL — coarse in-play flag (ADR-017, ADR-021)
   createdAt    INTEGER (unix ms)
@@ -394,7 +395,7 @@ Anthropic's `ephemeral` cache defaults to a **5-minute** TTL; pass `cache_contro
 | Feature | Default Model | Notes |
 |---|---|---|
 | Recall synthesis | `claude-sonnet-4-6` | Lower latency/cost; configurable to Opus |
-| Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 8-option "in the moment" + open-ended "directions" — ADR-016) |
+| Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 6-option "in the moment" + open-ended "directions" — ADR-016) |
 | Converse | `claude-opus-4-8` | Third AI lens; **reuses the Suggest model + effort setting**; single-shot structured, direct-fetch grounding (ADR-025) |
 | Auto-tagging (future) | `claude-haiku-4-5` | Background task, latency-insensitive |
 
@@ -451,7 +452,7 @@ interface SuggestResult {
 
 > **⚠️ Superseded by ADR-016 (`docs/adr/016-suggest-multitag-overhaul.md`).** The 4-of-7 fixed-attitude
 > model in this section — and the `Attitude` / `AttitudeRecommendation` / `count: 4` types above — was
-> the MVP design. Current Suggest returns **8 options** from a **62-tag** vocabulary (1 primary + ≤2
+> the MVP design. Current Suggest returns **6 options** from a **62-tag** vocabulary (1 primary + ≤2
 > secondary tags, distinct primaries), plus an open-ended **"directions"** mode. The structured-output
 > + code-side-validation *mechanism* described below still holds; the output *shape* does not.
 
@@ -516,7 +517,7 @@ All communication between renderer and main process goes through typed IPC chann
 
 // AI channels
 'recall:query'       → streamed tokens + final citations (streaming)
-'suggest:query'      → SuggestResult (single structured response; multi-tag 8-option + directions — ADR-016)
+'suggest:query'      → SuggestResult (single structured response; multi-tag 6-option + directions — ADR-016)
 'converse:query'     → ConverseResult (single structured response: briefing + in-character questions — ADR-025)
 
 // Settings channels
@@ -536,18 +537,25 @@ All communication between renderer and main process goes through typed IPC chann
 ## 8. Folder / Module Structure
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
-> Notably: the renderer groups feature panes under `components/views/` (`JournalView`, `RecallView`,
-> `SuggestView`, `ConverseView`, `RecapView`, `ImportView`, `SettingsView`, `NotesView`), with a shared
+> Notably: the renderer groups feature panes under `components/views/` (`CharacterView`, `JournalView`,
+> `RecallView`, `SuggestView`, `ConverseView`, `RecapView`, `ImportView`, `SettingsView`, `NotesView`), with a shared
 > `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
 > `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
 > `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, and `session`
 > services; `db/` adds `backup.ts`. The **Journal** (the reworked
 > `components/capture/EventFeed.tsx`, surfaced top-level as `JournalView`) is the primary capture
-> surface — entries feed the Import extract→review→apply engine through a shared `ChangesetReview`,
-> stamped at the current session — and each campaign persists a **main character**
-> (`campaign.main_character_id`) that defaults the Recall/Suggest lens (ADR-022). The third AI lens
-> **Converse** (ADR-025) adds `services/converse.service.ts`, `ipc/converse.ts`, `views/ConverseView.tsx`,
-> `hooks/use-converse.ts`, and `shared/converse-types.ts`. Packaging assets live in `build/`
+> surface — entries feed the Import extract→review→apply engine through a shared `ChangesetReview`
+> (entities, notes, status/relationship changes, and field edits to existing entities — ADR-028),
+> stamped at the current session — and each campaign persists a **mandatory main character**
+> (`campaign.main_character_id`, created with the campaign) — the **sole** in-character lens (ADR-029; the
+> active-PC switcher is gone). Backstory, the PC persona, and a promoted `voice_examples` field are
+> main-character-only, and a **derive-from-backstory** tool (`services/derive-profile.service.ts`,
+> `hooks/use-derive-profile.ts`, `components/entities/DeriveReview.tsx`) proposes the profile FIELDS for
+> approval — the persona is then rebuilt by the ONE canonical generator (`persona.service`), and the main
+> character is managed on a dedicated **Character page** (`views/CharacterView.tsx`, first in the nav; the
+> sidebar shows a read-only "Playing as X" and Codex redirects the MC there), ADR-030.
+> The third AI lens **Converse** (ADR-025) adds `services/converse.service.ts`, `ipc/converse.ts`,
+> `views/ConverseView.tsx`, `hooks/use-converse.ts`, and `shared/converse-types.ts`. Packaging assets live in `build/`
 > (`icon.svg` → `icon.png`, ADR-024) with CI in `.github/workflows/`.
 
 ```
@@ -717,12 +725,14 @@ per-campaign session persistence. See ADR-020.
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
 
 > **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
-> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–025**, with status changes (e.g.
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–029**, with status changes (e.g.
 > ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
 > (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
 > 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes),
 > 022 (main character + journal-driven capture), 023 (post-journal capture/UI refinements),
-> 024 (grim "Ash & Ember" re-theme), 025 (Converse — in-character question lens).
+> 024 (grim "Ash & Ember" re-theme), 025 (Converse — in-character question lens), 026 (Counsel v2),
+> 027 (scene Counsel-only), 028 (changeset field changes), 029 (main character overhaul — mandatory
+> single lens · Voice Examples · derive-from-backstory), 030 (Character page + unified persona).
 
 | # | Decision | Status |
 |---|---|---|

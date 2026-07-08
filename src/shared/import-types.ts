@@ -34,6 +34,8 @@ export interface RawExtraction {
   statusChanges?: { entityRef: string; lifecycle?: string; status?: string }[]
   /** Changeset v2 (withChanges only): relationships that formed or ended during the described events. */
   relationshipChanges?: { fromRef: string; toRef: string; relation: string; action: string }[]
+  /** Changeset v2+ (withChanges only): edits to an EXISTING entity's fields (traits/goals/flaws/attributes). */
+  fieldChanges?: { entityRef: string; field?: string; op?: string; value?: string; oldValue?: string }[]
 }
 
 /** A possible existing match for a proposed entity (drives the "link instead of create" choice). */
@@ -77,11 +79,24 @@ export interface ProposedRelationshipChange {
   action: 'form' | 'sever'
 }
 
+export type FieldChangeOp = 'add' | 'cut' | 'alter'
+
+/** A validated FIELD change: add/cut/alter a promoted list (traits/goals/flaws) or a type attribute on an
+ *  EXISTING entity. For a list cut/alter, `oldValue` is the exact current item (else null). */
+export interface ProposedFieldChange {
+  entityRef: EntityRef
+  field: string // 'traits' | 'goals' | 'flaws' | an attribute key
+  op: FieldChangeOp
+  value: string | null
+  oldValue: string | null
+}
+
 export interface ExtractionProposal {
   entities: ProposedEntity[]
   notes: ProposedNote[]
   statusChanges: ProposedStatusChange[]
   relationshipChanges: ProposedRelationshipChange[]
+  fieldChanges: ProposedFieldChange[]
 }
 
 export type ExtractFailureReason =
@@ -135,6 +150,15 @@ export interface ConfirmedRelationshipChange {
   include: boolean
 }
 
+export interface ConfirmedFieldChange {
+  entityRef: EntityRef
+  field: string
+  op: FieldChangeOp
+  value: string | null
+  oldValue: string | null
+  include: boolean
+}
+
 export interface ConfirmedChangeset {
   campaignId: string
   sessionId: string | null
@@ -143,6 +167,7 @@ export interface ConfirmedChangeset {
   /** Changeset v2 (backfill) — absent for the plain Import pane. */
   statusChanges?: ConfirmedStatusChange[]
   relationshipChanges?: ConfirmedRelationshipChange[]
+  fieldChanges?: ConfirmedFieldChange[]
 }
 
 export interface ApplyResult {
@@ -151,5 +176,6 @@ export interface ApplyResult {
   createdNoteIds: string[]
   statusChangesApplied: number
   relationshipChangesApplied: number
+  fieldChangesApplied: number
   skipped: { kind: 'entity' | 'note' | 'change'; reason: string }[]
 }

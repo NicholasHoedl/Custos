@@ -88,7 +88,7 @@ export function SettingsView() {
     try {
       const res = await ledger.campaign.export(activeCampaignId)
       if (res.ok) {
-        toast.success('Saga exported', {
+        toast.success('Campaign exported', {
           description: `${res.counts.entities} entities · ${res.counts.notes} notes · ${res.counts.links} links → ${res.path}`
         })
       } else if ('error' in res) {
@@ -253,9 +253,9 @@ export function SettingsView() {
       <Separator />
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-medium text-foreground">Export saga</h2>
+        <h2 className="font-display text-lg font-medium text-foreground">Export campaign</h2>
         <p className="text-sm text-muted-foreground">
-          Save the active saga to a JSON file — a portable backup of every entity, note, link,
+          Save the active campaign to a JSON file — a portable backup of every entity, note, link,
           session, and event. (Search embeddings are omitted; they rebuild automatically on load.)
         </p>
         <Button
@@ -268,7 +268,7 @@ export function SettingsView() {
           {exporting ? 'Exporting…' : 'Export to JSON'}
         </Button>
         {!activeCampaignId && (
-          <p className="text-xs text-muted-foreground">Select a saga first.</p>
+          <p className="text-xs text-muted-foreground">Select a campaign first.</p>
         )}
       </section>
     </PaneShell>

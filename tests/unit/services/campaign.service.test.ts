@@ -101,6 +101,15 @@ describe('campaign.service', () => {
       expect(getCampaign(ctx, c.id)?.mainCharacterId).toBeNull()
     })
 
+    it('creates the mandatory main character atomically when a name is given (ADR-029)', () => {
+      const c = createCampaign(ctx, { name: 'Party', mainCharacterName: '  Theron  ' })
+      expect(c.mainCharacterId).not.toBeNull()
+      const pcs = listEntities(ctx, c.id, 'pc')
+      expect(pcs.map((p) => p.name)).toEqual(['Theron']) // trimmed
+      expect(c.mainCharacterId).toBe(pcs[0].id)
+      expect(getEntity(ctx, c.mainCharacterId!)?.type).toBe('pc')
+    })
+
     it('sets a pc as the main character and clears it with null', () => {
       const c = createCampaign(ctx, { name: 'Party' })
       const pc = createEntity(ctx, { campaignId: c.id, type: 'pc', name: 'Theron' })

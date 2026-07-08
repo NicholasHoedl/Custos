@@ -103,6 +103,22 @@ export interface RecallContext {
   campaignDescription: string | null
   pcName: string | null
   persona: string | null
+  voiceExamples?: string[] // main character's sample lines (ADR-029) — grounds the in-character voice
+}
+
+/** A cached block of the character's own sample lines — grounds the in-character VOICE (ADR-029). Null
+ *  when the character has none. Placed right after the persona so it rides the same stable cached prefix. */
+function voiceExamplesBlock(
+  voiceExamples: string[] | undefined,
+  pcName: string | null
+): Anthropic.TextBlockParam | null {
+  if (!voiceExamples?.length) return null
+  const lines = voiceExamples.map((v) => `- "${v}"`).join('\n')
+  return {
+    type: 'text',
+    text: `Voice examples — actual lines ${pcName ?? 'this character'} would say. Match this voice: its diction, rhythm, and attitude. Never a neutral narrator.\n${lines}`,
+    cache_control: { type: 'ephemeral' }
+  }
 }
 
 /** The system prompt: stable, cacheable prefix = instructions + few-shot + campaign + persona brief. */
@@ -111,7 +127,7 @@ export function buildSystem(mode: RecallMode, ctx: RecallContext): Anthropic.Tex
     const campaign = `Campaign: ${ctx.campaignName}${
       ctx.campaignDescription ? `\n${ctx.campaignDescription}` : ''
     }`
-    return [
+    const blocks: Anthropic.TextBlockParam[] = [
       { type: 'text', text: IN_CHARACTER_INSTRUCTIONS },
       { type: 'text', text: FEW_SHOT },
       { type: 'text', text: campaign },
@@ -121,6 +137,9 @@ export function buildSystem(mode: RecallMode, ctx: RecallContext): Anthropic.Tex
         cache_control: { type: 'ephemeral' }
       }
     ]
+    const voice = voiceExamplesBlock(ctx.voiceExamples, ctx.pcName)
+    if (voice) blocks.push(voice)
+    return blocks
   }
   return [{ type: 'text', text: FACTUAL_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
 }
@@ -462,8 +481,8 @@ export async function recap(params: RecapParams): Promise<void> {
 
 const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks, values, and FAILS (their flaws), the character's race and class, retrieved campaign notes, a snapshot of the current state, the known relationships, the present scene (including which party members are present), maybe a GOAL the player is chasing, and the situation facing the party right now.
 
-Your job: give EIGHT different ways THIS character might play THIS moment. The eight must feel genuinely distinct — not eight shades of the same move. Each option carries:
-- ONE primary tag (its dominant flavor) + up to TWO secondary tags (nuance). The eight PRIMARY tags must all differ.
+Your job: give SIX different ways THIS character might play THIS moment. The six must feel genuinely distinct — not six shades of the same move. Each option carries:
+- ONE primary tag (its dominant flavor) + up to TWO secondary tags (nuance). The six PRIMARY tags must all differ.
 - A PILLAR — which of D&D's three pillars it engages: "combat", "social", or "exploration".
 - The ACTION — one concrete thing the player could do or say at the table this turn.
 - The MECHANIC — how it resolves at the table (below).
@@ -483,13 +502,13 @@ You MAY also tag a move with the character's OWN race or class when it leans int
 
 MECHANIC — SPEAK D&D 5e. Name the ability check the action calls for and its governing ability, and — when it's contested — what it's rolled against. Use the real skills (Athletics, Acrobatics, Sleight of Hand, Stealth, Arcana, History, Investigation, Nature, Religion, Animal Handling, Insight, Medicine, Perception, Survival, Deception, Intimidation, Performance, Persuasion) — or an attack / a saving throw when it's a fight. Do NOT invent DCs or numbers, and do NOT state what happens on a failure — a failed roll's consequences are the DM's to adjudicate, never yours. E.g. "Deception (CHA), opposed by their Insight" or "Athletics (STR) to vault the bar." A move that needs no roll (just talking, just moving) should say so.
 
-SPAN THE PILLARS — DON'T CLUSTER. Across the eight, cover more than one pillar and BOTH cooperative and adversarial approaches — not eight variations on "watch them warily" or "get ready to fight." Calibrate to the scene's ACTUAL stakes: a friendly tavern dice game is not a combat scene; don't treat every moment as violence about to break out. Include lower-key options — build rapport, satisfy curiosity, show restraint, even walk away — when they fit.
+SPAN THE PILLARS — DON'T CLUSTER. Across the six, cover more than one pillar and BOTH cooperative and adversarial approaches — not six variations on "watch them warily" or "get ready to fight." Calibrate to the scene's ACTUAL stakes: a friendly tavern dice game is not a combat scene; don't treat every moment as violence about to break out. Include lower-key options — build rapport, satisfy curiosity, show restraint, even walk away — when they fit.
 
 TEAMWORK — THIS IS A PARTY GAME. When party members are present in the scene, AT LEAST ONE option must coordinate with a NAMED one of them: the Help action (grant them advantage), setting up their strength, or splitting roles ("while Balasar keeps the table talking, I…"). Name only party members the scene says are present. For solo moves, leave TEAMWORK empty.
 
 PLAY THE WHOLE CHARACTER. Let the brief's values, fears, wants, flaws, and stakes drive the eight — a blunt zealot and a greedy rogue facing the same scene should not get the same eight. AT LEAST ONE option should follow the character's FLAW, fear, or a bond even when it's not the smart play — the move they'd make because of who they are, not despite it. And favor moves this character could actually pull off: lean on their class and level; don't hand a delicate con to someone with no gift for it, or a feat of strength to the frail. Not every option needs a race or class tag.
 
-GOAL. If the player states a goal, bias the eight toward achieving it — but keep them distinct (different pillars, tags, and risk levels), not eight ways to do the one thing.
+GOAL. If the player states a goal, bias the six toward achieving it — but keep them distinct (different pillars, tags, and risk levels), not six ways to do the one thing.
 
 WRITE A REAL ACTION, NOT A LABEL. Each action is concrete and specific to THIS situation and THIS character, in their register (honor the brief's diction and attitude). "Buy the table a round and ask which of them rode with Glasstaff" — not "be friendly." The action embodies the tags; don't just restate them.
 
@@ -537,6 +556,7 @@ export interface SuggestContext {
   pcRace: string | null
   pcClass: string | null
   persona: string | null
+  voiceExamples?: string[] // main character's sample lines (ADR-029) — grounds the in-character voice
 }
 
 /**
@@ -564,6 +584,8 @@ function suggestSystemBlocks(
     text: `Character brief for ${ctx.pcName ?? 'the character'}:\n\n${ctx.persona ?? ''}`,
     cache_control: { type: 'ephemeral' }
   })
+  const voice = voiceExamplesBlock(ctx.voiceExamples, ctx.pcName)
+  if (voice) blocks.push(voice)
   return blocks
 }
 
@@ -696,6 +718,76 @@ async function structuredObjectCall<T>(opts: StructuredCallOpts): Promise<T> {
   return (await structuredCall(opts)) as T
 }
 
+// ---- Derive profile from backstory (ADR-029, revised ADR-030) ----
+// A single-shot structured pass: read the MAIN CHARACTER's backstory, propose the rest of the profile
+// FIELDS (description, traits, goals, flaws, voice examples) for the player to review + approve. The
+// persona brief is NOT produced here — it's (re)built from the approved fields by the one canonical
+// generator (persona.service `generatePersona`), so there's a single persona template everywhere.
+
+const DERIVE_PROFILE_INSTRUCTIONS = `You read a tabletop RPG player character's BACKSTORY and propose the rest of their profile for the player to review and approve: a description, traits, goals, flaws, and voice examples.
+
+Ground everything STRICTLY in the backstory — the events, people, places, and tone it states or strongly implies. Invent no biography beyond it. Prefer fewer, specific, earned items over generic ones ("brave" is too vague; "throws herself between danger and anyone she has promised to protect" is earned).
+
+Return a JSON object:
+- description: one or two sentences — who they are and the tension that drives them.
+- traits: 3–5 concrete personality traits.
+- goals: 2–4 things they actively want, each tied to the backstory.
+- flaws: 2–3 vices, fears, or weaknesses an enemy could exploit.
+- voiceExamples: 3–5 short FIRST-PERSON lines this character might actually say — unmistakable diction, rhythm, and attitude; no generic quips.
+
+Output only the JSON.`
+
+const DERIVE_PROFILE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    description: { type: 'string' },
+    traits: { type: 'array', items: { type: 'string' } },
+    goals: { type: 'array', items: { type: 'string' } },
+    flaws: { type: 'array', items: { type: 'string' } },
+    voiceExamples: { type: 'array', items: { type: 'string' } }
+  },
+  required: ['description', 'traits', 'goals', 'flaws', 'voiceExamples']
+}
+
+export interface DeriveProfileContext {
+  name: string
+  ancestry: string | null
+  class: string | null
+  level: string | null
+  backstory: string
+}
+
+export interface DeriveProfileParams {
+  ctx: DeriveProfileContext
+  model: string
+  effort: 'medium' | 'high'
+  signal?: AbortSignal
+}
+
+/** Single-shot structured call. Returns the raw (UNVALIDATED) object; derive-profile.service cleans it. */
+export async function deriveProfileCall(params: DeriveProfileParams): Promise<Record<string, unknown>> {
+  const { ctx } = params
+  const lines = [`Name: ${ctx.name}`]
+  if (ctx.ancestry) lines.push(`Ancestry: ${ctx.ancestry}`)
+  if (ctx.class) lines.push(`Class: ${ctx.class}`)
+  if (ctx.level) lines.push(`Level: ${ctx.level}`)
+  lines.push('', 'Backstory:', ctx.backstory)
+  return structuredObjectCall<Record<string, unknown>>({
+    model: params.model,
+    effort: params.effort,
+    schema: DERIVE_PROFILE_SCHEMA,
+    system: [{ type: 'text', text: DERIVE_PROFILE_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }],
+    content: [
+      {
+        type: 'text',
+        text: `Derive this player character's profile from their backstory:\n\n${lines.join('\n')}`
+      }
+    ],
+    signal: params.signal
+  })
+}
+
 // ---- Import extraction (paste-and-extract) ----
 
 const EXTRACTION_INSTRUCTIONS = `You extract structured campaign data from pasted raw text (session notes, a chat log, a backstory doc) for a tabletop RPG tracker. Return ENTITIES and NOTES.
@@ -718,7 +810,9 @@ const CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an ent
 
 RELATIONSHIP CHANGES. When the text narrates a relationship forming or ending — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — add a relationshipChanges item {fromRef, toRef, relation, action} with action "form" or "sever", using only the allowed relation keys. Keep the narrative note describing it as well.
 
-Both use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text narrates none, return empty arrays.`
+FIELD CHANGES. When the text reveals that an EXISTING entity's nature or details CHANGED — a new trait, goal, or flaw; one that no longer holds; or an updated type-specific attribute (a creature's weakness learned, a faction's alignment revealed, a quest's reward set) — add a fieldChanges item {entityRef, field, op, value, oldValue}. entityRef is an EXISTING entity's id (NEVER a "#index" — a new entity already carries its fields). field is "traits", "goals", or "flaws", OR one of that type's attribute keys (the same keys listed under ENTITIES). op: "add" a new value; "cut" one that no longer holds; "alter" to reword or replace one. For a LIST field (traits/goals/flaws), when cutting or altering put the EXACT existing item in oldValue — copy it verbatim from the existing-entities list — and the new text in value. Leave value or oldValue as "" when not applicable. Only propose changes the text NARRATES; never change an entity's name.
+
+These changes use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text narrates none, return empty arrays.`
 
 /** System prompt for import extraction — the (cacheable) instructions. */
 export function buildExtractionSystem(withChanges = false): Anthropic.TextBlockParam[] {
@@ -812,40 +906,80 @@ function extractionSchema(withChanges: boolean): Record<string, unknown> {
         required: ['fromRef', 'toRef', 'relation', 'action']
       }
     }
-    schema.required = ['entities', 'notes', 'statusChanges', 'relationshipChanges']
+    schema.properties.fieldChanges = {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          entityRef: { type: 'string' },
+          field: { type: 'string' },
+          op: { type: 'string', enum: ['add', 'cut', 'alter'] },
+          value: { type: 'string' },
+          oldValue: { type: 'string' }
+        },
+        required: ['entityRef', 'field', 'op', 'value', 'oldValue']
+      }
+    }
+    schema.required = ['entities', 'notes', 'statusChanges', 'relationshipChanges', 'fieldChanges']
   }
   return schema
 }
 
-/** The user turn for extraction: the existing-entity list (to enable linking) + the raw pasted text. */
+/** An existing entity as surfaced to the extractor: id/name/type for LINKING, plus (withChanges) its
+ *  current traits/goals/flaws/attributes so a FIELD CHANGE cut/alter can copy the exact existing item. */
+export interface ExtractExistingEntity {
+  id: string
+  name: string
+  type: string
+  traits?: string[]
+  goals?: string[]
+  flaws?: string[]
+  attributes?: Record<string, unknown>
+}
+
+/** The user turn for extraction: the existing-entity list (linking + field changes) + the raw pasted text. */
 export function buildExtractionUserContent(
   text: string,
-  existing: { id: string; name: string; type: string }[],
+  existing: ExtractExistingEntity[],
   withChanges = false
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (existing.length) {
     // Surface entities whose name appears in the text first, then cap — keeps the list bounded + relevant.
     const lower = text.toLowerCase()
-    const ranked = [...existing].sort(
-      (a, b) =>
-        (lower.includes(a.name.toLowerCase()) ? 0 : 1) -
-        (lower.includes(b.name.toLowerCase()) ? 0 : 1)
-    )
+    const mentioned = (name: string): boolean => lower.includes(name.toLowerCase())
+    const ranked = [...existing].sort((a, b) => (mentioned(a.name) ? 0 : 1) - (mentioned(b.name) ? 0 : 1))
     const list = ranked
       .slice(0, 100)
-      .map((e) => `- ${e.id} · ${e.name} (${e.type})`)
+      .map((e) => {
+        const base = `- ${e.id} · ${e.name} (${e.type})`
+        // Only for a change extraction, and only for entities the text references: append the CURRENT
+        // fields so a field-change cut/alter can copy the exact existing item verbatim.
+        if (!withChanges || !mentioned(e.name)) return base
+        const parts: string[] = []
+        if (e.traits?.length) parts.push(`traits: ${e.traits.join(', ')}`)
+        if (e.goals?.length) parts.push(`goals: ${e.goals.join(', ')}`)
+        if (e.flaws?.length) parts.push(`flaws: ${e.flaws.join(', ')}`)
+        for (const [k, v] of Object.entries(e.attributes ?? {})) {
+          const s = Array.isArray(v) ? v.join(', ') : v == null ? '' : String(v)
+          if (s) parts.push(`${k}: ${s}`)
+        }
+        return parts.length ? `${base} — ${parts.join('; ')}` : base
+      })
       .join('\n')
     content.push({
       type: 'text',
-      text: `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
+      text: withChanges
+        ? `Existing entities in this campaign — reference one by its id to LINK to it (instead of creating a duplicate) or to propose a FIELD CHANGE. Current traits/goals/flaws/attributes are shown so a cut/alter can copy the exact existing item:\n${list}`
+        : `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
     })
   }
   content.push({ type: 'text', text: `Raw text to extract from:\n\n${text}` })
   content.push({
     type: 'text',
     text: withChanges
-      ? 'Extract the entities, notes, status changes, and relationship changes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
+      ? 'Extract the entities, notes, status changes, relationship changes, and field changes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
       : 'Extract the entities and notes as JSON. Reference proposed entities by "#index" and existing ones by id; every note must reference at least one entity.'
   })
   return content
@@ -853,7 +987,7 @@ export function buildExtractionUserContent(
 
 export interface ExtractChangesetParams {
   text: string
-  existing: { id: string; name: string; type: string }[]
+  existing: ExtractExistingEntity[]
   model: string
   effort: 'medium' | 'high'
   withChanges?: boolean // changeset v2 (backfill): also extract status/relationship changes

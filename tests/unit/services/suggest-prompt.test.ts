@@ -45,8 +45,8 @@ describe('suggest prompt assembly (in the moment)', () => {
     const text = sys.map((b) => b.text).join('\n')
     expect(text).toContain('Phandelver')
     expect(text).toContain('THE-CHARACTER-BRIEF')
-    // the moment-tag vocabulary + eight-options framing live in the instructions
-    expect(text).toContain('EIGHT')
+    // the moment-tag vocabulary + six-options framing live in the instructions
+    expect(text).toContain('SIX')
     expect(text).toContain('religious')
     expect(text).toContain('investigative')
     expect(text).toContain('forceful') // an expansion tag is present in the vocabulary
@@ -59,6 +59,26 @@ describe('suggest prompt assembly (in the moment)', () => {
     expect(text).toContain('elf wizard')
     // the cacheable breakpoint is on the last (persona) block
     expect(sys[sys.length - 1].cache_control).toEqual({ type: 'ephemeral' })
+  })
+
+  it('appends a cached voice-examples block only when the MC has them (ADR-029)', () => {
+    const base = {
+      campaignName: 'Phandelver',
+      campaignDescription: null,
+      pcName: 'Vargas',
+      pcRace: null,
+      pcClass: null,
+      persona: 'BRIEF'
+    }
+    const withVoice = buildSuggestSystem({ ...base, voiceExamples: ['Coin first, questions later.'] })
+    const text = withVoice.map((b) => b.text).join('\n')
+    expect(text).toMatch(/Voice examples/)
+    expect(text).toContain('Coin first, questions later.')
+    expect(withVoice[withVoice.length - 1].cache_control).toEqual({ type: 'ephemeral' }) // cached last
+    const without = buildSuggestSystem(base)
+      .map((b) => b.text)
+      .join('\n')
+    expect(without).not.toMatch(/Voice examples/)
   })
 
   it('user content uses PLAIN TEXT blocks (never document/citations) and ends with the situation', () => {

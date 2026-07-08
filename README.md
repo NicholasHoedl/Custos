@@ -13,7 +13,7 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
   campaign and session. A global hotkey / `Ctrl+K` opens the add-entity form from anywhere.
 - **Recall** — ask a natural-language question; get a cited, streamed answer synthesized from the
   relevant notes (semantic search over local embeddings).
-- **Suggest** — in-character ideas for the moment (eight tagged options in your PC's voice) or
+- **Suggest** — in-character ideas for the moment (six tagged options in your PC's voice) or
   open-ended directions for where to take the story next.
 
 Built on top of these: **Converse** (pick another character and get a briefing on what your party knows

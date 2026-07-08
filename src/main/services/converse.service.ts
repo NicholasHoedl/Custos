@@ -115,7 +115,8 @@ export async function converse(
       pcName: pc.name,
       pcRace: attrStr('ancestry'),
       pcClass: attrStr('class'),
-      persona: persona.brief
+      persona: persona.brief,
+      voiceExamples: pc.voiceExamples
     }
 
     // Target grounding — DIRECT FETCH (no semantic search). getEntityContext gives the target's notes;

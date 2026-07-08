@@ -27,7 +27,7 @@ async function addEntity(name: string, description?: string): Promise<void> {
 // campaign → session → add entities (full profile form) → typed relationship → local search → delete.
 test('capture flow: campaign, session, entities, link, search, delete', async () => {
   // Flow A — create and activate a campaign.
-  await page.getByRole('button', { name: 'New saga' }).click()
+  await page.getByRole('button', { name: 'New campaign' }).click()
   await page.getByLabel('Name').fill('Phandalin')
   await page.getByRole('button', { name: 'Create' }).click()
 

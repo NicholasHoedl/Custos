@@ -32,13 +32,18 @@ export function TagInput({ value, onChange, placeholder = 'Add…', id }: TagInp
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {value.map((tag, i) => (
-            <Badge key={`${tag}-${i}`} variant="secondary" className="gap-1 pr-1">
-              {tag}
+            <Badge
+              key={`${tag}-${i}`}
+              variant="secondary"
+              // Tags can be long sentences (derived traits/goals): wrap instead of forcing width.
+              className="h-auto max-w-full items-start gap-1 whitespace-normal rounded-md py-1 pr-1 text-left"
+            >
+              <span className="min-w-0 break-words">{tag}</span>
               <button
                 type="button"
                 onClick={() => removeAt(i)}
                 aria-label={`Remove ${tag}`}
-                className="rounded-sm text-muted-foreground transition-colors hover:text-destructive"
+                className="mt-0.5 shrink-0 rounded-sm text-muted-foreground transition-colors hover:text-destructive"
               >
                 <X className="size-3" />
               </button>

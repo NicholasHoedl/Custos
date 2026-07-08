@@ -105,9 +105,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
       m('cunning'),
       m('friendly'),
       m('protective'),
-      m('merciful'),
-      m('honorable'),
-      m('bold')
+      m('merciful')
     ])
 
     const res = await suggest(
@@ -118,7 +116,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     )
 
     expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(8)
+    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(6)
 
     expect(claudeSuggest).toHaveBeenCalledTimes(1)
     const call = claudeSuggest.mock.calls[0][0] as {
@@ -217,9 +215,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
       m('cunning'),
       m('friendly'),
       m('protective'),
-      m('merciful'),
-      m('honorable'),
-      m('bold')
+      m('merciful')
     ])
 
     const res = await suggest(

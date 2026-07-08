@@ -33,6 +33,19 @@ describe('entity.service', () => {
     campaignId = createCampaign(ctx, { name: 'Test Campaign' }).id
   })
 
+  it('round-trips voiceExamples (ADR-029) through create + update', () => {
+    const e = createEntity(ctx, {
+      campaignId,
+      type: 'pc',
+      name: 'Vargas',
+      voiceExamples: ['Coin first, questions later.']
+    })
+    expect(getEntity(ctx, e.id)?.voiceExamples).toEqual(['Coin first, questions later.'])
+    const next = ['We do this my way.', 'Coin first, questions later.']
+    expect(updateEntity(ctx, e.id, { voiceExamples: next }).voiceExamples).toEqual(next)
+    expect(getEntity(ctx, e.id)?.voiceExamples).toEqual(next)
+  })
+
   it('creates an entity and round-trips traits/goals/flaws/attributes JSON', () => {
     const e = createEntity(ctx, {
       campaignId,

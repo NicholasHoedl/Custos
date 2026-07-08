@@ -3,6 +3,7 @@ import type {
   ApplyResult,
   ConfirmedChangeset,
   ConfirmedEntity,
+  ConfirmedFieldChange,
   ConfirmedNote,
   ConfirmedRelationshipChange,
   ConfirmedStatusChange,
@@ -45,6 +46,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
   notes: ConfirmedNote[]
   statusChanges: ConfirmedStatusChange[]
   relationshipChanges: ConfirmedRelationshipChange[]
+  fieldChanges: ConfirmedFieldChange[]
   reason: ExtractFailureReason | null
   error: string | null
   result: ApplyResult | null
@@ -52,6 +54,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
   setNotes: Dispatch<SetStateAction<ConfirmedNote[]>>
   setStatusChanges: Dispatch<SetStateAction<ConfirmedStatusChange[]>>
   setRelationshipChanges: Dispatch<SetStateAction<ConfirmedRelationshipChange[]>>
+  setFieldChanges: Dispatch<SetStateAction<ConfirmedFieldChange[]>>
   extract: (text: string) => void
   apply: (sessionIdOverride?: string | null) => void
   reset: () => void
@@ -63,6 +66,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
   const [notes, setNotes] = useState<ConfirmedNote[]>([])
   const [statusChanges, setStatusChanges] = useState<ConfirmedStatusChange[]>([])
   const [relationshipChanges, setRelationshipChanges] = useState<ConfirmedRelationshipChange[]>([])
+  const [fieldChanges, setFieldChanges] = useState<ConfirmedFieldChange[]>([])
   const [reason, setReason] = useState<ExtractFailureReason | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApplyResult | null>(null)
@@ -99,6 +103,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
           setRelationshipChanges(
             res.proposal.relationshipChanges.map((c) => ({ ...c, include: true }))
           )
+          setFieldChanges(res.proposal.fieldChanges.map((c) => ({ ...c, include: true })))
           setStatus('review')
         })
         .catch((e) => {
@@ -120,7 +125,8 @@ export function useImport(opts?: { withChanges?: boolean }): {
         entities,
         notes,
         statusChanges,
-        relationshipChanges
+        relationshipChanges,
+        fieldChanges
       }
       ledger.import
         .apply(payload)
@@ -134,7 +140,15 @@ export function useImport(opts?: { withChanges?: boolean }): {
           setError(String(e))
         })
     },
-    [activeCampaignId, activeSessionId, entities, notes, statusChanges, relationshipChanges]
+    [
+      activeCampaignId,
+      activeSessionId,
+      entities,
+      notes,
+      statusChanges,
+      relationshipChanges,
+      fieldChanges
+    ]
   )
 
   const reset = useCallback(() => {
@@ -144,6 +158,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
     setNotes([])
     setStatusChanges([])
     setRelationshipChanges([])
+    setFieldChanges([])
     setReason(null)
     setError(null)
     setResult(null)
@@ -156,6 +171,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
     notes,
     statusChanges,
     relationshipChanges,
+    fieldChanges,
     reason,
     error,
     result,
@@ -163,6 +179,7 @@ export function useImport(opts?: { withChanges?: boolean }): {
     setNotes,
     setStatusChanges,
     setRelationshipChanges,
+    setFieldChanges,
     extract,
     apply,
     reset

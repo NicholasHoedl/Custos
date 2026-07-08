@@ -1,0 +1,1 @@
+ALTER TABLE `entity` ADD `voice_examples` text;

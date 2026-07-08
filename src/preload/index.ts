@@ -93,6 +93,9 @@ const api: LedgerApi = {
   converse: {
     query: (input) => ipcRenderer.invoke(IPC.converseQuery, input)
   },
+  deriveProfile: {
+    query: (input) => ipcRenderer.invoke(IPC.deriveProfileQuery, input)
+  },
   import: {
     extract: (input) => ipcRenderer.invoke(IPC.importExtract, input),
     apply: (payload) => ipcRenderer.invoke(IPC.importApply, payload)

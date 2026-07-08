@@ -6,6 +6,7 @@ import { plural } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import {
   EntityRow,
+  FieldChangeRow,
   NoteRow,
   RelationshipChangeRow,
   StatusChangeRow
@@ -57,7 +58,8 @@ export function ChangesetReview({
   const noting = imp.notes.filter((n) => n.include).length
   const changing =
     imp.statusChanges.filter((c) => c.include).length +
-    imp.relationshipChanges.filter((c) => c.include).length
+    imp.relationshipChanges.filter((c) => c.include).length +
+    imp.fieldChanges.filter((c) => c.include).length
   const applying = imp.status === 'applying'
   const nothing = creating === 0 && linking === 0 && noting === 0 && changing === 0
 
@@ -106,6 +108,22 @@ export function ChangesetReview({
                 refName={refName}
                 onToggle={() =>
                   imp.setRelationshipChanges((cs) =>
+                    cs.map((x, j) => (j === i ? { ...x, include: !x.include } : x))
+                  )
+                }
+              />
+            ))}
+          </Section>
+        )}
+        {imp.fieldChanges.length > 0 && (
+          <Section label="Field changes">
+            {imp.fieldChanges.map((c, i) => (
+              <FieldChangeRow
+                key={i}
+                change={c}
+                refName={refName}
+                onToggle={() =>
+                  imp.setFieldChanges((cs) =>
                     cs.map((x, j) => (j === i ? { ...x, include: !x.include } : x))
                   )
                 }

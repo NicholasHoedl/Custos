@@ -64,4 +64,45 @@ describe('persona.service', () => {
     completeFn.mockResolvedValue('x')
     await expect(generatePersona(ctx, npc.id)).rejects.toThrow()
   })
+
+  it('mines voice examples into the prompt and re-flags stale when they change (ADR-029)', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const pc = createEntity(ctx, {
+      campaignId,
+      type: 'pc',
+      name: 'Vargas',
+      voiceExamples: ['We do this my way.']
+    })
+    completeFn.mockResolvedValue('BRIEF')
+    await generatePersona(ctx, pc.id)
+    // This file doesn't clear the mock between tests — assert on the LATEST generation call.
+    expect(completeFn.mock.calls.at(-1)?.[1] as string).toContain('We do this my way.')
+    expect(getPersona(ctx, pc.id)?.stale).toBe(false)
+
+    updateEntity(ctx, pc.id, { voiceExamples: ['We do this my way.', 'Coin first.'] })
+    markStaleIfChanged(ctx, pc.id)
+    expect(getPersona(ctx, pc.id)?.stale).toBe(true)
+  })
+
+  it('updatePersona clears stale + re-syncs the source hash so it is not regenerated away (ADR-029)', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas', traits: ['greedy'] })
+    completeFn.mockResolvedValue('BRIEF')
+    await generatePersona(ctx, pc.id)
+
+    // The derive apply changes fields (flags the old brief stale) then saves an approved brief in the
+    // same breath — the saved brief must NOT stay stale, or the next lens call would regenerate it.
+    updateEntity(ctx, pc.id, { traits: ['greedy', 'reckless'] })
+    markStaleIfChanged(ctx, pc.id)
+    expect(getPersona(ctx, pc.id)?.stale).toBe(true)
+
+    const saved = updatePersona(ctx, pc.id, 'approved brief')
+    expect(saved.edited).toBe(true)
+    expect(saved.stale).toBe(false)
+    // And a later stale-check against the same fields keeps it fresh (hash was re-synced).
+    markStaleIfChanged(ctx, pc.id)
+    expect(getPersona(ctx, pc.id)?.stale).toBe(false)
+  })
 })

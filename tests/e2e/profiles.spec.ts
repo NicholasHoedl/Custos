@@ -19,7 +19,7 @@ test.afterAll(async () => {
 // add/remove chips, the dropdown+custom status, and a type-specific field — all round-tripping into
 // the detail view on create.
 test('per-type profile editor: chips, custom status, type-specific field', async () => {
-  await page.getByRole('button', { name: 'New saga' }).click()
+  await page.getByRole('button', { name: 'New campaign' }).click()
   await page.getByLabel('Name').fill('Phandalin')
   await page.getByRole('button', { name: 'Create' }).click()
 

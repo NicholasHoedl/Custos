@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useEntities } from '@renderer/hooks/use-ledger'
+import { Star } from 'lucide-react'
+import { Button } from '@renderer/components/ui/button'
+import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { OnboardingChecklist } from '@renderer/components/OnboardingChecklist'
@@ -24,6 +26,9 @@ export function CaptureView() {
   const [filter, setFilter] = useState<EntityFilter>('all')
   const [capturePanel, setCapturePanel] = useState<CapturePanel>('notes')
   const { entities, refresh } = useEntities(activeCampaignId)
+  const { campaigns } = useCampaigns()
+  const setActiveView = useUiStore((s) => s.setActiveView)
+  const mainCharacterId = campaigns.find((c) => c.id === activeCampaignId)?.mainCharacterId ?? null
 
   // The global quick-add hotkey / Ctrl+K (ADR-010/023) opens the Add-entity pane. Skip the initial mount
   // so it only fires on an actual bump.
@@ -81,10 +86,20 @@ export function CaptureView() {
               setSelectedEntity(null)
               setCapturePanel('import')
             }}
+            mainCharacterId={mainCharacterId}
           />
         </div>
         <div className="min-w-0 flex-1">
-          {selectedEntityId ? (
+          {selectedEntityId && selectedEntityId === mainCharacterId ? (
+            // The main character is managed on the Character page (ADR-030) — redirect instead of editing here.
+            <MainCharacterRedirect
+              name={entities.find((e) => e.id === selectedEntityId)?.name}
+              onGo={() => {
+                setSelectedEntity(null)
+                setActiveView('character')
+              }}
+            />
+          ) : selectedEntityId ? (
             <EntityDetail
               key={selectedEntityId}
               entityId={selectedEntityId}
@@ -115,6 +130,27 @@ export function CaptureView() {
             <NotesView key={activeCampaignId} />
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Shown in Codex when the selected entity is the campaign's main character — it's managed on the
+// dedicated Character page (ADR-030), not edited inline here.
+function MainCharacterRedirect({ name, onGo }: { name?: string; onGo: () => void }) {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <div className="max-w-sm space-y-3 rounded-lg border border-border bg-card/60 p-6 text-center">
+        <Star className="mx-auto size-7 fill-primary text-primary" />
+        <p className="text-sm text-foreground">
+          <span className="font-medium">{name ?? 'This character'}</span> is your main character.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Manage their profile, persona, and voice on the Character page.
+        </p>
+        <Button size="sm" onClick={onGo}>
+          Go to Character page
+        </Button>
       </div>
     </div>
   )

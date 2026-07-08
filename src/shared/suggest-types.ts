@@ -95,7 +95,7 @@ export function tagLabel(tag: string): string {
 }
 
 /** The three pillars of D&D play. Every "in the moment" option is tagged with the pillar it engages, so
- *  the eight span combat / social / exploration instead of clustering in one (ADR-026). */
+ *  the six span combat / social / exploration instead of clustering in one (ADR-026). */
 export const SUGGEST_PILLARS = ['combat', 'social', 'exploration'] as const
 export type SuggestPillar = (typeof SUGGEST_PILLARS)[number]
 
@@ -123,7 +123,7 @@ export interface MomentSuggestion {
 }
 
 /**
- * Suggest has two modes: 'attitudes' (the "in the moment" mode — 8 tagged ways to react to a charged
+ * Suggest has two modes: 'attitudes' (the "in the moment" mode — 6 tagged ways to react to a charged
  * moment) and 'directions' (open-ended — story-progression moves to keep things going).
  */
 export type SuggestMode = 'attitudes' | 'directions'
