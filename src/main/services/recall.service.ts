@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import type { RecallMode, RecallRequest, RecallSource } from '@shared/recall-types'
 import type { RelationshipView } from '@shared/graph-types'
 import type { Lifecycle } from '@shared/entity-types'
+import type { AiRunCost } from '@shared/usage-types'
 import {
   RECALL_CHUNK_CHANNEL,
   RECALL_DONE_CHANNEL,
@@ -178,6 +179,7 @@ export async function ask(
           })()
     const state = formatState(anchorLabel, stateItems, asOf !== undefined)
 
+    let cost: AiRunCost | undefined
     const sources = await claudeRecall({
       query,
       chunks,
@@ -187,9 +189,10 @@ export async function ask(
       context,
       model: getSettings().recallModel,
       onText: (text) => send(RECALL_CHUNK_CHANNEL, { requestId, text }),
+      onCost: (c) => (cost = c), // per-run cost rides the done event (P0-4)
       signal
     })
-    send(RECALL_DONE_CHANNEL, { requestId, mode: effectiveMode, sources, reason: 'ok' })
+    send(RECALL_DONE_CHANNEL, { requestId, mode: effectiveMode, sources, reason: 'ok', cost })
   } catch (err) {
     if (signal.aborted) return // user cancelled — swallow
     send(RECALL_ERROR_CHANNEL, {

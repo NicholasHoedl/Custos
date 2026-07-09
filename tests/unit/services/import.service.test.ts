@@ -17,6 +17,8 @@ vi.mock('../../../src/main/services/settings.service', () => ({
     recallModel: 'claude-sonnet-4-6',
     suggestModel: 'claude-opus-4-8',
     suggestEffort: 'high',
+    extractionModel: 'claude-sonnet-4-6',
+    extractionEffort: 'medium',
     theme: 'dark',
     fontSize: 'md',
     hotkey: ''

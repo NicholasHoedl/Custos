@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { addRunCost, type AiRunCost } from '@shared/usage-types'
 import {
   CONVERSE_TAGS,
   type ConverseFailureReason,
@@ -130,6 +131,7 @@ export async function converse(
           })()
 
     const { suggestModel, suggestEffort } = getSettings()
+    let cost: AiRunCost | undefined // sums across the retry (P0-4)
     const callOnce = (): Promise<ConverseQuestion[]> =>
       claudeConverse({
         target: {
@@ -150,13 +152,14 @@ export async function converse(
         context,
         model: suggestModel,
         effort: suggestEffort,
+        onUsage: (c) => (cost = addRunCost(cost, c)),
         signal
       })
     // One retry: the model occasionally returns too few or duplicate-tag questions.
     let out = validateConverse(await callOnce())
     if (!out) out = validateConverse(await callOnce())
     if (!out) return fail('invalid')
-    return { ok: true, questions: out }
+    return { ok: true, questions: out, cost }
   } catch (err) {
     if (signal.aborted) return fail('unknown')
     return {

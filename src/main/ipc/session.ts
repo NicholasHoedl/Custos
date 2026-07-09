@@ -11,4 +11,5 @@ export function registerSessionHandlers(ctx: DbContext): void {
     svc.updateSession(ctx, id, patch)
   )
   ipcMain.handle(IPC.sessionDelete, (_e, id: string) => svc.deleteSession(ctx, id))
+  ipcMain.handle(IPC.sessionUnclosed, (_e, campaignId: string) => svc.unclosedCounts(ctx, campaignId))
 }

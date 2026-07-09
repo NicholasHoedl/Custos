@@ -48,6 +48,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [034](034-converse-questions-only.md) | Converse v2: questions-only tagged spread (talk WITH a character) + as-of notes clamp; revises ADR-025 output | Accepted | 2026-07-08 |
 | [035](035-two-tier-extraction.md) | Two-tier extraction: 'capture' note-taker (entities+notes+status) + per-entity "Illuminate" enrichment from full note history | Accepted | 2026-07-08 |
 | [036](036-chronicle-header-consolidation.md) | Chronicle-header consolidation: Transcribe becomes a header dialog; the session selector moves out of the Sidebar (revises ADR-032) | Accepted | 2026-07-08 |
+| [037](037-session-integrity.md) | Session integrity: a derived "unclosed" signal (no stamp column) + editable chronicle entries | Accepted | 2026-07-09 |
 
 ## Status legend
 

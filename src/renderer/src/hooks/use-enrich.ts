@@ -10,6 +10,7 @@ import type {
   ProposedRelationshipChange
 } from '@shared/import-types'
 import { RELATIONS } from '@shared/relations'
+import { addRunCost, type AiRunCost } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
 import { useUiStore } from '@renderer/store/ui-store'
 import type { ChangesetReviewModel } from '@renderer/components/capture/ChangesetReview'
@@ -69,7 +70,9 @@ export function useEnrich(
   error: string | null
   result: ApplyResult | null
   merged: number
-  scan: () => void
+  /** Summed per-entity spend for this sweep (P0-4); null until a call reports usage. */
+  cost: AiRunCost | null
+  scan: (opts?: { defaultUnchecked?: string[] }) => void
   run: () => void
   cancel: () => void
   apply: () => void
@@ -85,24 +88,32 @@ export function useEnrich(
   const [globalReason, setGlobalReason] = useState<ExtractFailureReason | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApplyResult | null>(null)
+  const [cost, setCost] = useState<AiRunCost | null>(null)
   const cancelRef = useRef(false)
 
-  const scan = useCallback(() => {
-    if (!session) return
-    setPhase('scanning')
-    setError(null)
-    ledger.enrich
-      .touched(session.id)
-      .then((t) => {
-        setTouched(t)
-        setChecked(new Set(t.map((x) => x.entityId))) // default: everything checked
-        setPhase('checklist')
-      })
-      .catch((e) => {
-        setError(String(e))
-        setPhase('error')
-      })
-  }, [session])
+  const scan = useCallback(
+    (opts?: { defaultUnchecked?: string[] }) => {
+      if (!session) return
+      setPhase('scanning')
+      setError(null)
+      const excluded = new Set(opts?.defaultUnchecked ?? [])
+      ledger.enrich
+        .touched(session.id)
+        .then((t) => {
+          setTouched(t)
+          // Default: everything checked EXCEPT the caller's exclusions (the close-out wizard passes
+          // tier-1's just-created entities — their profiles were derived from this same log seconds
+          // ago, so a sweep over their 1–2 notes is near-redundant; ADR-035 cost tuning). Still checkable.
+          setChecked(new Set(t.map((x) => x.entityId).filter((id) => !excluded.has(id))))
+          setPhase('checklist')
+        })
+        .catch((e) => {
+          setError(String(e))
+          setPhase('error')
+        })
+    },
+    [session]
+  )
 
   const toggle = useCallback((entityId: string) => {
     setChecked((prev) => {
@@ -120,6 +131,7 @@ export function useEnrich(
     cancelRef.current = false
     setPhase('running')
     setGlobalReason(null)
+    setCost(null)
     setProgress(
       targets.map((t) => ({
         entityId: t.entityId,
@@ -159,6 +171,7 @@ export function useEnrich(
         }
         continue
       }
+      if (res.cost) setCost((prev) => addRunCost(prev ?? undefined, res.cost!)) // sweep total (P0-4)
       // Cross-entity tie dedup (F7): enriching both endpoints can propose the same edge twice.
       const freshTies = res.relationshipChanges.filter((rc) => {
         const key = canonicalTieKey(rc)
@@ -225,6 +238,7 @@ export function useEnrich(
     setGlobalReason(null)
     setError(null)
     setResult(null)
+    setCost(null)
   }, [])
 
   // The reviewer's structural surface: constant-empty entities/notes/status (their sections auto-hide),
@@ -254,6 +268,7 @@ export function useEnrich(
     error,
     result,
     merged: relationshipChanges.length + fieldChanges.length,
+    cost,
     scan,
     run,
     cancel,

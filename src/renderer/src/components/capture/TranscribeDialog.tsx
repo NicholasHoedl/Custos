@@ -135,7 +135,7 @@ export function TranscribeDialog({
               </span>
               <Button size="sm" onClick={() => imp.extract(text)} disabled={extracting || !text.trim()}>
                 <FileText className="size-3.5" />
-                {extracting ? 'Reading…' : 'Extract'}
+                {extracting ? 'Reading…' : 'Transcribe'}
               </Button>
             </div>
             {imp.status === 'error' && (

@@ -38,6 +38,7 @@ import {
 } from '@renderer/components/ui/command'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { reasonCopy } from '@renderer/lib/ai-copy'
+import { formatRunCost } from '@renderer/lib/format'
 import { Banner, EmptyState, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
 // You talk WITH a character (an NPC or a fellow PC), never a place/faction/item.
@@ -154,8 +155,8 @@ export function ConverseView() {
       <div className="flex-1 space-y-4 overflow-y-auto">
         {converse.status === 'idle' && (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            Pick who your character wants to talk with. You&apos;ll get a spread of questions to ask —
-            in your character&apos;s voice, from safe openers to pointed probes.
+            Pick who your character wants to talk with. The Keeper readies a spread of questions to ask
+            — in your character&apos;s voice, from safe openers to pointed probes.
           </p>
         )}
 
@@ -178,6 +179,12 @@ export function ConverseView() {
 
         {converse.status === 'done' && converse.result?.ok && (
           <QuestionSpread questions={converse.result.questions} />
+        )}
+
+        {converse.status === 'done' && converse.result?.ok && converse.result.cost && (
+          <p className="text-right font-mono text-[10px] text-muted-foreground">
+            {formatRunCost(converse.result.cost)}
+          </p>
         )}
       </div>
     </PaneShell>

@@ -1,5 +1,6 @@
 import type { EntityType, Lifecycle, NoteConfidence } from './entity-types'
 import type { RelationKey } from './relations'
+import type { AiRunCost } from './usage-types'
 
 // ---- Paste-and-extract import + backfill interview (changeset v2) ----
 // The model proposes new entities + notes from pasted raw text; the user reviews/edits/confirms each
@@ -136,7 +137,7 @@ export type ExtractFailureReason =
   | 'too_long'
 
 export type ExtractResult =
-  | { ok: true; proposal: ExtractionProposal }
+  | { ok: true; proposal: ExtractionProposal; cost?: AiRunCost }
   | { ok: false; reason: ExtractFailureReason; message?: string }
 
 /** A reviewed entity: create a new one, link the proposal onto an existing entity, or skip it. */

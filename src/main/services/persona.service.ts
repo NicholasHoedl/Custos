@@ -65,7 +65,9 @@ function sourceText(e: Entity): string {
     e.status ?? ''
   ].join('\n')
 }
-function sourceHash(e: Entity): string {
+/** Exported for campaign import (P0-2): exports omit the hash, so restore recomputes it against the
+ *  just-imported entity — keeping the stale-detection invariant without duplicating this function. */
+export function sourceHash(e: Entity): string {
   return createHash('sha1').update(sourceText(e)).digest('hex')
 }
 

@@ -6,6 +6,7 @@
 
 import type { TouchedEntity, EnrichEntityRequest, EnrichEntityResult } from '@shared/enrich-types'
 import type { ExtractFailureReason } from '@shared/import-types'
+import type { AiRunCost } from '@shared/usage-types'
 import type { RelationshipView } from '@shared/graph-types'
 import { profileKeys } from '@shared/entity-profiles'
 import type { DbContext } from './db-context'
@@ -24,6 +25,11 @@ import log from 'electron-log/main'
 
 /** Grounding cap: the newest N notes feed the prompt (rendered oldest-first); older ones are counted. */
 const ENRICH_NOTE_CAP = 30
+
+/** Roster cap (ADR-035 cost tuning): only plausible tie ENDPOINTS reach the prompt — entities named in
+ *  the subject's notes plus current tie endpoints. A tie to an entity never mentioned would be
+ *  ungrounded by definition, so the full-campaign roster (100 UUID-bearing lines) was mostly noise. */
+const ENRICH_ROSTER_CAP = 25
 
 /**
  * The entities a session's notes touched, with per-entity note counts — the pre-flight checklist.
@@ -91,10 +97,26 @@ export async function enrichEntity(
     const allNotes = listNotesForEntity(ctx, req.entityId) // newest first
     const capped = allNotes.slice(0, ENRICH_NOTE_CAP).reverse() // prompt reads oldest → newest
     const omitted = Math.max(0, allNotes.length - ENRICH_NOTE_CAP)
-    const tieLines = tieLinesWithIds(subject.name, listForEntity(ctx, req.entityId))
+    const views = listForEntity(ctx, req.entityId) // live ties
+    const tieLines = tieLinesWithIds(subject.name, views)
     const others = listEntities(ctx, req.campaignId).filter((e) => e.id !== subject.id)
+    // Slim roster (ADR-035 cost tuning): current tie endpoints (a sever must reference them) first,
+    // then entities NAMED in the grounding notes, capped. The validator stays permissive over the full
+    // campaign (byId below) — this only bounds what the prompt carries.
+    const haystack = capped.map((n) => n.content.toLowerCase()).join('\n')
+    const tieEndpointIds = new Set(views.map((v) => v.other.id))
+    const roster = others
+      .filter((e) => tieEndpointIds.has(e.id) || haystack.includes(e.name.toLowerCase()))
+      .sort(
+        (a, b) =>
+          (tieEndpointIds.has(a.id) ? 0 : 1) - (tieEndpointIds.has(b.id) ? 0 : 1) ||
+          a.name.localeCompare(b.name)
+      )
+      .slice(0, ENRICH_ROSTER_CAP)
 
-    const { suggestModel, suggestEffort } = getSettings()
+    // Enrichment shares the extraction knobs (ADR-035 cost tuning) — structured, validated, review-gated.
+    const { extractionModel, extractionEffort } = getSettings()
+    let cost: AiRunCost | undefined // per-entity cost — the renderer sums the sweep (P0-4)
     const raw = await enrichChangeset({
       subject: {
         id: subject.id,
@@ -110,10 +132,11 @@ export async function enrichEntity(
       },
       notes: capped.map((n) => ({ content: n.content, confidence: n.confidence })),
       tieLines,
-      existing: others.map((e) => ({ id: e.id, name: e.name, type: e.type })),
+      existing: roster.map((e) => ({ id: e.id, name: e.name, type: e.type })),
       omittedNotes: omitted,
-      model: suggestModel,
-      effort: suggestEffort,
+      model: extractionModel,
+      effort: extractionEffort,
+      onUsage: (c) => (cost = c),
       signal
     })
 
@@ -149,7 +172,7 @@ export async function enrichEntity(
         fc.entityRef.entityId === subject.id &&
         allowedFields.has(fc.field)
     )
-    return { ok: true, relationshipChanges, fieldChanges }
+    return { ok: true, relationshipChanges, fieldChanges, cost }
   } catch (err) {
     log.error('enrich.entity failed', err)
     const message = err instanceof Error ? err.message : String(err)

@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 import type { EventLogEntry } from '@shared/entity-types'
-import type { CreateEventInput } from '@shared/ipc-types'
+import type { CreateEventInput, UpdateEventInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { newId, now, rowToEvent } from './serialize'
@@ -24,6 +24,25 @@ export function listEventsForCampaign(ctx: DbContext, campaignId: string): Event
     .orderBy(asc(schema.eventLog.timestamp))
     .all()
     .map(rowToEvent)
+}
+
+/** Edit a chronicle entry's content in place (ROADMAP P1-4). The timestamp is left untouched so the
+ *  entry keeps its position in the oldest-first log. Editing after close-out does NOT retroactively
+ *  change already-extracted notes — they're independent records (see the EventFeed hint). */
+export function updateEvent(ctx: DbContext, id: string, patch: UpdateEventInput): EventLogEntry {
+  ctx.drizzle
+    .update(schema.eventLog)
+    .set({ content: patch.content })
+    .where(eq(schema.eventLog.id, id))
+    .run()
+  const r = ctx.drizzle.select().from(schema.eventLog).where(eq(schema.eventLog.id, id)).get()
+  if (!r) throw new Error(`Event ${id} not found`)
+  return rowToEvent(r)
+}
+
+/** Delete a chronicle entry. Nothing references event_log, so this is an unconstrained single delete. */
+export function deleteEvent(ctx: DbContext, id: string): void {
+  ctx.drizzle.delete(schema.eventLog).where(eq(schema.eventLog.id, id)).run()
 }
 
 export function createEvent(ctx: DbContext, input: CreateEventInput): EventLogEntry {

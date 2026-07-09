@@ -1,13 +1,14 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import log from 'electron-log/main'
 import { IPC, type CreateCampaignInput, type UpdateCampaignInput } from '@shared/ipc-types'
-import type { CampaignExportResult } from '@shared/export-types'
+import type { CampaignExportResult, CampaignImportResult } from '@shared/export-types'
 import type { DbContext } from '../services/db-context'
 import * as svc from '../services/campaign.service'
 import { buildCampaignExport } from '../services/export.service'
+import { importCampaign } from '../services/import-campaign.service'
 
-export function registerCampaignHandlers(ctx: DbContext): void {
+export function registerCampaignHandlers(ctx: DbContext, reindex: () => Promise<number>): void {
   ipcMain.handle(IPC.campaignList, () => svc.listCampaigns(ctx))
   ipcMain.handle(IPC.campaignGet, (_e, id: string) => svc.getCampaign(ctx, id))
   ipcMain.handle(IPC.campaignCreate, (_e, input: CreateCampaignInput) => svc.createCampaign(ctx, input))
@@ -44,6 +45,36 @@ export function registerCampaignHandlers(ctx: DbContext): void {
       }
     } catch (err) {
       log.error('campaign export failed', err)
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Import (P0-2): open dialog + file read + one-transaction restore. Errors are returned (not
+  // thrown) with user-readable messages from the service; embeddings rebuild in the background
+  // (the export omits them by design).
+  ipcMain.handle(IPC.campaignImport, async (): Promise<CampaignImportResult> => {
+    try {
+      const opts = {
+        title: 'Import campaign',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        properties: ['openFile' as const]
+      }
+      const win = BrowserWindow.getFocusedWindow()
+      const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      if (res.canceled || res.filePaths.length === 0) return { ok: false, canceled: true }
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(await readFile(res.filePaths[0], 'utf8'))
+      } catch {
+        return { ok: false, error: 'That file is not valid JSON.' }
+      }
+      const out = importCampaign(ctx, parsed)
+      void reindex() // embeddings are omitted from exports — rebuild them in the background
+      log.info(`imported campaign ${out.campaignId} ← ${res.filePaths[0]}`)
+      return { ok: true, ...out }
+    } catch (err) {
+      log.error('campaign import failed', err)
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })

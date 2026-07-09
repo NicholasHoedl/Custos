@@ -10,6 +10,10 @@ const DEFAULTS: AppSettings = {
   recallModel: 'claude-sonnet-4-6',
   suggestModel: 'claude-opus-4-8',
   suggestEffort: 'high',
+  // Extraction is structured data-entry behind a validation net + review gate (ADR-035): Sonnet at
+  // medium effort is ~a quarter of Opus-high's cost per close-out with little quality to lose there.
+  extractionModel: 'claude-sonnet-4-6',
+  extractionEffort: 'medium',
   hotkey: DEFAULT_HOTKEY
 }
 

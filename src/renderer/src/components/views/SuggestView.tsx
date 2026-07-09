@@ -43,6 +43,7 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { SceneControls } from '@renderer/components/scene/SceneControls'
 import { reasonCopy } from '@renderer/lib/ai-copy'
+import { formatRunCost } from '@renderer/lib/format'
 import {
   Banner,
   EmptyState,
@@ -233,8 +234,8 @@ export function SuggestView() {
           {suggest.status === 'idle' && (
             <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
               {mode === 'attitudes'
-                ? 'Six tagged options will appear here, drawn from who your character is and what’s happened.'
-                : 'Story directions will appear here — grouped by kind, drawn from your open quests, the party, and where you are.'}
+                ? 'The Keeper’s counsel appears here — six ways your character might play the moment, drawn from who they are and what’s happened.'
+                : 'The Keeper’s counsel appears here — ways to carry the story onward, drawn from your open quests, the party, and where you are.'}
             </p>
           )}
 
@@ -272,6 +273,12 @@ export function SuggestView() {
             suggest.result.mode === 'directions' && (
               <DirectionsList suggestions={suggest.result.suggestions} />
             )}
+
+          {suggest.status === 'done' && suggest.result?.ok && suggest.result.cost && (
+            <p className="text-right font-mono text-[10px] text-muted-foreground">
+              {formatRunCost(suggest.result.cost)}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -18,6 +18,8 @@ vi.mock('../../../src/main/services/settings.service', () => ({
     recallModel: 'claude-sonnet-4-6',
     suggestModel: 'claude-opus-4-8',
     suggestEffort: 'high',
+    extractionModel: 'claude-sonnet-4-6',
+    extractionEffort: 'medium',
     theme: 'dark',
     fontSize: 'md',
     hotkey: ''
@@ -231,6 +233,43 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
     if (!res.ok) return
     expect(res.relationshipChanges).toEqual([])
     expect(res.fieldChanges).toEqual([])
+  })
+
+  it('runs on the EXTRACTION model/effort knobs, not Counsel’s (ADR-035 cost tuning)', async () => {
+    const { ctx, campaignId, session, subject } = setup()
+    enrichFn.mockResolvedValue({ relationshipChanges: [], fieldChanges: [] })
+
+    await enrichEntity(ctx, { campaignId, sessionId: session.id, entityId: subject.id }, sig())
+    const call = enrichFn.mock.calls[0][0] as { model: string; effort: string }
+    expect(call.model).toBe('claude-sonnet-4-6') // extractionModel, NOT suggestModel (opus)
+    expect(call.effort).toBe('medium') // extractionEffort, NOT suggestEffort (high)
+  })
+
+  it('slims the roster to note-mentioned entities + live tie endpoints (ADR-035 cost tuning)', async () => {
+    const { ctx, campaignId, session, subject, manor, spider } = setup()
+    // Manor is a live TIE endpoint (never named in notes); Spider is NAMED in a note; Bystander is neither.
+    createLink(ctx, {
+      campaignId,
+      fromEntityId: subject.id,
+      toEntityId: manor.id,
+      relation: 'located_in'
+    })
+    createNote(ctx, {
+      campaignId,
+      entityIds: [subject.id],
+      content: 'He whispers about The Black Spider after dark.',
+      sessionId: session.id
+    })
+    const bystander = createEntity(ctx, { campaignId, type: 'npc', name: 'Unrelated Bystander' })
+    enrichFn.mockResolvedValue({ relationshipChanges: [], fieldChanges: [] })
+
+    await enrichEntity(ctx, { campaignId, sessionId: session.id, entityId: subject.id }, sig())
+    const call = enrichFn.mock.calls[0][0] as { existing: Array<{ id: string }> }
+    const ids = call.existing.map((e) => e.id)
+    expect(ids).toContain(manor.id) // tie endpoint — kept (a sever must reference it)
+    expect(ids).toContain(spider.id) // named in the notes — kept
+    expect(ids).not.toContain(bystander.id) // neither — dropped from the prompt
+    expect(ids).not.toContain(subject.id) // never itself
   })
 
   it('guards: no_key (model never called), invalid entity, truncated → too_long', async () => {

@@ -61,9 +61,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `density="compact"`); other callers pass neither and are unchanged. **'full'** (all five arrays) has exactly ONE caller: backstory step 2 (`DeriveReview`, with
   `backstorySubjectId` so standing ties anchor to the MC — ADR-030 v3). Ties + field changes otherwise
   come from **"Illuminate"** (code name `enrich`) — the manual per-session tier-2 pass on the Sessions
-  view: checklist of the session's touched entities (from `listNotesForSession` entityIds) → ONE focused
+  view: checklist of the session's touched entities (from `listNotesForSession` entityIds; the close-out
+  wizard default-UNCHECKS entities tier 1 just created) → ONE focused
   call per entity (`enrich.service` → `enrichChangeset`; grounding = full note history capped 30 +
-  current profile + id-bearing live-tie lines + roster) proposing ONLY relationship/field changes with
+  current profile + id-bearing live-tie lines + a SLIM roster of tie endpoints + note-mentioned entities
+  capped 25) proposing ONLY relationship/field changes with
   **REAL-ID refs** (never `#index`; never new entities/notes/status/type) → renderer merges (cross-entity
   tie dedup via `inverseKey`, `use-enrich`) → shared `ChangesetReview` → ONE `import.apply` stamped at
   the enriched session (ties open intervals at N). Field changes stay existing-only + un-versioned
@@ -147,7 +149,24 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   persona surface; `updatePersona` clears `stale` + re-syncs the source hash so a saved brief sticks.
 - **Live-DB safety:** SQLite runs in WAL. Never let a second process write `ledger.db` while the app is
   open — close it first. Real failures land in `%APPDATA%\Ledger\logs\main.log` (electron-log); Import
-  maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`.
+  maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`. Renderer
+  CRASHES also reach that log (ErrorBoundary + window handlers → `RENDERER_ERROR_CHANNEL` → `ipc/app.ts`).
+- **App shell & cost accounting (docs/ROADMAP.md P0, as-built):** every claude.service call records
+  usage centrally — `structuredCall` opts REQUIRE a `feature: AiFeature` tag (a new lens must pick one;
+  `usage.service` prices it, persists monthly buckets to `userData/usage.json`, Settings shows the
+  totals) and optional `onUsage` threads per-run cost onto ok-results (`cost?: AiRunCost`) for the muted
+  cost lines. Campaign **import** now exists (`import-campaign.service`, one txn, ids preserved, rejects
+  a still-existing campaign id, reindexes after) — the export is no longer a one-way street. Window
+  bounds persist via `window-state.json`; "Back up now"/data-folder/version live in Settings "Your data".
+- **Session integrity (docs/ROADMAP.md P1-2/4, ADR-037):** a session is "unclosed" when its newest
+  `event_log.timestamp` > its newest `note.createdAt` (close-out stamps notes at the session) — DERIVED,
+  no `lastClosedOut` column. `session.service.unclosedCounts` → `session:unclosed` IPC → `useUnclosedSessions`
+  badges the **Close out session** button + Sessions rows; freshness rides the sessions version bump
+  (entry add/edit/delete and `use-import.apply` all fire it). **Chronicle entries are editable** now
+  (`event.service` gained `updateEvent`/`deleteEvent`; nothing FKs to `event_log`): EventFeed rows have
+  hover/focus edit (inline textarea) + delete (`DeleteEventDialog`), allowed ALWAYS — editing post-close-out
+  does NOT change already-extracted notes (they're independent records; a `title` hint says so). The
+  **LoopExplainer** (localStorage `ledger.loopExplainerDismissed`) names the ritual once atop JournalView.
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.

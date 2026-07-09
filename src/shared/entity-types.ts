@@ -155,5 +155,10 @@ export interface AppSettings {
   recallModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestEffort: 'medium' | 'high'
+  /** The extraction tiers' knobs (ADR-035 cost tuning): close-out/Transcribe/backstory extraction +
+   *  Illuminate enrichment. Structured work behind a validation net + review gate — a cheaper model at
+   *  medium effort loses little; Counsel/Converse keep their own settings. */
+  extractionModel: 'claude-sonnet-4-6' | 'claude-opus-4-8' | 'claude-haiku-4-5'
+  extractionEffort: 'medium' | 'high'
   hotkey: string
 }

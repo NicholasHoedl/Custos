@@ -5,7 +5,7 @@ import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { useEvents, useSessions } from '@renderer/hooks/use-ledger'
+import { useEvents, useSessions, useUnclosedSessions } from '@renderer/hooks/use-ledger'
 import { formatTime } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { EmptyState } from '@renderer/components/chrome'
@@ -34,6 +34,7 @@ export function SessionsView() {
 
 function SessionsWorkspace({ campaignId }: { campaignId: string }) {
   const { sessions, refresh } = useSessions(campaignId)
+  const { counts: unclosed } = useUnclosedSessions(campaignId)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -97,6 +98,14 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium">Session {s.number}</span>
                   {s.summary && <Check className="size-3 shrink-0 text-primary" aria-label="Recapped" />}
+                  {(unclosed[s.id] ?? 0) > 0 && (
+                    <span
+                      className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
+                      title={`${unclosed[s.id]} ${unclosed[s.id] === 1 ? 'entry' : 'entries'} to close out`}
+                    >
+                      {unclosed[s.id]}
+                    </span>
+                  )}
                 </div>
                 {(s.title || s.date) && (
                   <div className="truncate text-xs text-muted-foreground">

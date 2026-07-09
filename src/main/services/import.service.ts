@@ -25,6 +25,7 @@ import type {
   RawExtraction
 } from '@shared/import-types'
 import { RELATIONS, isRelationAllowed, isRelationKey, type RelationKey } from '@shared/relations'
+import type { AiRunCost } from '@shared/usage-types'
 import { profileFor, type StatusPreset } from '@shared/entity-profiles'
 import type { UpdateEntityInput } from '@shared/ipc-types'
 import type { DbContext } from './db-context'
@@ -60,7 +61,9 @@ export async function extract(
     if (!(await isOnline())) return { ok: false, reason: 'offline' }
 
     const existing = listEntities(ctx, campaignId)
-    const { suggestModel, suggestEffort } = getSettings()
+    // Extraction runs on ITS OWN model/effort knobs (ADR-035 cost tuning) — decoupled from Counsel's.
+    const { extractionModel, extractionEffort } = getSettings()
+    let cost: AiRunCost | undefined // per-run cost surfaces in the wizard/Transcribe (P0-4)
     // ADR-030 v3: the backstory flow names its subject so the standing ties anchor to that character.
     const subject = req.backstorySubjectId
       ? existing.find((e) => e.id === req.backstorySubjectId)
@@ -76,8 +79,9 @@ export async function extract(
         flaws: e.flaws,
         attributes: e.attributes
       })),
-      model: suggestModel,
-      effort: suggestEffort,
+      model: extractionModel,
+      effort: extractionEffort,
+      onUsage: (c) => (cost = c),
       mode: req.mode ?? 'capture',
       backstorySubject: subject ? { id: subject.id, name: subject.name } : undefined,
       signal
@@ -94,7 +98,7 @@ export async function extract(
     ) {
       return { ok: false, reason: 'empty' }
     }
-    return { ok: true, proposal }
+    return { ok: true, proposal, cost }
   } catch (err) {
     // Log the real cause — otherwise every non-network failure (a truncated response, a schema error
     // during a stale-migration dev restart, an unparseable reply) collapses to a generic toast with no

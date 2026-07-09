@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { AlertTriangle, Loader2, Sparkles } from 'lucide-react'
 import type { Session } from '@shared/entity-types'
-import { plural } from '@renderer/lib/format'
+import { formatRunCost, plural } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useEntities } from '@renderer/hooks/use-ledger'
@@ -170,6 +170,11 @@ export function EnrichDialog({
                     </li>
                   ))}
                 </ul>
+              )}
+              {enrich.cost && (
+                <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                  This sweep used {formatRunCost(enrich.cost)}
+                </p>
               )}
             </div>
             <DialogFooter>

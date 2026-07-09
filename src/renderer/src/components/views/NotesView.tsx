@@ -28,6 +28,7 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
+import { DeleteNoteDialog } from '@renderer/components/notes/DeleteNoteDialog'
 import {
   Command,
   CommandEmpty,
@@ -67,6 +68,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
   const [confidence, setConfidence] = useState<NoteConfidence>('confirmed')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState<Note | null>(null)
 
   const selectedEntities = selectedIds
     .map((id) => entityById.get(id))
@@ -114,16 +116,6 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
       toast.error('Could not save note', { description: String(err) })
     } finally {
       setBusy(false)
-    }
-  }
-
-  async function remove(id: string): Promise<void> {
-    try {
-      await ledger.note.delete(id)
-      if (editingId === id) resetComposer()
-      refresh()
-    } catch (err) {
-      toast.error('Could not delete note', { description: String(err) })
     }
   }
 
@@ -223,11 +215,22 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
               entityById={entityById}
               editing={editingId === n.id}
               onEdit={() => startEdit(n)}
-              onDelete={() => remove(n.id)}
+              onDelete={() => setConfirmingDelete(n)}
             />
           ))
         )}
       </div>
+
+      <DeleteNoteDialog
+        note={confirmingDelete}
+        onOpenChange={(o) => {
+          if (!o) setConfirmingDelete(null)
+        }}
+        onDeleted={(id) => {
+          if (editingId === id) resetComposer()
+          refresh()
+        }}
+      />
     </PaneShell>
   )
 }
@@ -285,7 +288,8 @@ function NoteCard({
           {formatTimestamp(note.createdAt)}
         </span>
       </div>
-      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      {/* Revealed on hover OR keyboard focus (P0-1) — hover-only actions are invisible to tab users. */}
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
         <button
           onClick={onEdit}
           className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"

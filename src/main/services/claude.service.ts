@@ -20,7 +20,9 @@ import { ENTITY_PROFILES } from '@shared/entity-profiles'
 import { RELATIONS } from '@shared/relations'
 import type { ExtractionMode, RawExtraction } from '@shared/import-types'
 import type { RawEnrichment } from '@shared/enrich-types'
+import type { AiFeature, AiRunCost, AiUsage } from '@shared/usage-types'
 import type { RetrievedChunk } from './vector-store.service'
+import { recordUsage } from './usage.service'
 import { getKey, keyExists } from './key.service'
 
 // All Claude API access lives here, in the main process. The key is read from key.service (never
@@ -343,6 +345,16 @@ function mapSources(message: Anthropic.Message, chunks: RetrievedChunk[]): Recal
   return out
 }
 
+/** The API's usage block in our shape (P0-4). Cache fields are nullable on the wire. */
+function usageOf(m: Anthropic.Message): AiUsage {
+  return {
+    inputTokens: m.usage.input_tokens,
+    outputTokens: m.usage.output_tokens,
+    cacheReadTokens: m.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: m.usage.cache_creation_input_tokens ?? 0
+  }
+}
+
 export interface RecallParams {
   query: string
   chunks: RetrievedChunk[]
@@ -352,6 +364,8 @@ export interface RecallParams {
   context: RecallContext
   model: string
   onText: (text: string) => void
+  /** Per-run cost, fired after the stream completes (P0-4) — rides the renderer's done event. */
+  onCost?: (cost: AiRunCost) => void
   signal?: AbortSignal
 }
 
@@ -380,6 +394,7 @@ export async function recall(params: RecallParams): Promise<RecallSource[]> {
   )
   stream.on('text', (text) => params.onText(text))
   const message = await stream.finalMessage()
+  params.onCost?.(recordUsage('lore', params.model, usageOf(message)))
   return mapSources(message, params.chunks)
 }
 
@@ -393,6 +408,7 @@ export async function complete(system: string, user: string, model: string): Pro
     system,
     messages: [{ role: 'user', content: user }]
   })
+  recordUsage('persona', model, usageOf(message)) // sole caller is persona generation
   return message.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
@@ -490,7 +506,8 @@ export async function recap(params: RecapParams): Promise<void> {
     { signal: params.signal }
   )
   stream.on('text', (text) => params.onText(text))
-  await stream.finalMessage()
+  const message = await stream.finalMessage()
+  recordUsage('recap', params.model, usageOf(message))
 }
 
 // ---- Suggest prompt (Phase 3) ----
@@ -675,6 +692,7 @@ export interface SuggestParams {
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
+  onUsage?: (cost: AiRunCost) => void // per-run cost back to the caller (P0-4)
   signal?: AbortSignal
 }
 
@@ -684,6 +702,10 @@ interface StructuredCallOpts {
   schema: Record<string, unknown>
   system: Anthropic.TextBlockParam[]
   content: Anthropic.ContentBlockParam[]
+  /** Which surface this call belongs to — usage/cost is recorded centrally per call (P0-4). */
+  feature: AiFeature
+  /** Per-run cost callback so callers can attach cost to their results (P0-4). */
+  onUsage?: (cost: AiRunCost) => void
   signal?: AbortSignal
   maxTokens?: number // output budget (shared with adaptive thinking); defaults to 8192
 }
@@ -707,6 +729,8 @@ async function structuredCall(opts: StructuredCallOpts): Promise<Record<string, 
     },
     { signal: opts.signal }
   )
+  // Record BEFORE the outcome checks — refused/truncated calls still billed whatever they used.
+  opts.onUsage?.(recordUsage(opts.feature, opts.model, usageOf(message)))
   if (message.stop_reason === 'refusal') throw new Error('refusal')
   if (message.stop_reason === 'max_tokens') throw new Error('truncated')
   const text = message.content
@@ -790,6 +814,7 @@ export async function deriveProfileCall(params: DeriveProfileParams): Promise<Re
   if (ctx.level) lines.push(`Level: ${ctx.level}`)
   lines.push('', 'Backstory:', ctx.backstory)
   return structuredObjectCall<Record<string, unknown>>({
+    feature: 'backstory',
     model: params.model,
     effort: params.effort,
     schema: DERIVE_PROFILE_SCHEMA,
@@ -1045,12 +1070,15 @@ export interface ExtractChangesetParams {
   effort: 'medium' | 'high'
   mode: ExtractionMode // tier split (ADR-035): 'capture' (note-taker) or 'full' (backstory only)
   backstorySubject?: { id: string; name: string } // ADR-030 v3: whose backstory the text is
+  onUsage?: (cost: AiRunCost) => void // per-run cost back to the caller (P0-4)
   signal?: AbortSignal
 }
 
 /** Single-shot structured extraction. Returns the raw (UNVALIDATED) changeset; import.service cleans it. */
 export async function extractChangeset(params: ExtractChangesetParams): Promise<RawExtraction> {
   return structuredObjectCall<RawExtraction>({
+    feature: 'extraction',
+    onUsage: params.onUsage,
     model: params.model,
     effort: params.effort,
     schema: extractionSchema(params.mode),
@@ -1195,12 +1223,15 @@ export interface EnrichCallParams {
   omittedNotes?: number
   model: string
   effort: 'medium' | 'high'
+  onUsage?: (cost: AiRunCost) => void // per-run cost back to the caller (P0-4)
   signal?: AbortSignal
 }
 
 /** Single-shot per-entity enrichment. Returns the raw (UNVALIDATED) two arrays; enrich.service cleans. */
 export async function enrichChangeset(params: EnrichCallParams): Promise<RawEnrichment> {
   return structuredObjectCall<RawEnrichment>({
+    feature: 'illuminate',
+    onUsage: params.onUsage,
     model: params.model,
     effort: params.effort,
     schema: ENRICH_SCHEMA,
@@ -1219,6 +1250,8 @@ export async function enrichChangeset(params: EnrichCallParams): Promise<RawEnri
 /** "In the moment" call. Returns raw suggestions (caller enforces the 8-distinct-primary rule). */
 export async function suggest(params: SuggestParams): Promise<MomentSuggestion[]> {
   return structuredArrayCall<MomentSuggestion>({
+    feature: 'counsel',
+    onUsage: params.onUsage,
     model: params.model,
     effort: params.effort,
     schema: SUGGEST_SCHEMA,
@@ -1377,12 +1410,15 @@ export interface SuggestDirectionsParams {
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
+  onUsage?: (cost: AiRunCost) => void // per-run cost back to the caller (P0-4)
   signal?: AbortSignal
 }
 
 /** Open-ended directions call. Returns raw suggestions (caller validates count/shape). */
 export async function suggestDirections(params: SuggestDirectionsParams): Promise<StorySuggestion[]> {
   return structuredArrayCall<StorySuggestion>({
+    feature: 'counsel',
+    onUsage: params.onUsage,
     model: params.model,
     effort: params.effort,
     schema: DIRECTIONS_SCHEMA,
@@ -1559,6 +1595,7 @@ export interface ConverseParams {
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
+  onUsage?: (cost: AiRunCost) => void // per-run cost back to the caller (P0-4)
   signal?: AbortSignal
 }
 
@@ -1566,6 +1603,8 @@ export interface ConverseParams {
  *  distinct tags + floor/cap). */
 export async function converse(params: ConverseParams): Promise<ConverseQuestion[]> {
   return structuredArrayCall<ConverseQuestion>({
+    feature: 'converse',
+    onUsage: params.onUsage,
     model: params.model,
     effort: params.effort,
     schema: CONVERSE_SCHEMA,

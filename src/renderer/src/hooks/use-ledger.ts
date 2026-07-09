@@ -65,6 +65,25 @@ export function useSessions(campaignId: string | null): {
   return { sessions, loading, refresh }
 }
 
+/**
+ * Per-session count of chronicle entries not yet closed out (ROADMAP P1-2), keyed by session id (sparse
+ * — only unclosed sessions appear). Refetches on the sessions version bump, which the mutation points
+ * that move the signal (entry add/edit/delete, close-out apply) all fire.
+ */
+export function useUnclosedSessions(campaignId: string | null): {
+  counts: Record<string, number>
+  refresh: () => void
+} {
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const sessionsVersion = useUiStore((s) => s.sessionsVersion)
+  const refresh = useCallback(() => {
+    if (!campaignId) return setCounts({})
+    ledger.session.unclosed(campaignId).then(setCounts).catch(fetchFailed('session status'))
+  }, [campaignId])
+  useEffect(() => refresh(), [refresh, sessionsVersion])
+  return { counts, refresh }
+}
+
 export function useEntities(
   campaignId: string | null,
   type?: EntityType

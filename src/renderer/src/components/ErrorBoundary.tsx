@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { ledger } from '@renderer/lib/ipc'
 import { Button } from '@renderer/components/ui/button'
 
 // Last line of defense (T2): a renderer render-crash used to blank the window with no explanation —
@@ -17,8 +18,17 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Console is the only sink available in the renderer; the main-process log covers the backend.
     console.error('[renderer] uncaught error', error, info.componentStack)
+    // Also land it in userData/logs/main.log — the packaged app has no devtools console (P0-3).
+    try {
+      ledger.log.rendererError({
+        source: 'error-boundary',
+        message: error.message,
+        stack: `${error.stack ?? ''}\n--- component stack ---${info.componentStack ?? ''}`
+      })
+    } catch {
+      // The bridge failing must never cascade out of the boundary.
+    }
   }
 
   render(): ReactNode {

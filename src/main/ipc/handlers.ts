@@ -21,6 +21,7 @@ import { registerDeriveProfileHandlers } from './derive-profile'
 import { registerImportHandlers } from './import'
 import { registerEnrichHandlers } from './enrich'
 import { registerPersonaHandlers } from './persona'
+import { registerAppHandlers } from './app'
 
 /** Send a one-way event to the renderer (streaming: recall chunks, model-download progress). */
 export type Send = (channel: string, payload: unknown) => void
@@ -39,7 +40,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   const store = new BruteForceVectorStore(ctx)
   const reindex = (): Promise<number> => backfill(ctx, store)
 
-  registerCampaignHandlers(ctx)
+  registerCampaignHandlers(ctx, reindex) // reindex: an import restores content with no embeddings
   registerSessionHandlers(ctx)
   registerEntityHandlers(ctx, store)
   registerNoteHandlers(ctx, store)
@@ -57,6 +58,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerImportHandlers(ctx, store)
   registerEnrichHandlers(ctx) // no vector store — enrich creates no notes/entities (ADR-035)
   registerPersonaHandlers(ctx)
+  registerAppHandlers(ctx) // shell: About/version, data-folder + backup-now, renderer-error sink (P0-2/3)
 
   void reindex() // embed anything unindexed (no-ops until the model is downloaded)
 }

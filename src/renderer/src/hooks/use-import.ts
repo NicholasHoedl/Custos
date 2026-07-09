@@ -12,6 +12,7 @@ import type {
   ExtractionProposal,
   ProposedEntity
 } from '@shared/import-types'
+import type { AiRunCost } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
@@ -51,6 +52,8 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
   reason: ExtractFailureReason | null
   error: string | null
   result: ApplyResult | null
+  /** What the extraction call cost (P0-4); null until a run reports usage. */
+  cost: AiRunCost | null
   setEntities: Dispatch<SetStateAction<ConfirmedEntity[]>>
   setNotes: Dispatch<SetStateAction<ConfirmedNote[]>>
   setStatusChanges: Dispatch<SetStateAction<ConfirmedStatusChange[]>>
@@ -72,6 +75,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
   const [reason, setReason] = useState<ExtractFailureReason | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApplyResult | null>(null)
+  const [cost, setCost] = useState<AiRunCost | null>(null)
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
 
@@ -82,6 +86,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
       setReason(null)
       setError(null)
       setResult(null)
+      setCost(null)
       ledger.import
         .extract({ campaignId: activeCampaignId, text, mode, backstorySubjectId })
         .then((res) => {
@@ -91,6 +96,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
             return
           }
           setProposal(res.proposal)
+          setCost(res.cost ?? null)
           setEntities(res.proposal.entities.map(seedEntity))
           setNotes(
             res.proposal.notes.map((n) => ({
@@ -137,7 +143,9 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
         .then((res) => {
           setResult(res)
           setStatus('done')
-          useUiStore.getState().bumpEntities() // refresh entity lists across the app
+          const ui = useUiStore.getState()
+          ui.bumpEntities() // refresh entity lists across the app
+          ui.bumpSessions() // notes stamped at the session clear its unclosed badge (P1-2)
         })
         .catch((e) => {
           setStatus('error')
@@ -166,6 +174,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
     setReason(null)
     setError(null)
     setResult(null)
+    setCost(null)
   }, [])
 
   return {
@@ -179,6 +188,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
     reason,
     error,
     result,
+    cost,
     setEntities,
     setNotes,
     setStatusChanges,

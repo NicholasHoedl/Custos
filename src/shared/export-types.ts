@@ -9,11 +9,12 @@ import type {
 } from './entity-types'
 import type { PersonaBrief } from './recall-types'
 
-// A portable, self-contained snapshot of ONE campaign's whole graph (export-only, ADR pending). It's a
-// second backup channel and the "campaign portability" out-path. Embeddings are intentionally OMITTED —
-// they regenerate from content on load (embedding-index backfill), keeping the file small and
-// model-version-independent. A round-trip IMPORT is a separate, larger project (id remapping + FK order
-// + session-number/chronology-interval integrity); this defines only the export shape.
+// A portable, self-contained snapshot of ONE campaign's whole graph. It's a second backup channel and
+// the campaign portability path — both directions since ROADMAP P0-2: export via buildCampaignExport,
+// restore via importCampaign (ids + timestamps preserved verbatim; UUIDs never collide across
+// machines, and re-importing a campaign that still exists is rejected by id). Embeddings are
+// intentionally OMITTED — they regenerate from content after import (embedding-index backfill),
+// keeping the file small and model-version-independent.
 
 export const CAMPAIGN_EXPORT_VERSION = 1
 
@@ -37,5 +38,16 @@ export interface CampaignExport {
 /** Result of the main-process export handler (after the save dialog). */
 export type CampaignExportResult =
   | { ok: true; path: string; counts: { entities: number; notes: number; links: number } }
+  | { ok: false; canceled: true }
+  | { ok: false; error: string }
+
+/** Result of the main-process import handler (after the open dialog). Errors are user-readable. */
+export type CampaignImportResult =
+  | {
+      ok: true
+      campaignId: string
+      name: string
+      counts: { sessions: number; entities: number; notes: number; links: number; events: number }
+    }
   | { ok: false; canceled: true }
   | { ok: false; error: string }

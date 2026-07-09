@@ -1,9 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Check, Download, Eye, EyeOff, FileDown, KeyRound } from 'lucide-react'
+import {
+  Check,
+  DatabaseBackup,
+  Download,
+  Eye,
+  EyeOff,
+  FileDown,
+  FileUp,
+  FolderOpen,
+  KeyRound,
+  ScrollText
+} from 'lucide-react'
 import { toast } from 'sonner'
 import type { AppSettings } from '@shared/entity-types'
+import type { AppInfo } from '@shared/ipc-types'
+import { AI_FEATURE_LABELS, type AiFeature, type UsageSummary } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
+import { formatUsd } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/app-store'
+import { useUiStore } from '@renderer/store/ui-store'
 import { useSettings } from '@renderer/hooks/use-settings'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
@@ -28,6 +43,10 @@ export function SettingsView() {
   const [busy, setBusy] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [backingUp, setBackingUp] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [usage, setUsage] = useState<UsageSummary | null>(null)
 
   useEffect(() => {
     ledger.apikey
@@ -37,7 +56,53 @@ export function SettingsView() {
         setKeyExists(false)
         toast.error("Couldn't check for a saved key", { description: String(e) })
       })
+    // Version + data-folder location for the "Your data" card (P0-3). Silent on failure — the card
+    // simply shows without them.
+    ledger.app
+      .info()
+      .then(setAppInfo)
+      .catch(() => setAppInfo(null))
+    // AI spend totals (P0-4) — refreshed each time Settings mounts.
+    ledger.usage
+      .summary()
+      .then(setUsage)
+      .catch(() => setUsage(null))
   }, [])
+
+  async function backupNow(): Promise<void> {
+    if (backingUp) return
+    setBackingUp(true)
+    try {
+      const res = await ledger.app.backupNow()
+      if (res.ok) toast.success('Backup written', { description: res.path })
+      else toast.error('Backup failed', { description: res.error })
+    } catch (err) {
+      toast.error('Backup failed', { description: String(err) })
+    } finally {
+      setBackingUp(false)
+    }
+  }
+
+  async function importCampaign(): Promise<void> {
+    if (importing) return
+    setImporting(true)
+    try {
+      const res = await ledger.campaign.import()
+      if (res.ok) {
+        useUiStore.getState().bumpCampaigns()
+        useAppStore.getState().setActiveCampaign(res.campaignId)
+        toast.success(`Imported “${res.name}”`, {
+          description: `${res.counts.entities} entities · ${res.counts.notes} notes · ${res.counts.sessions} sessions. Search re-indexes in the background.`
+        })
+      } else if (!('canceled' in res)) {
+        toast.error('Import failed', { description: res.error })
+      }
+    } catch (err) {
+      toast.error('Import failed', { description: String(err) })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   async function saveKey() {
     const k = keyInput.trim()
@@ -180,8 +245,8 @@ export function SettingsView() {
       <section className="space-y-3">
         <h2 className="font-display text-lg font-medium text-foreground">Counsel model</h2>
         <p className="text-sm text-muted-foreground">
-          The model and reasoning depth behind Counsel, Converse, and text extraction. Opus reasons best;
-          higher effort is richer but slower at the table.
+          The model and reasoning depth behind Counsel and Converse. Opus reasons best; higher effort is
+          richer but slower at the table.
         </p>
         <div className="flex flex-wrap gap-4">
           <div className="space-y-1.5">
@@ -211,6 +276,50 @@ export function SettingsView() {
               <SelectContent>
                 <SelectItem value="high">High (default)</SelectItem>
                 <SelectItem value="medium">Medium (faster)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium text-foreground">Extraction model</h2>
+        <p className="text-sm text-muted-foreground">
+          Reads your chronicle at close-out, Transcribe, and Illuminate, proposing entities, notes, and
+          changes for review. Structured work with a safety net — a cheaper model at medium effort keeps
+          close-outs inexpensive with little quality loss.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <div className="space-y-1.5">
+            <span className="block text-xs text-muted-foreground">Model</span>
+            <Select
+              value={settings?.extractionModel ?? 'claude-sonnet-4-6'}
+              onValueChange={(v) => update({ extractionModel: v as AppSettings['extractionModel'] })}
+            >
+              <SelectTrigger className="w-72">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claude-sonnet-4-6">Claude Sonnet 4.6 (default)</SelectItem>
+                <SelectItem value="claude-opus-4-8">Claude Opus 4.8 (highest quality)</SelectItem>
+                <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5 (cheapest)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <span className="block text-xs text-muted-foreground">Effort</span>
+            <Select
+              value={settings?.extractionEffort ?? 'medium'}
+              onValueChange={(v) => update({ extractionEffort: v as AppSettings['extractionEffort'] })}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="medium">Medium (default)</SelectItem>
+                <SelectItem value="high">High (richer)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -254,22 +363,103 @@ export function SettingsView() {
       <Separator />
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-medium text-foreground">Export campaign</h2>
+        <h2 className="font-display text-lg font-medium text-foreground">Export &amp; import</h2>
         <p className="text-sm text-muted-foreground">
           Save the active campaign to a JSON file — a portable backup of every entity, note, link,
-          session, and event. (Search embeddings are omitted; they rebuild automatically on load.)
+          session, and event — or restore one to move a campaign between machines. (Search embeddings
+          rebuild automatically after import.)
         </p>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={exportCampaign}
-          disabled={!activeCampaignId || exporting}
-        >
-          <FileDown className="size-4" />
-          {exporting ? 'Exporting…' : 'Export to JSON'}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={exportCampaign}
+            disabled={!activeCampaignId || exporting}
+          >
+            <FileDown className="size-4" />
+            {exporting ? 'Exporting…' : 'Export to JSON'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void importCampaign()}
+            disabled={importing}
+          >
+            <FileUp className="size-4" />
+            {importing ? 'Importing…' : 'Import from JSON'}
+          </Button>
+        </div>
         {!activeCampaignId && (
-          <p className="text-xs text-muted-foreground">Select a campaign first.</p>
+          <p className="text-xs text-muted-foreground">Select a campaign to export.</p>
+        )}
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium text-foreground">Your data</h2>
+        <p className="text-sm text-muted-foreground">
+          Everything lives on this device. Ledger snapshots the database on every launch (the five
+          newest are kept in the backups folder) — take one on demand before anything you might
+          regret.
+        </p>
+        {appInfo && (
+          <p className="break-all font-mono text-xs text-muted-foreground">{appInfo.dataDir}</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => void backupNow()} disabled={backingUp}>
+            <DatabaseBackup className="size-4" />
+            {backingUp ? 'Backing up…' : 'Back up now'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void ledger.app.openDataFolder()}>
+            <FolderOpen className="size-4" />
+            Open data folder
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void ledger.app.openLogsFolder()}>
+            <ScrollText className="size-4" />
+            Open logs
+          </Button>
+        </div>
+        {appInfo && (
+          <p className="pt-1 text-xs text-muted-foreground">Ledger v{appInfo.version}</p>
+        )}
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium text-foreground">AI usage</h2>
+        <p className="text-sm text-muted-foreground">
+          Estimated spend on your Anthropic key, tracked locally per call. The API bills the truth —
+          this exists so a close-out is never a surprise.
+        </p>
+        {usage ? (
+          <div className="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+            <p className="text-foreground">
+              This month ({usage.monthKey}): <strong>{formatUsd(usage.monthUsd)}</strong> across{' '}
+              {usage.monthCalls} {usage.monthCalls === 1 ? 'call' : 'calls'}
+            </p>
+            {Object.entries(usage.byFeature).length > 0 && (
+              <ul className="space-y-0.5 text-xs text-muted-foreground">
+                {(Object.entries(usage.byFeature) as [AiFeature, { calls: number; usd: number }][])
+                  .sort((a, b) => b[1].usd - a[1].usd)
+                  .map(([feature, f]) => (
+                    <li key={feature} className="flex justify-between">
+                      <span>{AI_FEATURE_LABELS[feature] ?? feature}</span>
+                      <span className="font-mono">
+                        {formatUsd(f.usd)} · {f.calls}×
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            )}
+            <p className="border-t border-border pt-1.5 text-xs text-muted-foreground">
+              Lifetime: {formatUsd(usage.lifetimeUsd)} across {usage.lifetimeCalls}{' '}
+              {usage.lifetimeCalls === 1 ? 'call' : 'calls'}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No usage recorded yet.</p>
         )}
       </section>
     </PaneShell>

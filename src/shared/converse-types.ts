@@ -5,6 +5,8 @@
 // service reasons over what the party knows/suspects/doesn't internally and emits only the questions
 // (ADR-034). Like Suggest, it's single-shot (request/response, not streaming) and structured (ADR-008/009).
 
+import type { AiRunCost } from './usage-types'
+
 export interface ConverseRequest {
   campaignId: string
   /** The asker — the in-character POV. Requires an active PC (+ persona), like Suggest/Counsel. */
@@ -127,5 +129,5 @@ export type ConverseFailureReason =
  * 'no_model' reason — Converse grounds by DIRECT FETCH, not semantic search, so it needs no local model.
  */
 export type ConverseResult =
-  | { ok: true; questions: ConverseQuestion[] }
+  | { ok: true; questions: ConverseQuestion[]; cost?: AiRunCost }
   | { ok: false; reason: ConverseFailureReason; message?: string }

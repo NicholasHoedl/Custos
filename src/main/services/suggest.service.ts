@@ -14,6 +14,7 @@ import {
 } from '@shared/suggest-types'
 import type { Entity, Lifecycle } from '@shared/entity-types'
 import type { RelationshipView } from '@shared/graph-types'
+import { addRunCost, type AiRunCost } from '@shared/usage-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import type { RetrievedChunk, VectorStore } from './vector-store.service'
@@ -246,6 +247,7 @@ export async function suggest(
         .filter((p) => p.id !== pcId)
         .map((p) => ({ name: p.name }))
       const threads = formatCampaignThreads(openQuests, otherPcs)
+      let cost: AiRunCost | undefined // sums across the retry (P0-4)
       const callOnce = (): Promise<StorySuggestion[]> =>
         claudeSuggestDirections({
           situation,
@@ -257,15 +259,17 @@ export async function suggest(
           context,
           model: suggestModel,
           effort: suggestEffort,
+          onUsage: (c) => (cost = addRunCost(cost, c)),
           signal
         })
       // One retry: the model occasionally returns too few usable suggestions.
       let suggestions = validateDirections(await callOnce())
       if (!suggestions) suggestions = validateDirections(await callOnce())
       if (!suggestions) return fail('invalid')
-      return { ok: true, mode: 'directions', suggestions }
+      return { ok: true, mode: 'directions', suggestions, cost }
     }
 
+    let cost: AiRunCost | undefined // sums across the retry (P0-4)
     const callOnce = (): Promise<MomentSuggestion[]> =>
       claudeSuggest({
         situation,
@@ -277,13 +281,14 @@ export async function suggest(
         context,
         model: suggestModel,
         effort: suggestEffort,
+        onUsage: (c) => (cost = addRunCost(cost, c)),
         signal
       })
     // One retry: the model occasionally returns fewer than 6 or a duplicate primary tag.
     let recs = validateMoment(await callOnce())
     if (!recs) recs = validateMoment(await callOnce())
     if (!recs) return fail('invalid')
-    return { ok: true, mode: 'attitudes', recommendations: recs }
+    return { ok: true, mode: 'attitudes', recommendations: recs, cost }
   } catch (err) {
     if (signal.aborted) return fail('unknown')
     return {

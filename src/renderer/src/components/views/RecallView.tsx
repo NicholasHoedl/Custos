@@ -11,6 +11,7 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { PromptStarters } from '@renderer/components/recall/PromptStarters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
+import { formatRunCost } from '@renderer/lib/format'
 import {
   Banner,
   EmptyState,
@@ -162,6 +163,12 @@ export function RecallView() {
         )}
 
         {recall.sources.length > 0 && <Sources sources={recall.sources} />}
+
+        {recall.status === 'done' && recall.cost && (
+          <p className="text-right font-mono text-[10px] text-muted-foreground">
+            {formatRunCost(recall.cost)}
+          </p>
+        )}
       </div>
     </PaneShell>
   )

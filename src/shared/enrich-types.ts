@@ -11,6 +11,7 @@ import type {
   ProposedRelationshipChange,
   RawExtraction
 } from './import-types'
+import type { AiRunCost } from './usage-types'
 
 /** One entity a session's notes touched — a pre-flight checklist row. */
 export interface TouchedEntity {
@@ -40,5 +41,6 @@ export type EnrichEntityResult =
       ok: true
       relationshipChanges: ProposedRelationshipChange[]
       fieldChanges: ProposedFieldChange[]
+      cost?: AiRunCost
     }
   | { ok: false; reason: ExtractFailureReason; message?: string }

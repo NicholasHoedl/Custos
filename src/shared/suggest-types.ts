@@ -3,6 +3,7 @@
 // returns a structured set of recommendations (ADR-008, ADR-009).
 
 import type { SceneContext } from './scene-types'
+import type { AiRunCost } from './usage-types'
 
 // The "in the moment" tag vocabulary. Each suggestion gets ONE primary tag (its dominant flavor) plus
 // up to two secondary tags, drawn from this pool. Disposition tags describe the KIND of move; the
@@ -191,6 +192,6 @@ export type SuggestFailureReason =
  * failure, a reason the renderer can render without try/catch (mirrors RecallDone.reason).
  */
 export type SuggestResult =
-  | { ok: true; mode: 'attitudes'; recommendations: MomentSuggestion[] }
-  | { ok: true; mode: 'directions'; suggestions: StorySuggestion[] }
+  | { ok: true; mode: 'attitudes'; recommendations: MomentSuggestion[]; cost?: AiRunCost }
+  | { ok: true; mode: 'directions'; suggestions: StorySuggestion[]; cost?: AiRunCost }
   | { ok: false; reason: SuggestFailureReason; message?: string }

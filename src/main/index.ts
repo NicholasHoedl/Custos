@@ -6,12 +6,14 @@ import { APP_ID, APP_NAME, DEFAULT_HOTKEY } from '@shared/constants'
 import { QUICK_ADD_FOCUS_CHANNEL } from '@shared/ipc-types'
 import { getDb, dbHealthCheck, closeDb } from './db'
 import { registerIpcHandlers } from './ipc/handlers'
+import { loadWindowState, trackWindowState } from './window-state'
 import { warm } from './services/embedding.service'
 import icon from '../../resources/icon.png?asset'
 
 app.setName(APP_NAME)
-// Persistent main-process log (T2): userData/logs/main.log (1 MiB rotation). Main-only — no
-// log.initialize() (that wires renderer bridging; the renderer surfaces errors via toasts instead).
+// Persistent main-process log (T2): userData/logs/main.log (1 MiB rotation). No log.initialize()
+// (that wires electron-log's own renderer bridging) — renderer CRASHES reach this log via the typed
+// RENDERER_ERROR_CHANNEL sink (ipc/app.ts, P0-3); ordinary renderer errors still surface as toasts.
 log.transports.file.level = 'info'
 log.transports.console.level = is.dev ? 'silly' : false
 log.errorHandler.startCatching({ showDialog: false }) // uncaught main exceptions land in the log
@@ -19,9 +21,12 @@ log.errorHandler.startCatching({ showDialog: false }) // uncaught main exception
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
+  // Restore the last session's bounds when they still land on a live display (P0-3).
+  const saved = loadWindowState()
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: saved?.bounds.width ?? 1200,
+    height: saved?.bounds.height ?? 800,
+    ...(saved ? { x: saved.bounds.x, y: saved.bounds.y } : {}),
     minWidth: 940,
     minHeight: 640,
     show: false,
@@ -37,6 +42,8 @@ function createWindow(): void {
       nodeIntegration: false
     }
   })
+  if (saved?.maximized) mainWindow.maximize() // before ready-to-show — no un-maximized flash
+  trackWindowState(mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()

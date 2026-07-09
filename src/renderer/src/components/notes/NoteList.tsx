@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { CircleDashed, Pencil, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
 import { NOTE_CONFIDENCE_LABELS, type Note } from '@shared/entity-types'
-import { ledger } from '@renderer/lib/ipc'
 import { formatTimestamp } from '@renderer/lib/format'
 import { NoteEditDialog } from './NoteEditDialog'
+import { DeleteNoteDialog } from './DeleteNoteDialog'
 
 // Read + edit + delete list of an entity's annals, shared by EntityDetail and the Character dashboard
 // (ADR-032) — both were delete-only, so fixing a note's typo meant hunting it down in the Annals view.
+// Deletion confirms via the shared DeleteNoteDialog (P0-1).
 export function NoteList({
   notes,
   onChanged,
@@ -18,15 +18,7 @@ export function NoteList({
   emptyText?: string
 }) {
   const [editing, setEditing] = useState<Note | null>(null)
-
-  async function remove(id: string): Promise<void> {
-    try {
-      await ledger.note.delete(id)
-      onChanged()
-    } catch (err) {
-      toast.error('Could not delete note', { description: String(err) })
-    }
-  }
+  const [confirmingDelete, setConfirmingDelete] = useState<Note | null>(null)
 
   if (notes.length === 0) {
     return <p className="text-xs text-muted-foreground">{emptyText}</p>
@@ -50,7 +42,8 @@ export function NoteList({
                 </span>
               )}
             </div>
-            <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            {/* Revealed on hover OR keyboard focus (P0-1) — hover-only actions are invisible to tab users. */}
+            <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
               <button
                 onClick={() => setEditing(n)}
                 className="rounded p-1 text-muted-foreground hover:text-foreground"
@@ -59,7 +52,7 @@ export function NoteList({
                 <Pencil className="size-3.5" />
               </button>
               <button
-                onClick={() => void remove(n.id)}
+                onClick={() => setConfirmingDelete(n)}
                 className="rounded p-1 text-muted-foreground hover:text-destructive"
                 aria-label="Delete note"
               >
@@ -79,6 +72,13 @@ export function NoteList({
           onSaved={onChanged}
         />
       )}
+      <DeleteNoteDialog
+        note={confirmingDelete}
+        onOpenChange={(o) => {
+          if (!o) setConfirmingDelete(null)
+        }}
+        onDeleted={() => onChanged()}
+      />
     </>
   )
 }

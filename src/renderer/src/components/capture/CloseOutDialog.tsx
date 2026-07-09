@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Loader2, Sparkles } from 'lucide-react'
 import type { Session } from '@shared/entity-types'
+import { addRunCost } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
-import { applySummary, plural } from '@renderer/lib/format'
+import { applySummary, formatRunCost, plural } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useEntities } from '@renderer/hooks/use-ledger'
@@ -112,9 +113,13 @@ export function CloseOutDialog({
   }, [open, step, imp.status])
 
   // E4 — entering Illuminate: scan the session's (now freshly written) notes for touched entities.
+  // Entities tier 1 JUST created start unchecked (their profiles were derived from this same log
+  // seconds ago — enriching them again is near-redundant; ADR-035 cost tuning). Still checkable.
   useEffect(() => {
-    if (open && step === 'illuminate' && enrich.phase === 'idle') enrichScan()
-  }, [open, step, enrich.phase, enrichScan])
+    if (open && step === 'illuminate' && enrich.phase === 'idle') {
+      enrichScan({ defaultUnchecked: imp.result?.createdEntityIds ?? [] })
+    }
+  }, [open, step, enrich.phase, enrichScan, imp.result])
 
   // E5 — tier 2 finished (applied, or a clean nothing-new sweep): show the summary.
   useEffect(() => {
@@ -126,6 +131,13 @@ export function CloseOutDialog({
   const tier1Failed = imp.status === 'error' || tier1Reason !== null
   const tier1Reviewing = imp.status === 'review' || imp.status === 'applying'
   const running = enrich.phase === 'running'
+  // Whether the checklist contains rows tier 1 just created (default-unchecked — explain why).
+  const freshIds = new Set(imp.result?.createdEntityIds ?? [])
+  const hasFresh = enrich.touched.some((t) => freshIds.has(t.entityId))
+  // Both tiers' spend, for the summary (P0-4). addRunCost tolerates either being absent.
+  const totalCost = enrich.cost
+    ? addRunCost(imp.cost ?? undefined, enrich.cost)
+    : (imp.cost ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, usd: 0 })
 
   return (
     <>
@@ -234,6 +246,12 @@ export function CloseOutDialog({
                   </>
                 ) : (
                   <>
+                    {hasFresh && (
+                      <p className="text-xs text-muted-foreground">
+                        Newly inscribed entities start unchecked — their profiles were just drawn from
+                        this log.
+                      </p>
+                    )}
                     <div className="max-h-[60vh] space-y-1.5 overflow-y-auto pr-1">
                       {enrich.touched.map((t) => (
                         <ChecklistRow
@@ -340,6 +358,11 @@ export function CloseOutDialog({
                     Skipped a {s.kind}: {s.reason}
                   </p>
                 ))}
+                {(imp.cost || enrich.cost) && (
+                  <p className="pt-1 font-mono text-[10px] text-muted-foreground">
+                    This close-out used {formatRunCost(totalCost)}
+                  </p>
+                )}
               </div>
               <DialogFooter>
                 <Button size="sm" onClick={() => onOpenChange(false)}>

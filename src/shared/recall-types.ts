@@ -1,4 +1,5 @@
 import type { EntityType } from './entity-types'
+import type { AiRunCost } from './usage-types'
 
 // Shared types for Phase 2 Recall: the streaming request/response contract and the persona brief.
 
@@ -40,6 +41,8 @@ export interface RecallDone {
   mode: RecallMode
   sources: RecallSource[]
   reason: RecallReason
+  /** Per-run token/price readout (P0-4); absent on the no-op paths (offline/no_key/no_model). */
+  cost?: AiRunCost
 }
 
 export type RecallErrorKind = 'offline' | 'no_key' | 'bad_key' | 'no_model' | 'api' | 'unknown'

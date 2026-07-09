@@ -47,7 +47,8 @@ session's **touched entities** (derived from `listNotesForSession`'s entityIds w
 chronicle events never carry an entityId in practice, so notes are the record). Each checked entity gets
 **one focused model call** (`enrich.service.enrichEntity` → `enrichChangeset`) grounded in its **full
 note history** (newest 30, rendered oldest-first), current profile, live ties (id-bearing lines — a
-sever must reference the far endpoint by real id), and the roster. The model proposes ONLY
+sever must reference the far endpoint by real id), and a **slim roster** (see cost tuning below). The
+model proposes ONLY
 `relationshipChanges` + `fieldChanges`, referencing **real ids** (never `#index`; never new
 entities/notes/status; never name/type changes). The renderer sequences the calls (progress per row;
 cancel between entities; a key/offline failure aborts the remainder), **merges** proposals (cross-entity
@@ -77,6 +78,24 @@ failure). Re-running Illuminate is safe: the ADR-031 dedup rules drop everything
 **Naming.** User-facing label **"Illuminate"** (the illuminated-manuscript register beside
 Chronicle/Codex/Annals); code name `enrich` everywhere (`enrich.service`, `ipc/enrich`, `enrich:*`
 channels, `use-enrich`, `EnrichDialog`) — the same label↔code split as Transcribe↔import.
+
+**Cost tuning (as-built revision — a live close-out ran ~$1 on the original knobs).** Three levers,
+none touching the quality story (the closed schemas + validators + review gate are the safety net):
+1. **Dedicated `extractionModel`/`extractionEffort` settings** (default **Sonnet 4.6 at `medium`**,
+   Settings gains an "Extraction model" section with a Haiku option) — both extraction tiers had been
+   riding Counsel's `suggestModel`/`suggestEffort` (Opus at `high`), paying the marquee-reasoning price
+   for structured data-entry. Counsel/Converse keep their own knobs; the backstory 'full' extraction
+   shares the extraction knobs (same task shape, same net). No migration (settings merge grandfathers).
+2. **Slim enrich roster** — the per-entity prompt carried the full campaign roster (cap 100, UUID-bearing
+   lines). Now: current tie endpoints (a sever must reference them) + entities NAMED in the grounding
+   notes, cap 25 (`ENRICH_ROSTER_CAP`). A tie to a never-mentioned entity would be ungrounded by
+   definition; the validator stays permissive over the full campaign.
+3. **Close-out checklist defaults** — entities tier 1 *just created* in the same wizard run start
+   UNCHECKED (`use-enrich.scan({defaultUnchecked})` fed by `imp.result.createdEntityIds`): their
+   profiles were derived from the same log seconds earlier, so an immediate sweep is near-redundant.
+   Still checkable; the standalone EnrichDialog passes nothing and is unchanged.
+Expected: ~$1 → ~$0.15–0.30 per close-out at the defaults; the review gate makes any quality drift
+visible immediately, and the settings dropdown makes reverting to Opus one click.
 
 ## Consequences
 

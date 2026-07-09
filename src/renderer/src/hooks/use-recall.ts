@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RecallMode, RecallReason, RecallSource } from '@shared/recall-types'
+import type { AiRunCost } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/app-store'
 
@@ -10,10 +11,18 @@ interface RecallState {
   answer: string
   sources: RecallSource[]
   reason: RecallReason | null
+  cost: AiRunCost | null
   error: { message: string; kind: string } | null
 }
 
-const IDLE: RecallState = { status: 'idle', answer: '', sources: [], reason: null, error: null }
+const IDLE: RecallState = {
+  status: 'idle',
+  answer: '',
+  sources: [],
+  reason: null,
+  cost: null,
+  error: null
+}
 
 export function useRecall(): RecallState & {
   ask: (query: string, mode: RecallMode, asOfSession?: number) => void
@@ -53,7 +62,13 @@ export function useRecall(): RecallState & {
     const offDone = ledger.onRecallDone((done) => {
       if (done.requestId !== reqId.current) return
       flush()
-      setState((s) => ({ ...s, status: 'done', sources: done.sources, reason: done.reason }))
+      setState((s) => ({
+        ...s,
+        status: 'done',
+        sources: done.sources,
+        reason: done.reason,
+        cost: done.cost ?? null
+      }))
     })
     const offError = ledger.onRecallError((err) => {
       if (err.requestId !== reqId.current) return
@@ -73,7 +88,7 @@ export function useRecall(): RecallState & {
       const requestId = crypto.randomUUID()
       reqId.current = requestId
       buffer.current = ''
-      setState({ status: 'streaming', answer: '', sources: [], reason: null, error: null })
+      setState({ status: 'streaming', answer: '', sources: [], reason: null, cost: null, error: null })
       ledger.recall
         .query({
           requestId,

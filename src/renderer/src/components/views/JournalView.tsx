@@ -1,6 +1,7 @@
 import { useSessions } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { OnboardingChecklist } from '@renderer/components/OnboardingChecklist'
+import { LoopExplainer } from '@renderer/components/onboarding/LoopExplainer'
 import { EventFeed } from '@renderer/components/capture/EventFeed'
 
 // The Journal is the primary at-the-table view: a running log of plain entries (no per-entry AI —
@@ -25,7 +26,14 @@ export function JournalView() {
     )
   }
 
-  // Key by campaign so per-campaign UI state (open dialogs, composer text) never survives a campaign
-  // switch. Mirrors how CaptureView keys its panels.
-  return <EventFeed key={activeCampaignId} sessionId={activeSessionId} restoring={restoringSession} />
+  // The one-time loop explainer (P1-3) rides above the feed; it self-hides once dismissed. Key EventFeed
+  // by campaign so per-campaign UI state (open dialogs, composer text) never survives a campaign switch.
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <LoopExplainer />
+      <div className="min-h-0 flex-1">
+        <EventFeed key={activeCampaignId} sessionId={activeSessionId} restoring={restoringSession} />
+      </div>
+    </div>
+  )
 }

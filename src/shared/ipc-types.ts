@@ -28,7 +28,8 @@ import type { SuggestRequest, SuggestResult } from './suggest-types'
 import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
 import type { ApplyResult, ConfirmedChangeset, ExtractRequest, ExtractResult } from './import-types'
 import type { EnrichEntityRequest, EnrichEntityResult, TouchedEntity } from './enrich-types'
-import type { CampaignExportResult } from './export-types'
+import type { CampaignExportResult, CampaignImportResult } from './export-types'
+import type { UsageSummary } from './usage-types'
 
 // ---- Input payloads ----
 export interface CreateCampaignInput {
@@ -103,6 +104,9 @@ export interface CreateEventInput {
   content: string
   entityId?: string
 }
+export interface UpdateEventInput {
+  content: string
+}
 export interface CreateLinkInput {
   campaignId: string
   fromEntityId: string
@@ -145,8 +149,10 @@ export interface LedgerApi {
     create(input: CreateCampaignInput): Promise<Campaign>
     update(id: string, patch: UpdateCampaignInput): Promise<Campaign>
     delete(id: string): Promise<void>
-    /** Serialize the campaign to a JSON file via a save dialog (export-only, backup + portability). */
+    /** Serialize the campaign to a JSON file via a save dialog (backup + portability). */
     export(campaignId: string): Promise<CampaignExportResult>
+    /** Restore a campaign from an export file via an open dialog (P0-2 — ids preserved verbatim). */
+    import(): Promise<CampaignImportResult>
   }
   session: {
     list(campaignId: string): Promise<Session[]>
@@ -154,6 +160,8 @@ export interface LedgerApi {
     create(input: CreateSessionInput): Promise<Session>
     update(id: string, patch: UpdateSessionInput): Promise<Session>
     delete(id: string): Promise<void>
+    /** Per-session count of chronicle entries added since the last close-out (P1-2); sparse map. */
+    unclosed(campaignId: string): Promise<Record<string, number>>
   }
   entity: {
     list(campaignId: string, type?: EntityType): Promise<Entity[]>
@@ -174,6 +182,9 @@ export interface LedgerApi {
   event: {
     list(sessionId: string): Promise<EventLogEntry[]>
     create(input: CreateEventInput): Promise<EventLogEntry>
+    /** Edit a chronicle entry's content (P1-4). Timestamp/position unchanged. */
+    update(id: string, patch: UpdateEventInput): Promise<EventLogEntry>
+    delete(id: string): Promise<void>
   }
   link: {
     create(input: CreateLinkInput): Promise<EntityLink>
@@ -238,6 +249,22 @@ export interface LedgerApi {
     downloadModel(): Promise<void>
     reindex(): Promise<number>
   }
+  app: {
+    /** Version + data-folder location (Settings "Your data" card — P0-3). */
+    info(): Promise<AppInfo>
+    openDataFolder(): Promise<void>
+    openLogsFolder(): Promise<void>
+    /** On-demand snapshot — the same WAL-safe VACUUM INTO as the launch backup (P0-2). */
+    backupNow(): Promise<BackupNowResult>
+  }
+  log: {
+    /** Fire-and-forget: renderer crashes land in the main-process log (P0-3). */
+    rendererError(report: RendererErrorReport): void
+  }
+  usage: {
+    /** AI spend totals for the Settings card: this month + lifetime, per feature (P0-4). */
+    summary(): Promise<UsageSummary>
+  }
   /** Subscribe to the main process asking the renderer to focus quick-add (global hotkey / Ctrl+K). */
   onQuickAddFocus(callback: () => void): () => void
   /** Streaming Recall events (filter by requestId in the renderer). Each returns an unsubscribe fn. */
@@ -259,11 +286,13 @@ export const IPC = {
   campaignUpdate: 'campaign:update',
   campaignDelete: 'campaign:delete',
   campaignExport: 'campaign:export',
+  campaignImport: 'campaign:import',
   sessionList: 'session:list',
   sessionGet: 'session:get',
   sessionCreate: 'session:create',
   sessionUpdate: 'session:update',
   sessionDelete: 'session:delete',
+  sessionUnclosed: 'session:unclosed',
   entityList: 'entity:list',
   entityGet: 'entity:get',
   entityCreate: 'entity:create',
@@ -277,6 +306,8 @@ export const IPC = {
   noteDelete: 'note:delete',
   eventList: 'event:list',
   eventCreate: 'event:create',
+  eventUpdate: 'event:update',
+  eventDelete: 'event:delete',
   linkCreate: 'link:create',
   linkUpdate: 'link:update',
   linkSever: 'link:sever',
@@ -307,11 +338,35 @@ export const IPC = {
   personaUpdate: 'persona:update',
   onboardingStatus: 'onboarding:status',
   modelDownload: 'onboarding:download-model',
-  onboardingReindex: 'onboarding:reindex'
+  onboardingReindex: 'onboarding:reindex',
+  appInfo: 'app:info',
+  appOpenDataFolder: 'app:open-data-folder',
+  appOpenLogsFolder: 'app:open-logs-folder',
+  appBackupNow: 'app:backup-now',
+  usageSummary: 'usage:summary'
 } as const
 
 /** One-way channel: main -> renderer, asking the UI to focus the quick-add bar. */
 export const QUICK_ADD_FOCUS_CHANNEL = 'ui:quick-add-focus'
+
+/** One-way channel: renderer -> main, forwarding renderer crashes into userData/logs/main.log
+ *  (ROADMAP P0-3 — a packaged app has no devtools console, so these were previously lost). */
+export const RENDERER_ERROR_CHANNEL = 'log:renderer-error'
+
+/** A renderer-side crash/rejection forwarded to the main-process log. */
+export interface RendererErrorReport {
+  message: string
+  stack?: string
+  source: 'error-boundary' | 'window-error' | 'unhandled-rejection'
+}
+
+/** App shell info for the Settings "Your data" card (P0-3). */
+export interface AppInfo {
+  version: string
+  dataDir: string
+}
+
+export type BackupNowResult = { ok: true; path: string } | { ok: false; error: string }
 
 // ---- One-way streaming channels: main -> renderer (Recall). Payloads are requestId-tagged. ----
 export const RECALL_CHUNK_CHANNEL = 'stream:chunk'

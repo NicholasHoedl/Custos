@@ -9,6 +9,7 @@ import {
   RECAP_CHUNK_CHANNEL,
   RECAP_DONE_CHANNEL,
   RECAP_ERROR_CHANNEL,
+  RENDERER_ERROR_CHANNEL,
   type LedgerApi
 } from '@shared/ipc-types'
 
@@ -28,14 +29,16 @@ const api: LedgerApi = {
     create: (input) => ipcRenderer.invoke(IPC.campaignCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.campaignUpdate, id, patch),
     delete: (id) => ipcRenderer.invoke(IPC.campaignDelete, id),
-    export: (campaignId) => ipcRenderer.invoke(IPC.campaignExport, campaignId)
+    export: (campaignId) => ipcRenderer.invoke(IPC.campaignExport, campaignId),
+    import: () => ipcRenderer.invoke(IPC.campaignImport)
   },
   session: {
     list: (campaignId) => ipcRenderer.invoke(IPC.sessionList, campaignId),
     get: (id) => ipcRenderer.invoke(IPC.sessionGet, id),
     create: (input) => ipcRenderer.invoke(IPC.sessionCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.sessionUpdate, id, patch),
-    delete: (id) => ipcRenderer.invoke(IPC.sessionDelete, id)
+    delete: (id) => ipcRenderer.invoke(IPC.sessionDelete, id),
+    unclosed: (campaignId) => ipcRenderer.invoke(IPC.sessionUnclosed, campaignId)
   },
   entity: {
     list: (campaignId, type) => ipcRenderer.invoke(IPC.entityList, campaignId, type),
@@ -54,7 +57,9 @@ const api: LedgerApi = {
   },
   event: {
     list: (sessionId) => ipcRenderer.invoke(IPC.eventList, sessionId),
-    create: (input) => ipcRenderer.invoke(IPC.eventCreate, input)
+    create: (input) => ipcRenderer.invoke(IPC.eventCreate, input),
+    update: (id, patch) => ipcRenderer.invoke(IPC.eventUpdate, id, patch),
+    delete: (id) => ipcRenderer.invoke(IPC.eventDelete, id)
   },
   link: {
     create: (input) => ipcRenderer.invoke(IPC.linkCreate, input),
@@ -114,6 +119,19 @@ const api: LedgerApi = {
     status: () => ipcRenderer.invoke(IPC.onboardingStatus),
     downloadModel: () => ipcRenderer.invoke(IPC.modelDownload),
     reindex: () => ipcRenderer.invoke(IPC.onboardingReindex)
+  },
+  app: {
+    info: () => ipcRenderer.invoke(IPC.appInfo),
+    openDataFolder: () => ipcRenderer.invoke(IPC.appOpenDataFolder),
+    openLogsFolder: () => ipcRenderer.invoke(IPC.appOpenLogsFolder),
+    backupNow: () => ipcRenderer.invoke(IPC.appBackupNow)
+  },
+  log: {
+    // send, not invoke: a crashing renderer must never await its own crash report
+    rendererError: (report) => ipcRenderer.send(RENDERER_ERROR_CHANNEL, report)
+  },
+  usage: {
+    summary: () => ipcRenderer.invoke(IPC.usageSummary)
   },
   onQuickAddFocus: (callback) => {
     const listener = (): void => callback()
