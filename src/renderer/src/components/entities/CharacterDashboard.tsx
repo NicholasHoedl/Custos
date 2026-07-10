@@ -271,6 +271,9 @@ export function CharacterDashboard({
                 Sample lines in their own words — these ground Counsel and Converse.
               </p>
             </Card>
+            <Card>
+              <EntityHistory entityId={mainCharacterId} />
+            </Card>
           </div>
 
           {/* RIGHT — story & voice */}
@@ -315,11 +318,8 @@ export function CharacterDashboard({
           </div>
         </div>
 
-        {/* Full-width secondary: history + notes */}
+        {/* Full-width secondary: notes */}
         <div className="mt-4 space-y-4">
-          <Card>
-            <EntityHistory entityId={mainCharacterId} />
-          </Card>
           <Card title="Annals">
             <NoteList notes={notes} onChanged={refreshNotes} />
           </Card>
