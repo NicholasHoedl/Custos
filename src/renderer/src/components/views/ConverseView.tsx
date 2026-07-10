@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -17,13 +17,15 @@ import {
   CONVERSE_TAG_META,
   converseTagLabel,
   type ConverseFailureReason,
-  type ConverseQuestion
+  type ConverseQuestion,
+  type ConverseResult
 } from '@shared/converse-types'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useConverse } from '@renderer/hooks/use-converse'
 import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
+import { useLensHistory } from '@renderer/hooks/use-lens-history'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
@@ -37,7 +39,9 @@ import {
   CommandList
 } from '@renderer/components/ui/command'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
+import { LensResultBar } from '@renderer/components/lens/LensResultBar'
 import { reasonCopy } from '@renderer/lib/ai-copy'
+import { converseProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
 import { Banner, EmptyState, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
 
@@ -58,6 +62,21 @@ export function ConverseView() {
   const [targetId, setTargetId] = useState<string | null>(null)
   const [thread, setThread] = useState('')
   const [asOf, setAsOf] = useState<number | null>(null)
+  const [asked, setAsked] = useState<{ name: string; focus: string }>({ name: '', focus: '' })
+  const { entries: recent, remember } = useLensHistory()
+  const rememberedRef = useRef<ConverseResult | null>(null)
+
+  // Snapshot the spread into history once it's ready (P1-1).
+  useEffect(() => {
+    const r = converse.result
+    if (converse.status === 'done' && r?.ok && r !== rememberedRef.current) {
+      rememberedRef.current = r
+      remember(
+        `Questions for ${asked.name || 'them'}`,
+        converseProse(asked.name || 'them', asked.focus || undefined, r.questions)
+      )
+    }
+  }, [converse.status, converse.result, asked, remember])
 
   if (!activeCampaignId) {
     return (
@@ -75,9 +94,14 @@ export function ConverseView() {
   const thinking = converse.status === 'thinking'
   const canSubmit = onb.keyReady && hasPc && !thinking && Boolean(targetId)
   const target = entities.find((e) => e.id === targetId) ?? null
+  const prose =
+    converse.status === 'done' && converse.result?.ok
+      ? converseProse(asked.name || 'them', asked.focus || undefined, converse.result.questions)
+      : null
 
   function submit() {
     if (!canSubmit || !targetId) return
+    setAsked({ name: target?.name ?? 'them', focus: thread.trim() })
     converse.ask(targetId, thread, asOf ?? undefined)
   }
 
@@ -146,14 +170,22 @@ export function ConverseView() {
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
-          <Button size="sm" onClick={submit} disabled={!canSubmit}>
-            {thinking ? 'Thinking…' : 'Prepare questions'}
-          </Button>
+          {thinking ? (
+            <Button variant="outline" size="sm" onClick={converse.cancel}>
+              Stop
+            </Button>
+          ) : (
+            <Button size="sm" onClick={submit} disabled={!canSubmit}>
+              Prepare questions
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto">
-        {converse.status === 'idle' && (
+        {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+
+        {converse.status === 'idle' && recent.length === 0 && (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
             Pick who your character wants to talk with. The Keeper readies a spread of questions to ask
             — in your character&apos;s voice, from safe openers to pointed probes.

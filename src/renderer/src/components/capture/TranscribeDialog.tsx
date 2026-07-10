@@ -133,10 +133,16 @@ export function TranscribeDialog({
                 {text.length.toLocaleString()} characters
                 {text.length > 20000 ? ' — long pastes cost more and may be truncated' : ''}
               </span>
-              <Button size="sm" onClick={() => imp.extract(text)} disabled={extracting || !text.trim()}>
-                <FileText className="size-3.5" />
-                {extracting ? 'Reading…' : 'Transcribe'}
-              </Button>
+              {extracting ? (
+                <Button variant="outline" size="sm" onClick={imp.cancel}>
+                  Stop
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => imp.extract(text)} disabled={!text.trim()}>
+                  <FileText className="size-3.5" />
+                  Transcribe
+                </Button>
+              )}
             </div>
             {imp.status === 'error' && (
               <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">

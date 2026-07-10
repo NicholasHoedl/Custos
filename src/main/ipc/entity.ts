@@ -6,6 +6,7 @@ import type { VectorStore } from '../services/vector-store.service'
 import { indexEntity } from '../services/embedding-index.service'
 import { markStaleIfChanged } from '../services/persona.service'
 import { getEntityHistory } from '../services/chronology.service'
+import { mergeEntities } from '../services/merge.service'
 import * as svc from '../services/entity.service'
 
 export function registerEntityHandlers(ctx: DbContext, store: VectorStore): void {
@@ -26,4 +27,11 @@ export function registerEntityHandlers(ctx: DbContext, store: VectorStore): void
   })
   ipcMain.handle(IPC.entityDelete, (_e, id: string) => svc.deleteEntity(ctx, id))
   ipcMain.handle(IPC.entityHistory, (_e, id: string) => getEntityHistory(ctx, id))
+  // Merge (P1-6, re-point only): the loser's notes/ties/chronology move to the survivor, then it's
+  // deleted. Re-embed the survivor to be safe (a no-op via the hash guard — its text is unchanged).
+  ipcMain.handle(IPC.entityMerge, (_e, survivorId: string, loserId: string) => {
+    const survivor = mergeEntities(ctx, { survivorId, loserId })
+    indexEntity(ctx, store, survivorId) // hash-guarded no-op; keeps the seam honest if that ever changes
+    return survivor
+  })
 }

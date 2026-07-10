@@ -49,6 +49,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [035](035-two-tier-extraction.md) | Two-tier extraction: 'capture' note-taker (entities+notes+status) + per-entity "Illuminate" enrichment from full note history | Accepted | 2026-07-08 |
 | [036](036-chronicle-header-consolidation.md) | Chronicle-header consolidation: Transcribe becomes a header dialog; the session selector moves out of the Sidebar (revises ADR-032) | Accepted | 2026-07-08 |
 | [037](037-session-integrity.md) | Session integrity: a derived "unclosed" signal (no stamp column) + editable chronicle entries | Accepted | 2026-07-09 |
+| [038](038-entity-merge.md) | Entity merge: re-point only, cascade-swept dedup (no explicit pre-delete) | Accepted | 2026-07-09 |
 
 ## Status legend
 

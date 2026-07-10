@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { Pencil, Skull, Trash2 } from 'lucide-react'
+import { Combine, Pencil, Skull, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
@@ -11,6 +11,7 @@ import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { NoteList } from '@renderer/components/notes/NoteList'
 import { EntityForm } from './EntityForm'
+import { MergeEntityDialog } from './MergeEntityDialog'
 import { RelationshipEditor } from './RelationshipEditor'
 import { EntityHistory } from './EntityHistory'
 import { Button } from '@renderer/components/ui/button'
@@ -41,6 +42,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
   const [hierarchy, setHierarchy] = useState<HierarchyView | null>(null)
 
   const isHierarchical = entity?.type === 'location' || entity?.type === 'faction'
@@ -134,6 +136,16 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setMergeOpen(true)}
+            className="text-muted-foreground"
+            title="Merge a duplicate of this entity into another"
+          >
+            <Combine className="size-3.5" />
+            Merge
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setDeleteOpen(true)}
             className="text-muted-foreground hover:border-destructive/50 hover:text-destructive"
           >
@@ -188,6 +200,18 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
         onSaved={() => {
           refreshEntity()
           onEntityChanged()
+        }}
+      />
+
+      <MergeEntityDialog
+        loser={entity}
+        allEntities={allEntities}
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        onMerged={(survivorId) => {
+          setMergeOpen(false)
+          onEntityChanged() // drop the loser from the browser list
+          setSelectedEntity(survivorId) // navigate to the survivor
         }}
       />
 

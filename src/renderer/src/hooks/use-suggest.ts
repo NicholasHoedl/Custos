@@ -20,23 +20,29 @@ const IDLE: SuggestState = { status: 'idle', result: null, error: null }
  */
 export function useSuggest(): SuggestState & {
   ask: (situation: string, mode: SuggestMode, asOfSession?: number, goal?: string) => void
+  cancel: () => void
   reset: () => void
 } {
   const [state, setState] = useState<SuggestState>(IDLE)
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
   const scene = useAppStore((s) => s.scene)
-  // Token to drop a stale in-flight result if the user resets or re-asks (e.g. toggles mode) first.
+  // Token to drop a stale in-flight result if the user cancels, resets, or re-asks first.
   const reqRef = useRef(0)
+  // The current call's requestId — lets cancel() abort the main-process call (P1-5).
+  const requestIdRef = useRef<string | null>(null)
 
   const ask = useCallback(
     (situation: string, mode: SuggestMode, asOfSession?: number, goal?: string) => {
       if (!activeCampaignId || !activePcId) return
       if (mode === 'attitudes' && !situation.trim()) return
       const token = ++reqRef.current
+      const requestId = crypto.randomUUID()
+      requestIdRef.current = requestId
       setState({ status: 'thinking', result: null, error: null })
       ledger.suggest
         .query({
+          requestId,
           campaignId: activeCampaignId,
           pcId: activePcId,
           situation: situation.trim(),
@@ -56,10 +62,18 @@ export function useSuggest(): SuggestState & {
     [activeCampaignId, activePcId, scene]
   )
 
-  const reset = useCallback(() => {
+  // Abort the in-flight call (frees the model spend) and drop back to idle — the bumped token means the
+  // aborted promise's rejection is ignored, so this reads as "stopped", not an error.
+  const cancel = useCallback(() => {
     reqRef.current++
+    if (requestIdRef.current) ledger.suggest.cancel(requestIdRef.current)
+    requestIdRef.current = null
     setState(IDLE)
   }, [])
 
-  return { ...state, ask, reset }
+  const reset = useCallback(() => {
+    cancel()
+  }, [cancel])
+
+  return { ...state, ask, cancel, reset }
 }

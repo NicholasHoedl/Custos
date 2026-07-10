@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   BookOpen,
@@ -29,20 +29,24 @@ import {
   type SuggestCategory,
   type SuggestFailureReason,
   type SuggestMode,
-  type SuggestPillar
+  type SuggestPillar,
+  type SuggestResult
 } from '@shared/suggest-types'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useSuggest } from '@renderer/hooks/use-suggest'
 import { useSessions } from '@renderer/hooks/use-ledger'
+import { useLensHistory } from '@renderer/hooks/use-lens-history'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { SceneControls } from '@renderer/components/scene/SceneControls'
+import { LensResultBar } from '@renderer/components/lens/LensResultBar'
 import { reasonCopy } from '@renderer/lib/ai-copy'
+import { directionsProse, momentsProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
 import {
   Banner,
@@ -75,6 +79,30 @@ export function SuggestView() {
   const { sessions } = useSessions(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
   const [goal, setGoal] = useState('')
+  const [asked, setAsked] = useState('')
+  const { entries: recent, remember } = useLensHistory()
+  const rememberedRef = useRef<SuggestResult | null>(null)
+
+  // Prose for the current result (Copy/Inscribe), and a snapshot into history once it's done (P1-1).
+  const prose =
+    suggest.status === 'done' && suggest.result?.ok
+      ? suggest.result.mode === 'attitudes'
+        ? momentsProse(asked, suggest.result.recommendations)
+        : directionsProse(asked, suggest.result.suggestions)
+      : null
+  useEffect(() => {
+    const r = suggest.result
+    if (suggest.status === 'done' && r?.ok && r !== rememberedRef.current) {
+      rememberedRef.current = r
+      const label = asked || (r.mode === 'attitudes' ? 'In the moment' : 'What’s next')
+      remember(
+        label,
+        r.mode === 'attitudes'
+          ? momentsProse(asked, r.recommendations)
+          : directionsProse(asked, r.suggestions)
+      )
+    }
+  }, [suggest.status, suggest.result, asked, remember])
 
   // Switching mode clears any stale result so the output always matches the selected mode.
   function changeMode(m: SuggestMode) {
@@ -102,6 +130,7 @@ export function SuggestView() {
 
   function submit() {
     if (!canSubmit) return
+    setAsked(situation.trim())
     suggest.ask(situation, mode, asOf ?? undefined, goal)
   }
 
@@ -217,9 +246,15 @@ export function SuggestView() {
                 <ModeToggle mode={mode} setMode={changeMode} />
                 <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
               </div>
-              <Button size="sm" onClick={submit} disabled={!canSubmit}>
-                {thinking ? 'Thinking…' : 'Seek counsel'}
-              </Button>
+              {thinking ? (
+                <Button variant="outline" size="sm" onClick={suggest.cancel}>
+                  Stop
+                </Button>
+              ) : (
+                <Button size="sm" onClick={submit} disabled={!canSubmit}>
+                  Seek counsel
+                </Button>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               {mode === 'attitudes'
@@ -231,7 +266,9 @@ export function SuggestView() {
 
         {/* RIGHT — the counsel. Cards lay out by the pane's own width (container query), not the viewport. */}
         <div className="@container space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-          {suggest.status === 'idle' && (
+          {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+
+          {suggest.status === 'idle' && recent.length === 0 && (
             <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
               {mode === 'attitudes'
                 ? 'The Keeper’s counsel appears here — six ways your character might play the moment, drawn from who they are and what’s happened.'

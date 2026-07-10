@@ -71,7 +71,7 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 
 ## P1 — product completeness
 
-- **P1-1 ☐ "Inscribe this answer" + copy + history.** Copy button on every AI output; save a
+- **P1-1 ☑ "Inscribe this answer" + copy + history.** Copy button on every AI output; save a
   Lore/Counsel/Converse result to Annals as a campaign-lore note (null-entity notes exist — ADR-021);
   keep last ~5 results per lens in the hook (session-scoped, no persistence).
 - **P1-2 ☑ Unclosed-session nudge.** Definition: session has chronicle entries newer than its last
@@ -82,10 +82,10 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
   coherence gap. Also give Counsel/Converse empty states the Keeper's voice (audit §4.5).
 - **P1-4 ☑ Chronicle entry edit/delete** (pre-close-out only, to keep the ritual honest — gate on the
   P1-2 stamp once it exists).
-- **P1-5 ☐ Cancel for Counsel/Converse/Transcribe.** Services already take AbortSignal; only
+- **P1-5 ☑ Cancel for Counsel/Converse/Transcribe.** Services already take AbortSignal; only
   recall/recap wire a real controller. Generalize recall's cancel-channel pattern
   (`ipc/recall.ts:17`) to suggest/converse/import/enrich.
-- **P1-6 ☐ Entity merge.** Pick survivor + loser → re-point notes (junction rows), links (both ends,
+- **P1-6 ☑ Entity merge.** Pick survivor + loser → re-point notes (junction rows), links (both ends,
   drop self-loops + dedupe against survivor's live ties), status history, event log refs, personas
   (MC guard); delete loser; re-embed survivor. One transaction + integration test. UI: action in
   EntityDetail overflow.

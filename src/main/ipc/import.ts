@@ -5,12 +5,13 @@ import type { ConfirmedChangeset, ExtractRequest } from '@shared/import-types'
 import type { DbContext } from '../services/db-context'
 import type { VectorStore } from '../services/vector-store.service'
 import { applyChangeset, extract } from '../services/import.service'
+import { registerCancelable } from './cancelable'
 
 export function registerImportHandlers(ctx: DbContext, store: VectorStore): void {
-  // Two single-shot calls: extract (the expensive Claude pass) and apply (the DB transaction). A throwaway
-  // controller — a long extraction isn't separately cancellable in v1 (acceptable).
-  ipcMain.handle(IPC.importExtract, (_e, req: ExtractRequest) =>
-    extract(ctx, req, new AbortController().signal)
+  // Extract (the expensive Claude pass) is cancellable by requestId — import:extract-cancel aborts it
+  // (P1-5, Transcribe's Stop). Apply (the DB transaction below) is not cancellable.
+  registerCancelable<ExtractRequest>(IPC.importExtract, IPC.importExtractCancel, (req, signal) =>
+    extract(ctx, req, signal)
   )
   // apply throws on a failed transaction (the renderer toasts it) — log the real cause first so a
   // schema/write failure leaves a trace in logs/main.log rather than only a generic toast.

@@ -8,6 +8,9 @@
 import type { AiRunCost } from './usage-types'
 
 export interface ConverseRequest {
+  /** Cancellation key (P1-5): converse:cancel aborts the in-flight call by this id. Optional — the
+   *  renderer always sends one; direct service calls (tests) may omit it. */
+  requestId?: string
   campaignId: string
   /** The asker — the in-character POV. Requires an active PC (+ persona), like Suggest/Counsel. */
   pcId: string

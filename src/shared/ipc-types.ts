@@ -169,6 +169,8 @@ export interface LedgerApi {
     create(input: CreateEntityInput): Promise<Entity>
     update(id: string, patch: UpdateEntityInput): Promise<Entity>
     delete(id: string): Promise<void>
+    /** Merge the loser into the survivor (P1-6, re-point only); returns the surviving entity. */
+    merge(survivorId: string, loserId: string): Promise<Entity>
     /** Chronology: the entity's full status/lifecycle history, oldest first. */
     history(entityId: string): Promise<StatusHistoryEntry[]>
   }
@@ -218,9 +220,13 @@ export interface LedgerApi {
   }
   suggest: {
     query(input: SuggestRequest): Promise<SuggestResult>
+    /** Abort the in-flight Counsel call by requestId (P1-5). */
+    cancel(requestId: string): Promise<void>
   }
   converse: {
     query(input: ConverseRequest): Promise<ConverseResult>
+    /** Abort the in-flight Converse call by requestId (P1-5). */
+    cancel(requestId: string): Promise<void>
   }
   deriveProfile: {
     /** Derive a main character's profile fields from their backstory, for review (ADR-029). */
@@ -233,6 +239,8 @@ export interface LedgerApi {
   import: {
     extract(input: ExtractRequest): Promise<ExtractResult>
     apply(payload: ConfirmedChangeset): Promise<ApplyResult>
+    /** Abort an in-flight Transcribe extraction by requestId (P1-5). Apply is not cancellable. */
+    cancelExtract(requestId: string): Promise<void>
   }
   /** Illuminate (tier-2 enrichment, ADR-035): the pre-flight checklist + one focused call per entity. */
   enrich: {
@@ -298,6 +306,7 @@ export const IPC = {
   entityCreate: 'entity:create',
   entityUpdate: 'entity:update',
   entityDelete: 'entity:delete',
+  entityMerge: 'entity:merge',
   entityHistory: 'entity:history',
   noteList: 'note:list',
   noteListAll: 'note:listAll',
@@ -327,9 +336,12 @@ export const IPC = {
   recapGenerate: 'recap:generate',
   recapCancel: 'recap:cancel',
   suggestQuery: 'suggest:query',
+  suggestCancel: 'suggest:cancel',
   converseQuery: 'converse:query',
+  converseCancel: 'converse:cancel',
   deriveProfileQuery: 'derive-profile:query',
   importExtract: 'import:extract',
+  importExtractCancel: 'import:extract-cancel',
   importApply: 'import:apply',
   enrichTouched: 'enrich:touched',
   enrichEntity: 'enrich:entity',

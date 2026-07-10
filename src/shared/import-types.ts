@@ -17,6 +17,9 @@ import type { AiRunCost } from './usage-types'
 export type ExtractionMode = 'capture' | 'full'
 
 export interface ExtractRequest {
+  /** Cancellation key (P1-5): import:extract-cancel aborts the in-flight extraction by this id.
+   *  Optional — the renderer always sends one; direct service calls (tests) may omit it. */
+  requestId?: string
   campaignId: string
   text: string
   /** Extraction tier (ADR-035). Defaults to 'capture'. */

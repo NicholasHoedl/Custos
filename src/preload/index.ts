@@ -46,6 +46,7 @@ const api: LedgerApi = {
     create: (input) => ipcRenderer.invoke(IPC.entityCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.entityUpdate, id, patch),
     delete: (id) => ipcRenderer.invoke(IPC.entityDelete, id),
+    merge: (survivorId, loserId) => ipcRenderer.invoke(IPC.entityMerge, survivorId, loserId),
     history: (entityId) => ipcRenderer.invoke(IPC.entityHistory, entityId)
   },
   note: {
@@ -94,17 +95,20 @@ const api: LedgerApi = {
     cancel: (requestId) => ipcRenderer.invoke(IPC.recapCancel, requestId)
   },
   suggest: {
-    query: (input) => ipcRenderer.invoke(IPC.suggestQuery, input)
+    query: (input) => ipcRenderer.invoke(IPC.suggestQuery, input),
+    cancel: (requestId) => ipcRenderer.invoke(IPC.suggestCancel, requestId)
   },
   converse: {
-    query: (input) => ipcRenderer.invoke(IPC.converseQuery, input)
+    query: (input) => ipcRenderer.invoke(IPC.converseQuery, input),
+    cancel: (requestId) => ipcRenderer.invoke(IPC.converseCancel, requestId)
   },
   deriveProfile: {
     query: (input) => ipcRenderer.invoke(IPC.deriveProfileQuery, input)
   },
   import: {
     extract: (input) => ipcRenderer.invoke(IPC.importExtract, input),
-    apply: (payload) => ipcRenderer.invoke(IPC.importApply, payload)
+    apply: (payload) => ipcRenderer.invoke(IPC.importApply, payload),
+    cancelExtract: (requestId) => ipcRenderer.invoke(IPC.importExtractCancel, requestId)
   },
   enrich: {
     touched: (sessionId) => ipcRenderer.invoke(IPC.enrichTouched, sessionId),

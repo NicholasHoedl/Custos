@@ -167,6 +167,20 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   hover/focus edit (inline textarea) + delete (`DeleteEventDialog`), allowed ALWAYS — editing post-close-out
   does NOT change already-extracted notes (they're independent records; a `title` hint says so). The
   **LoopExplainer** (localStorage `ledger.loopExplainerDismissed`) names the ritual once atop JournalView.
+- **Lens polish + merge (docs/ROADMAP.md P1-1/5/6):** the three AI lenses share a `LensResultBar`
+  (Copy · **Inscribe** → a campaign-lore note via `ledger.note.create` entityIds:[] · **Recent** popover
+  of the last ~5) fed by `useLensHistory` + prose serializers in `lib/lens-prose.ts`; each view snapshots
+  on done (MainPanel keeps views mounted, so history survives nav, not restart). **Cancel** for Counsel/
+  Converse/Transcribe: request/response calls carry an OPTIONAL `requestId`; `ipc/cancelable.ts`
+  `registerCancelable` stores an AbortController per id + a `*:cancel` channel (mirrors recall's map);
+  hooks mint the id + a Stop button aborts (the numeric staleness token makes the aborted promise read as
+  "stopped", not an error). Illuminate keeps its between-entity Stop (unchanged). **Entity merge**
+  (ADR-038, re-point only): `merge.service.mergeEntities` moves the loser's notes/ties/chronology/event
+  refs to the survivor in one txn — colliding `note_entity`/`entity_link` rows are LEFT for
+  `deleteEntity`'s cascade (never an explicit pre-delete racing the open-interval unique index; dup ties
+  detected via `findOpenLink` over a tx-scoped ctx); MC pointer carried before delete (PC survivor
+  required); survivor fields untouched ⇒ no re-embed. UI: **Merge** action on EntityDetail →
+  `MergeEntityDialog` (reuses `EntityPicker`).
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.

@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Download, KeyRound, RotateCcw, Search, WifiOff } from 'lucide-react'
 import type { RecallSource } from '@shared/recall-types'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useRecall } from '@renderer/hooks/use-recall'
 import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
+import { useLensHistory } from '@renderer/hooks/use-lens-history'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { PromptStarters } from '@renderer/components/recall/PromptStarters'
+import { LensResultBar } from '@renderer/components/lens/LensResultBar'
 import { reasonCopy } from '@renderer/lib/ai-copy'
+import { recallProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
 import {
   Banner,
@@ -27,9 +30,20 @@ export function RecallView() {
   const { status: onb, progress, downloading, error: setupError, download } = useOnboarding()
   const recall = useRecall()
   const [query, setQuery] = useState('')
+  const [askedQuery, setAskedQuery] = useState('')
   const { sessions } = useSessions(activeCampaignId)
   const { entities } = useEntities(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
+  const { entries: recent, remember } = useLensHistory()
+  const rememberedRef = useRef<string | null>(null)
+
+  // Snapshot the answer to the lens history once it finishes streaming (P1-1).
+  useEffect(() => {
+    if (recall.status === 'done' && recall.answer && recall.answer !== rememberedRef.current) {
+      rememberedRef.current = recall.answer
+      remember(askedQuery || 'Lore', recallProse(askedQuery, recall.answer))
+    }
+  }, [recall.status, recall.answer, askedQuery, remember])
 
   if (!activeCampaignId) {
     return (
@@ -40,11 +54,13 @@ export function RecallView() {
   }
 
   const streaming = recall.status === 'streaming'
+  const prose = recall.status === 'done' && recall.answer ? recallProse(askedQuery, recall.answer) : null
 
   function submit() {
     if (!query.trim() || streaming || !onb.modelReady) return
     // In-character Recall is disabled in the UI for now (the logic stays in recall.service); ask
     // factually. Restore the mode toggle below to bring it back.
+    setAskedQuery(query.trim())
     recall.ask(query, 'factual', asOf ?? undefined)
   }
 
@@ -131,7 +147,9 @@ export function RecallView() {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto">
-        {recall.status === 'idle' && (
+        {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+
+        {recall.status === 'idle' && recent.length === 0 && (
           <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
             The Keeper’s answer appears here, drawn from your annals.
           </p>

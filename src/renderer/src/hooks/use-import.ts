@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type {
   ApplyResult,
   ConfirmedChangeset,
@@ -60,6 +60,8 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
   setRelationshipChanges: Dispatch<SetStateAction<ConfirmedRelationshipChange[]>>
   setFieldChanges: Dispatch<SetStateAction<ConfirmedFieldChange[]>>
   extract: (text: string) => void
+  /** Abort an in-flight extraction (Transcribe's Stop, P1-5) and return to idle. */
+  cancel: () => void
   apply: (sessionIdOverride?: string | null) => void
   reset: () => void
 } {
@@ -78,18 +80,23 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
   const [cost, setCost] = useState<AiRunCost | null>(null)
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
+  // The current extraction's requestId — guards its callbacks and lets cancel() abort it (P1-5).
+  const requestIdRef = useRef<string | null>(null)
 
   const extract = useCallback(
     (text: string) => {
       if (!activeCampaignId || !text.trim()) return
+      const requestId = crypto.randomUUID()
+      requestIdRef.current = requestId
       setStatus('extracting')
       setReason(null)
       setError(null)
       setResult(null)
       setCost(null)
       ledger.import
-        .extract({ campaignId: activeCampaignId, text, mode, backstorySubjectId })
+        .extract({ requestId, campaignId: activeCampaignId, text, mode, backstorySubjectId })
         .then((res) => {
+          if (requestIdRef.current !== requestId) return // cancelled or superseded
           if (!res.ok) {
             setStatus('idle')
             setReason(res.reason)
@@ -117,12 +124,20 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
           setStatus('review')
         })
         .catch((e) => {
+          if (requestIdRef.current !== requestId) return // cancelled — ignore the abort rejection
           setStatus('error')
           setError(String(e))
         })
     },
     [activeCampaignId, mode, backstorySubjectId]
   )
+
+  const cancel = useCallback(() => {
+    const id = requestIdRef.current
+    requestIdRef.current = null
+    if (id) ledger.import.cancelExtract(id)
+    setStatus('idle')
+  }, [])
 
   const apply = useCallback(
     (sessionIdOverride?: string | null) => {
@@ -164,6 +179,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
   )
 
   const reset = useCallback(() => {
+    requestIdRef.current = null // drop any in-flight extraction's callbacks
     setStatus('idle')
     setProposal(null)
     setEntities([])
@@ -195,6 +211,7 @@ export function useImport(opts?: { mode?: ExtractionMode; backstorySubjectId?: s
     setRelationshipChanges,
     setFieldChanges,
     extract,
+    cancel,
     apply,
     reset
   }

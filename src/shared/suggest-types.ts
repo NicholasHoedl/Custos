@@ -163,6 +163,9 @@ export interface StorySuggestion {
 }
 
 export interface SuggestRequest {
+  /** Cancellation key (P1-5): suggest:cancel aborts the in-flight call by this id. Optional — the
+   *  renderer always sends one; direct service calls (tests) may omit it. */
+  requestId?: string
   campaignId: string
   pcId: string
   situation: string
