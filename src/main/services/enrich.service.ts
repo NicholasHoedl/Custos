@@ -21,6 +21,7 @@ import {
 import { getSettings } from './settings.service'
 import { confidenceTag, enrichChangeset, isAvailable } from './claude.service'
 import { classifyError, isOnline } from './ai-util'
+import { fakeAiEnabled, fakeEnrichment } from './ai-fake'
 import log from 'electron-log/main'
 
 /** Grounding cap: the newest N notes feed the prompt (rendered oldest-first); older ones are counted. */
@@ -117,28 +118,32 @@ export async function enrichEntity(
     // Enrichment shares the extraction knobs (ADR-035 cost tuning) — structured, validated, review-gated.
     const { extractionModel, extractionEffort } = getSettings()
     let cost: AiRunCost | undefined // per-entity cost — the renderer sums the sweep (P0-4)
-    const raw = await enrichChangeset({
-      subject: {
-        id: subject.id,
-        name: subject.name,
-        type: subject.type,
-        description: subject.description,
-        status: subject.status,
-        lifecycle: subject.lifecycle,
-        traits: subject.traits,
-        goals: subject.goals,
-        flaws: subject.flaws,
-        attributes: subject.attributes
-      },
-      notes: capped.map((n) => ({ content: n.content, confidence: n.confidence })),
-      tieLines,
-      existing: roster.map((e) => ({ id: e.id, name: e.name, type: e.type })),
-      omittedNotes: omitted,
-      model: extractionModel,
-      effort: extractionEffort,
-      onUsage: (c) => (cost = c),
-      signal
-    })
+    // e2e fake-AI seam (P2-6): canned enrichment anchored to the REAL subject id (in scope here — which is
+    // why the seam lives at the call site, not inside claude.service). Guards above already ran.
+    const raw = fakeAiEnabled()
+      ? fakeEnrichment(subject.id)
+      : await enrichChangeset({
+          subject: {
+            id: subject.id,
+            name: subject.name,
+            type: subject.type,
+            description: subject.description,
+            status: subject.status,
+            lifecycle: subject.lifecycle,
+            traits: subject.traits,
+            goals: subject.goals,
+            flaws: subject.flaws,
+            attributes: subject.attributes
+          },
+          notes: capped.map((n) => ({ content: n.content, confidence: n.confidence })),
+          tieLines,
+          existing: roster.map((e) => ({ id: e.id, name: e.name, type: e.type })),
+          omittedNotes: omitted,
+          model: extractionModel,
+          effort: extractionEffort,
+          onUsage: (c) => (cost = c),
+          signal
+        })
 
     // Shared validation (ADR-031 live-tie/no-op drops + ADR-033 enrichment caps) over a REAL-ID-ONLY
     // resolver — a "#index" or unknown id resolves to null and the item drops.

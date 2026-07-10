@@ -1,4 +1,5 @@
 import { lookup } from 'node:dns/promises'
+import { fakeAiEnabled } from './ai-fake'
 
 // Small shared helpers for the AI-backed features (Recall, Suggest, Recap, Import). Kept out of
 // claude.service so they don't pull in the Anthropic SDK, and out of each orchestration service so the
@@ -6,6 +7,8 @@ import { lookup } from 'node:dns/promises'
 
 /** Cheap reachability probe: does api.anthropic.com resolve? Gate a Claude call behind this. */
 export async function isOnline(): Promise<boolean> {
+  // e2e fake-AI seam (P2-6): skip the DNS probe so the close-out flow is hermetic (no network).
+  if (fakeAiEnabled()) return true
   try {
     await lookup('api.anthropic.com')
     return true

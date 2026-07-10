@@ -39,6 +39,7 @@ import { indexEntity, indexNote } from './embedding-index.service'
 import { getSettings } from './settings.service'
 import { extractChangeset as claudeExtract, isAvailable } from './claude.service'
 import { classifyError, isOnline } from './ai-util'
+import { fakeAiEnabled, fakeExtraction } from './ai-fake'
 import log from 'electron-log/main'
 
 const ENTITY_TYPE_SET = new Set<string>(ENTITY_TYPES)
@@ -68,24 +69,28 @@ export async function extract(
     const subject = req.backstorySubjectId
       ? existing.find((e) => e.id === req.backstorySubjectId)
       : undefined
-    const raw = await claudeExtract({
-      text,
-      existing: existing.map((e) => ({
-        id: e.id,
-        name: e.name,
-        type: e.type,
-        traits: e.traits,
-        goals: e.goals,
-        flaws: e.flaws,
-        attributes: e.attributes
-      })),
-      model: extractionModel,
-      effort: extractionEffort,
-      onUsage: (c) => (cost = c),
-      mode: req.mode ?? 'capture',
-      backstorySubject: subject ? { id: subject.id, name: subject.name } : undefined,
-      signal
-    })
+    // e2e fake-AI seam (P2-6): return canned extraction so the wizard runs without a real Claude call.
+    // The guards above (key + online) already ran; everything downstream (validate + apply) is real.
+    const raw = fakeAiEnabled()
+      ? fakeExtraction()
+      : await claudeExtract({
+          text,
+          existing: existing.map((e) => ({
+            id: e.id,
+            name: e.name,
+            type: e.type,
+            traits: e.traits,
+            goals: e.goals,
+            flaws: e.flaws,
+            attributes: e.attributes
+          })),
+          model: extractionModel,
+          effort: extractionEffort,
+          onUsage: (c) => (cost = c),
+          mode: req.mode ?? 'capture',
+          backstorySubject: subject ? { id: subject.id, name: subject.name } : undefined,
+          signal
+        })
     // ADR-031: existing notes + live edges feed the dedup — an exact re-import drops silently, a
     // near-duplicate note is flagged for review, an already-recorded tie never reaches the review.
     const proposal = validateExtraction(ctx, raw, existing, listAllNotes(ctx, campaignId))

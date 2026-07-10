@@ -106,7 +106,10 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 - **P2-4 ☑ Global command palette** (cmdk is already a dependency; entities + views + actions).
 - **P2-5 ☐ List virtualization + note pagination** once a campaign crosses ~1k notes (Codex/Annals
   first; measure before building).
-- **P2-6 ☐ Close-out wizard e2e** (the most complex UI currently has none).
+- **P2-6 ☑ Close-out wizard e2e** (ADR-041). Added the first AI-mocking seam to the e2e harness — an
+  env-gated `LEDGER_FAKE_AI` (+ `!app.isPackaged`) branch at the two close-out call sites returns canned
+  proposals so the wizard runs offline/keyless while the real IPC + validators + DB apply still execute.
+  `close-out.spec.ts`: the full both-tier happy path + the reject/lock-exit path.
 
 ## R — removals (subtractions that finish the product)
 

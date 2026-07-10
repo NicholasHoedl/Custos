@@ -212,6 +212,17 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.
+- **e2e (Playwright)** run via `npm run test:e2e` = `electron-vite build && playwright test` — it
+  **rebuilds `out/`** first, so a main/preload change must go through this script (raw `playwright test`
+  uses the stale build). `tests/e2e/helpers.ts` `launchApp()` boots the built app against a throwaway
+  `--user-data-dir` (fresh DB, keyless, no embedding model — indexing no-ops gracefully). **AI-driven
+  flows are e2e-testable via the fake-AI seam (ADR-041):** `launchApp({ fakeAi: true })` sets
+  `LEDGER_FAKE_AI`, and `src/main/services/ai-fake.ts` (`fakeAiEnabled` = env `&& !app.isPackaged`) makes
+  `import.service.extract` / `enrich.service.enrichEntity` return canned proposals + `ai-util.isOnline`
+  return true — the real IPC + validators + DB apply still run. The seam is inert in any normal/packaged
+  run and under vitest (env unset → short-circuits before `app.isPackaged`). `close-out.spec.ts` drives
+  the locked close-out wizard through both tiers this way (plants a dummy key via `ledger.apikey.set` +
+  reloads so `keyReady` refetches). **10 e2e specs currently green.**
 
 ## Git
 Work lands on `main`. A remote (`origin`) is configured, but the GitHub repo may not exist yet, so
