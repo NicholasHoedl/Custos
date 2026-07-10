@@ -437,6 +437,18 @@ disposition, *per direction*, so "A is devoted to B while B merely tolerates A" 
 Converse) read the asymmetric feeling; the Draft/Chronicle/Transcribe extractors propose it (plus the tie's
 description) for review; and the Ties list shows it inline and edits it in place. Migration 0010.
 
+**Entity portraits** (ADR-039) — each entity carries an **optional portrait**, shown in the Codex rows, the
+entity detail header, the Character sheet, and the Web graph. It's stored as a bounded base64 JPEG
+thumbnail in a nullable `entity.image` column (migration 0011) rather than a file on disk, so there's no
+file lifecycle and it rides campaign export/import for free. Purely cosmetic — never embedded, so it
+doesn't touch retrieval.
+
+**Relationship graph — the "Web" view** (ADR-040) — a ninth nav view that draws the campaign's **live**
+relationships as a force-directed graph (d3-force layout, rendered as themed SVG). Nodes are entities
+(with their portrait clipped in, fallen ones dimmed); edges are open ties labelled by relation. Pan, zoom,
+drag a node to reposition, and click a node to open it. Read-only — a visual index over data that already
+existed, needing no migration.
+
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
-character-sheet stats, audio transcription, image/map attachments, and campaign file
-export/import. The nearest queued follow-up is an **in-character recap voice**.
+character-sheet stats, audio transcription, and map attachments. The nearest queued follow-up is an
+**in-character recap voice**.

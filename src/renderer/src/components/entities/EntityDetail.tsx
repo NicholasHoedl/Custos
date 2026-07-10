@@ -10,6 +10,7 @@ import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { NoteList } from '@renderer/components/notes/NoteList'
+import { Portrait } from './Portrait'
 import { EntityForm } from './EntityForm'
 import { MergeEntityDialog } from './MergeEntityDialog'
 import { RelationshipEditor } from './RelationshipEditor'
@@ -84,7 +85,14 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 gap-3">
+          <Portrait
+            image={entity.image}
+            name={entity.name}
+            lifecycle={entity.lifecycle}
+            size="md"
+          />
+          <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
               {ENTITY_TYPE_LABELS[entity.type]}
@@ -125,6 +133,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
               ))}
             </div>
           )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {/* The main character's derive/persona tooling lives on the Character page (ADR-030) —

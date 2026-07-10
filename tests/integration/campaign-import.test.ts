@@ -57,8 +57,9 @@ function seed() {
     attributes: { race: 'Dwarf' }
   })
   const manor = createEntity(ctx, { campaignId: campaign.id, type: 'location', name: 'Manor' })
-  // Status change ⇒ a dated status-history row beyond the creation baselines.
-  updateEntity(ctx, gundren.id, { status: 'Captured' })
+  // Status change ⇒ a dated status-history row beyond the creation baselines. The portrait (P2-2) is
+  // set here too so the round-trip proves image survives export → import (the field-by-field values map).
+  updateEntity(ctx, gundren.id, { status: 'Captured', image: 'data:image/jpeg;base64,PORTRAIT' })
   createLink(ctx, {
     campaignId: campaign.id,
     fromEntityId: gundren.id,
@@ -90,12 +91,12 @@ function seed() {
       updatedAt: 222
     })
     .run()
-  return { ctx, campaignId: campaign.id, mcId }
+  return { ctx, campaignId: campaign.id, mcId, gundrenId: gundren.id }
 }
 
 describe('import-campaign.service — round-trip', () => {
   it('export → import into a fresh DB → export again is identical (ids/timestamps verbatim)', () => {
-    const { ctx, campaignId, mcId } = seed()
+    const { ctx, campaignId, mcId, gundrenId } = seed()
     const snapshot = buildCampaignExport(ctx, campaignId)
     // Simulate the file: what the handler JSON.parses is a plain-object clone.
     const fileContents: unknown = JSON.parse(JSON.stringify(snapshot))
@@ -108,6 +109,11 @@ describe('import-campaign.service — round-trip', () => {
 
     const roundTripped = buildCampaignExport(fresh, campaignId)
     expect(normalized(roundTripped)).toEqual(normalized(snapshot))
+
+    // The portrait (P2-2) rode through the field-by-field entity values map intact.
+    expect(roundTripped.entities.find((e) => e.id === gundrenId)!.image).toBe(
+      'data:image/jpeg;base64,PORTRAIT'
+    )
 
     // MC survives the deferred-FK two-step, and the persona hash was recomputed (≠ the stale seed)
     // against the imported entity — the stale-detection invariant holds post-restore.

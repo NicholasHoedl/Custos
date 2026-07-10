@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, ImageIcon, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPES,
@@ -24,6 +24,7 @@ import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Label } from '@renderer/components/ui/label'
+import { Portrait } from './Portrait'
 import {
   Select,
   SelectContent,
@@ -79,6 +80,7 @@ export function EntityForm({
   const [name, setName] = useState('')
   const [type, setType] = useState<EntityType>(defaultType)
   const [description, setDescription] = useState('')
+  const [image, setImage] = useState<string | null>(null)
   const [traits, setTraits] = useState<string[]>([])
   const [goals, setGoals] = useState<string[]>([])
   const [flaws, setFlaws] = useState<string[]>([])
@@ -99,6 +101,7 @@ export function EntityForm({
     setName(e?.name ?? '')
     setType(t)
     setDescription(e?.description ?? '')
+    setImage(e?.image ?? null)
     setTraits(e?.traits ?? [])
     setGoals(e?.goals ?? [])
     setFlaws(e?.flaws ?? [])
@@ -179,6 +182,7 @@ export function EntityForm({
         ? await ledger.entity.update(entity.id, {
             name: trimmed,
             description: description.trim() || null,
+            image,
             traits: payloadTraits,
             goals: payloadGoals,
             flaws: payloadFlaws,
@@ -192,6 +196,7 @@ export function EntityForm({
             type,
             name: trimmed,
             description: description.trim() || undefined,
+            image,
             traits: payloadTraits,
             goals: payloadGoals,
             flaws: payloadFlaws,
@@ -307,6 +312,35 @@ export function EntityForm({
   // The shared field body — identical in the dialog and the page; only the surrounding chrome differs.
   const fields = (
     <>
+      <div className="flex items-center gap-3">
+        <Portrait image={image} name={name || '?'} size="md" />
+        <div className="flex flex-col items-start gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const url = await ledger.entity.pickImage()
+              if (url) setImage(url)
+            }}
+          >
+            <ImageIcon className="size-3.5" />
+            {image ? 'Change portrait' : 'Add portrait'}
+          </Button>
+          {image && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto px-1 py-0.5 text-xs text-muted-foreground"
+              onClick={() => setImage(null)}
+            >
+              Remove
+            </Button>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-[1fr_160px] gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="ef-name">Name</Label>

@@ -8,7 +8,7 @@ import type {
   Session
 } from '@shared/entity-types'
 import { toast } from 'sonner'
-import type { RelationshipView } from '@shared/graph-types'
+import type { CampaignGraph, RelationshipView } from '@shared/graph-types'
 import { ledger } from '@renderer/lib/ipc'
 import { useUiStore } from '@renderer/store/ui-store'
 
@@ -142,6 +142,22 @@ export function useRelationships(entityId: string | null): {
   }, [entityId])
   useEffect(() => refresh(), [refresh])
   return { relationships, refresh }
+}
+
+// The whole-campaign relationship graph for the "Web" view (P2-3). Refetches on any entity/tie mutation
+// (entitiesVersion) so the map stays live; the view also calls refresh() when it becomes active.
+export function useCampaignGraph(campaignId: string | null): {
+  graph: CampaignGraph
+  refresh: () => void
+} {
+  const [graph, setGraph] = useState<CampaignGraph>({ nodes: [], edges: [] })
+  const entitiesVersion = useUiStore((s) => s.entitiesVersion)
+  const refresh = useCallback(() => {
+    if (!campaignId) return setGraph({ nodes: [], edges: [] })
+    ledger.graph.campaign(campaignId).then(setGraph).catch(fetchFailed('the relationship map'))
+  }, [campaignId])
+  useEffect(() => refresh(), [refresh, entitiesVersion])
+  return { graph, refresh }
 }
 
 export function useEvents(sessionId: string | null): { events: EventLogEntry[]; refresh: () => void } {

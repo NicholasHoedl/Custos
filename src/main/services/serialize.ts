@@ -60,6 +60,7 @@ export function rowToEntity(r: typeof schema.entity.$inferSelect): Entity {
     type: r.type as EntityType,
     name: r.name,
     description: r.description,
+    image: r.image,
     traits: parseArray(r.traits),
     goals: parseArray(r.goals),
     flaws: parseArray(r.flaws),

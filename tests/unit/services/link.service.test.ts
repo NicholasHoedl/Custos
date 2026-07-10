@@ -7,6 +7,7 @@ import { createCampaign } from '../../../src/main/services/campaign.service'
 import { createEntity } from '../../../src/main/services/entity.service'
 import { createSession } from '../../../src/main/services/session.service'
 import {
+  buildCampaignGraph,
   createLink,
   deleteLink,
   listForEntity,
@@ -209,5 +210,90 @@ describe('link.service', () => {
     const afterReform = rowsFor()
     expect(afterReform).toHaveLength(2) // both intervals preserved
     expect(afterReform.filter((r) => r.endSessionNumber === null)).toHaveLength(1) // exactly one open
+  })
+
+  // ---- Campaign graph (P2-3, the "Web" view) ----
+
+  describe('buildCampaignGraph', () => {
+    it('emits a node per entity (carrying image + lifecycle) and a labelled edge per LIVE tie', () => {
+      const relic = createEntity(ctx, {
+        campaignId,
+        type: 'item',
+        name: 'Ashen Relic',
+        image: 'data:image/jpeg;base64,AAAA'
+      })
+      createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: inn.id,
+        relation: 'located_in'
+      })
+      createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: relic.id,
+        relation: 'owns'
+      })
+
+      const g = buildCampaignGraph(ctx, campaignId)
+      expect(g.nodes.map((n) => n.name).sort()).toEqual([
+        'Aldric Vane',
+        'Ashen Relic',
+        'Copper Kettle Inn'
+      ])
+      // Portrait + lifecycle ride through onto the node.
+      const relicNode = g.nodes.find((n) => n.id === relic.id)!
+      expect(relicNode.image).toBe('data:image/jpeg;base64,AAAA')
+      expect(relicNode.lifecycle).toBe(relic.lifecycle) // the node mirrors the entity's lifecycle
+      // The default (imageless) entity is null, not undefined.
+      expect(g.nodes.find((n) => n.id === inn.id)!.image).toBeNull()
+
+      // Edges carry the FORWARD display label (not the raw key), oriented from -> to.
+      const owns = g.edges.find((e) => e.to === relic.id)!
+      expect(owns.from).toBe(aldric.id)
+      expect(owns.label).toBe('owns')
+      expect(g.edges.find((e) => e.to === inn.id)!.label).toBe('located in')
+      expect(g.edges).toHaveLength(2)
+    })
+
+    it('excludes severed (closed-interval) ties — the map is the current picture', () => {
+      const s1 = createSession(ctx, { campaignId })
+      const live = createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: inn.id,
+        relation: 'located_in',
+        sessionId: s1.id
+      })
+      const mira = createEntity(ctx, { campaignId, type: 'npc', name: 'Mira' })
+      const doomed = createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: mira.id,
+        relation: 'ally_of',
+        sessionId: s1.id
+      })
+      const s2 = createSession(ctx, { campaignId })
+      severLink(ctx, doomed.id, s2.id)
+
+      const g = buildCampaignGraph(ctx, campaignId)
+      expect(g.nodes).toHaveLength(3) // Mira stays a node even though her tie is severed
+      expect(g.edges).toHaveLength(1) // only the live tie is an edge
+      expect(g.edges[0].id).toBe(live.id)
+    })
+
+    it('drops an edge whose endpoint entity is gone (defensive against dangling refs)', () => {
+      createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: inn.id,
+        relation: 'located_in'
+      })
+      // Force a dangling edge by removing the endpoint row directly (bypassing deleteEntity's cascade).
+      ctx.drizzle.delete(schema.entity).where(eq(schema.entity.id, inn.id)).run()
+      const g = buildCampaignGraph(ctx, campaignId)
+      expect(g.nodes.map((n) => n.id)).toEqual([aldric.id])
+      expect(g.edges).toHaveLength(0) // the dangling edge is dropped, not crashed on
+    })
   })
 })

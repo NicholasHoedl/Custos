@@ -53,6 +53,7 @@ export const entity = sqliteTable(
     type: text('type').notNull(), // EntityType (see @shared/entity-types)
     name: text('name').notNull(),
     description: text('description'),
+    image: text('image'), // optional portrait — a base64 data URL (JPEG thumbnail); NOT embedded (P2-2)
     traits: text('traits'), // JSON string[] — promoted: Suggest (Phase 3) reads these by name
     goals: text('goals'), // JSON string[] — promoted
     flaws: text('flaws'), // JSON string[] — promoted (ADR-026): a vice/fear/weakness; feeds persona + Counsel

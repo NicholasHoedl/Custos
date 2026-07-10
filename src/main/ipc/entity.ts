@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, nativeImage } from 'electron'
 import type { EntityType } from '@shared/entity-types'
 import { IPC, type CreateEntityInput, type UpdateEntityInput } from '@shared/ipc-types'
 import type { DbContext } from '../services/db-context'
@@ -27,6 +27,24 @@ export function registerEntityHandlers(ctx: DbContext, store: VectorStore): void
   })
   ipcMain.handle(IPC.entityDelete, (_e, id: string) => svc.deleteEntity(ctx, id))
   ipcMain.handle(IPC.entityHistory, (_e, id: string) => getEntityHistory(ctx, id))
+
+  // Portrait picker (P2-2): a native file dialog → downscale to a 512px-wide JPEG thumbnail →
+  // base64 data URL stored in entity.image. Thumbnailing bounds the DB/export size; no files, no
+  // custom protocol. Returns null on cancel or an unreadable image.
+  ipcMain.handle(IPC.entityPickImage, async (): Promise<string | null> => {
+    const opts = {
+      title: 'Choose a portrait',
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+      properties: ['openFile' as const]
+    }
+    const win = BrowserWindow.getFocusedWindow()
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    if (res.canceled || res.filePaths.length === 0) return null
+    const img = nativeImage.createFromPath(res.filePaths[0])
+    if (img.isEmpty()) return null
+    const scaled = img.getSize().width > 512 ? img.resize({ width: 512 }) : img
+    return `data:image/jpeg;base64,${scaled.toJPEG(72).toString('base64')}`
+  })
   // Merge (P1-6, re-point only): the loser's notes/ties/chronology move to the survivor, then it's
   // deleted. Re-embed the survivor to be safe (a no-op via the hash guard — its text is unchanged).
   ipcMain.handle(IPC.entityMerge, (_e, survivorId: string, loserId: string) => {

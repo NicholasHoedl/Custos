@@ -3,8 +3,11 @@ import type { Entity, EntityLink, NoteConfidence } from '@shared/entity-types'
 import type { RelationKey } from '@shared/relations'
 import type { CreateLinkInput, HierarchyKind, UpdateLinkInput } from '@shared/ipc-types'
 import type {
+  CampaignGraph,
   ContextNeighbor,
   EntityContext,
+  GraphEdge,
+  GraphNode,
   HierarchyDescendant,
   HierarchyView,
   RelationshipView
@@ -13,7 +16,7 @@ import { RELATIONS, isRelationAllowed, isRelationKey } from '@shared/relations'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { isIntervalLiveAt } from './chronology.service'
-import { getEntity } from './entity.service'
+import { getEntity, listEntities } from './entity.service'
 import { listNotesForEntity } from './note.service'
 import { resolveCaptureSessionNumber } from './session.service'
 import { newId, now, rowToLink } from './serialize'
@@ -155,6 +158,38 @@ export function listLinksForCampaign(ctx: DbContext, campaignId: string): Entity
     .where(eq(schema.entityLink.campaignId, campaignId))
     .all()
     .map(rowToLink)
+}
+
+/**
+ * The campaign relationship graph (P2-3): every entity as a node and every LIVE tie as a labelled edge,
+ * for the "Web" view. Only open intervals (`endSessionNumber === null`) are edges — a severed tie is
+ * history, not a current relationship. Edges whose endpoints aren't in the node set are dropped
+ * defensively (they shouldn't occur — deleteEntity cascades — but a dangling ref must never crash the
+ * layout). Structural, so no chronology/as-of param; the label is the forward display string.
+ */
+export function buildCampaignGraph(ctx: DbContext, campaignId: string): CampaignGraph {
+  const entities = listEntities(ctx, campaignId)
+  const nodes: GraphNode[] = entities.map((e) => ({
+    id: e.id,
+    name: e.name,
+    type: e.type,
+    image: e.image,
+    lifecycle: e.lifecycle
+  }))
+  const ids = new Set(nodes.map((n) => n.id))
+  const edges: GraphEdge[] = []
+  for (const link of listLinksForCampaign(ctx, campaignId)) {
+    if (link.endSessionNumber !== null) continue // severed — not a current relationship
+    if (!ids.has(link.fromEntityId) || !ids.has(link.toEntityId)) continue // defensive: drop dangling
+    edges.push({
+      id: link.id,
+      from: link.fromEntityId,
+      to: link.toEntityId,
+      relation: link.relation,
+      label: isRelationKey(link.relation) ? RELATIONS[link.relation].forward : link.relation
+    })
+  }
+  return { nodes, edges }
 }
 
 /**

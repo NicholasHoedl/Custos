@@ -96,9 +96,13 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 
 - **P2-1 ☐ ⚑ Distribution stack**: code signing (needs a cert decision), electron-updater +
   publish config, a release job in CI (tag → build → artifact), LICENSE, `engines` field.
-- **P2-2 ☐ Entity portraits** (nullable image column + userData images dir + picker/drop-zone;
-  render in EntityDetail/Browser/Character).
-- **P2-3 ☐ Relationship graph view** (read-only force layout over live ties; the data already exists).
+- **P2-2 ☑ Entity portraits** (ADR-039). Nullable `entity.image` column (migration 0011) holding a
+  base64 JPEG **thumbnail** — chosen over a userData images dir so there's no file lifecycle and it rides
+  export/import for free. `nativeImage` picker (no new dep); rendered via a shared `Portrait` in
+  EntityDetail/Browser/Character + clipped into the Web nodes. Not embedded.
+- **P2-3 ☑ Relationship graph view** (ADR-040). New 9th nav view **Web**: a d3-force layout (first viz
+  dep) over `buildCampaignGraph` (live ties only), rendered as themed SVG with pan/zoom/node-drag and
+  click-to-open. No migration.
 - **P2-4 ☑ Global command palette** (cmdk is already a dependency; entities + views + actions).
 - **P2-5 ☐ List virtualization + note pagination** once a campaign crosses ~1k notes (Codex/Annals
   first; measure before building).

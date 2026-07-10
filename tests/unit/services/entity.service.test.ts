@@ -46,6 +46,30 @@ describe('entity.service', () => {
     expect(getEntity(ctx, e.id)?.voiceExamples).toEqual(next)
   })
 
+  it('round-trips the portrait image (P2-2) through create + update, defaulting to null', () => {
+    const withImg = createEntity(ctx, {
+      campaignId,
+      type: 'npc',
+      name: 'Portrait NPC',
+      image: 'data:image/jpeg;base64,ZZZZ'
+    })
+    expect(withImg.image).toBe('data:image/jpeg;base64,ZZZZ')
+    expect(getEntity(ctx, withImg.id)?.image).toBe('data:image/jpeg;base64,ZZZZ')
+
+    // Omitted on create → null (not undefined).
+    const noImg = createEntity(ctx, { campaignId, type: 'npc', name: 'Faceless' })
+    expect(noImg.image).toBeNull()
+
+    // Update sets it, and can clear it back to null.
+    expect(updateEntity(ctx, noImg.id, { image: 'data:image/jpeg;base64,QQQQ' }).image).toBe(
+      'data:image/jpeg;base64,QQQQ'
+    )
+    expect(updateEntity(ctx, noImg.id, { image: null }).image).toBeNull()
+    // A patch that omits image leaves it untouched.
+    updateEntity(ctx, withImg.id, { name: 'Renamed' })
+    expect(getEntity(ctx, withImg.id)?.image).toBe('data:image/jpeg;base64,ZZZZ')
+  })
+
   it('creates an entity and round-trips traits/goals/flaws/attributes JSON', () => {
     const e = createEntity(ctx, {
       campaignId,

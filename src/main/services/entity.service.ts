@@ -43,6 +43,7 @@ export function createEntity(ctx: DbContext, input: CreateEntityInput): Entity {
     type: input.type,
     name: input.name.trim(),
     description: input.description ?? null,
+    image: input.image ?? null,
     traits: serializeArray(input.traits),
     goals: serializeArray(input.goals),
     flaws: serializeArray(input.flaws),
@@ -76,6 +77,7 @@ export function updateEntity(ctx: DbContext, id: string, patch: UpdateEntityInpu
   const set: Partial<typeof schema.entity.$inferInsert> = { updatedAt: ts }
   if (patch.name !== undefined) set.name = patch.name.trim()
   if (patch.description !== undefined) set.description = patch.description
+  if (patch.image !== undefined) set.image = patch.image
   if (patch.status !== undefined) set.status = patch.status
   if (patch.lifecycle !== undefined) set.lifecycle = patch.lifecycle
   if (patch.traits !== undefined) set.traits = serializeArray(patch.traits)

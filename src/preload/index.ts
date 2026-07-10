@@ -47,7 +47,8 @@ const api: LedgerApi = {
     update: (id, patch) => ipcRenderer.invoke(IPC.entityUpdate, id, patch),
     delete: (id) => ipcRenderer.invoke(IPC.entityDelete, id),
     merge: (survivorId, loserId) => ipcRenderer.invoke(IPC.entityMerge, survivorId, loserId),
-    history: (entityId) => ipcRenderer.invoke(IPC.entityHistory, entityId)
+    history: (entityId) => ipcRenderer.invoke(IPC.entityHistory, entityId),
+    pickImage: () => ipcRenderer.invoke(IPC.entityPickImage)
   },
   note: {
     list: (entityId) => ipcRenderer.invoke(IPC.noteList, entityId),
@@ -71,7 +72,8 @@ const api: LedgerApi = {
   },
   graph: {
     context: (entityId, depth) => ipcRenderer.invoke(IPC.graphContext, entityId, depth),
-    hierarchy: (entityId, kind) => ipcRenderer.invoke(IPC.graphHierarchy, entityId, kind)
+    hierarchy: (entityId, kind) => ipcRenderer.invoke(IPC.graphHierarchy, entityId, kind),
+    campaign: (campaignId) => ipcRenderer.invoke(IPC.graphCampaign, campaignId)
   },
   search: {
     text: (query, campaignId) => ipcRenderer.invoke(IPC.searchText, query, campaignId)

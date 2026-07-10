@@ -103,6 +103,7 @@ export function importCampaign(ctx: DbContext, raw: unknown): ImportedCampaign {
             type: e.type,
             name: e.name,
             description: e.description,
+            image: e.image,
             traits: serializeArray(e.traits),
             goals: serializeArray(e.goals),
             flaws: serializeArray(e.flaws),

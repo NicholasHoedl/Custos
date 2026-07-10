@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
+import { ImageIcon, Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entity-types'
 import { profileFor } from '@shared/entity-profiles'
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle
 } from '@renderer/components/ui/alert-dialog'
 import { InfoPopover } from '@renderer/components/chrome'
+import { Portrait } from './Portrait'
 import { StatusCombobox } from './StatusCombobox'
 import { ListEditDialog } from './ListEditDialog'
 import { PersonaEditor } from './PersonaEditor'
@@ -122,7 +123,27 @@ export function CharacterDashboard({
     <div className="flex h-full flex-col">
       {/* Header: name + type/status + Delete (editing is inline; no Edit dialog here). */}
       <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 gap-3">
+          <button
+            type="button"
+            title={entity.image ? 'Change portrait' : 'Set portrait'}
+            className="group relative shrink-0"
+            onClick={async () => {
+              const url = await ledger.entity.pickImage()
+              if (url) savePromoted({ image: url })
+            }}
+          >
+            <Portrait
+              image={entity.image}
+              name={entity.name}
+              lifecycle={entity.lifecycle}
+              size="lg"
+            />
+            <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              <ImageIcon className="size-5 text-white" />
+            </span>
+          </button>
+          <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
               {ENTITY_TYPE_LABELS.pc}
@@ -147,6 +168,7 @@ export function CharacterDashboard({
             {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
             {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
           </h2>
+          </div>
         </div>
         <Button
           variant="outline"

@@ -1,6 +1,30 @@
-import type { Entity, EntityLink, Note, NoteConfidence } from './entity-types'
+import type { Entity, EntityLink, EntityType, Lifecycle, Note, NoteConfidence } from './entity-types'
 
 export type LinkDirection = 'out' | 'in'
+
+// The campaign relationship graph (P2-3): a flat node/edge slice of the campaign's LIVE ties, consumed by
+// the "Web" view. Deliberately minimal — just what the d3-force layout + SVG render need. Severed
+// (closed-interval) edges are excluded upstream; this is the "as it stands now" picture.
+export interface GraphNode {
+  id: string
+  name: string
+  type: EntityType
+  image: string | null // portrait data URL (P2-2), clipped into the node when present
+  lifecycle: Lifecycle // drives the dimmed treatment for fallen / presumed entities
+}
+
+export interface GraphEdge {
+  id: string
+  from: string // source entity id (the edge's authored `from`)
+  to: string // target entity id
+  relation: string // the stored relation key (free text; may be an unknown key)
+  label: string // the forward display label (RELATIONS[relation].forward, or the raw key)
+}
+
+export interface CampaignGraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
 
 /** One relationship as seen from a particular entity (used by EntityDetail). */
 export interface RelationshipView {

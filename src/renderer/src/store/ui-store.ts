@@ -5,6 +5,7 @@ export type ViewKey =
   | 'journal'
   | 'sessions'
   | 'capture'
+  | 'web'
   | 'recall'
   | 'suggest'
   | 'converse'

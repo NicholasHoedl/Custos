@@ -8,6 +8,7 @@ import {
 } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
 import { Input } from '@renderer/components/ui/input'
+import { Portrait } from './Portrait'
 
 export type EntityFilter = EntityType | 'all'
 /** Which non-entity pane the capture detail area shows when no entity is selected. Previously… and
@@ -163,12 +164,14 @@ function EntityCard({
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors',
+        'flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left transition-colors',
         selected
           ? 'border-primary/50 bg-primary/10'
           : 'border-transparent hover:border-border hover:bg-muted/50'
       )}
     >
+      <Portrait image={entity.image} name={entity.name} lifecycle={entity.lifecycle} size="sm" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
       <div className="flex w-full items-center gap-2">
         <span
           className={cn(
@@ -190,6 +193,7 @@ function EntityCard({
       {entity.description && (
         <span className="line-clamp-1 text-xs text-muted-foreground">{entity.description}</span>
       )}
+      </div>
     </button>
   )
 }

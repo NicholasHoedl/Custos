@@ -226,6 +226,7 @@ Entity
   type         EntityType NOT NULL
   name         TEXT NOT NULL
   description  TEXT
+  image        TEXT (nullable — optional portrait: a base64 JPEG data-URL thumbnail; NOT embedded; migration 0011, ADR-039)
   traits       TEXT (JSON array of strings — used heavily for PC in Suggest)
   goals        TEXT (JSON array of strings — for NPC / PC)
   flaws        TEXT (JSON array of strings — a vice/fear/weakness for PC/NPC/faction; feeds persona + Counsel, ADR-026)
@@ -547,7 +548,7 @@ All communication between renderer and main process goes through typed IPC chann
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
 > Notably: the renderer groups feature panes under `components/views/` (`CharacterView`, `JournalView`,
-> `SessionsView`, `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`,
+> `SessionsView`, `WebView` [the relationship graph, ADR-040], `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`,
 > `SettingsView`, `NotesView` — top-level per ADR-032; Codex slimmed to Inscribe + Annals;
 > **Transcribe is no longer a view** — ADR-036 moved it into `components/capture/TranscribeDialog.tsx`,
 > opened from the Chronicle header, which also hosts the relocated active-session switcher

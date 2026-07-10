@@ -12,7 +12,7 @@ import type {
   StatusHistoryEntry
 } from './entity-types'
 import type { RelationKey } from './relations'
-import type { EntityContext, HierarchyView, RelationshipView } from './graph-types'
+import type { CampaignGraph, EntityContext, HierarchyView, RelationshipView } from './graph-types'
 import type {
   ModelDownloadProgress,
   OnboardingStatus,
@@ -59,6 +59,7 @@ export interface CreateEntityInput {
   type: EntityType
   name: string
   description?: string
+  image?: string | null // portrait data URL (P2-2)
   traits?: string[]
   goals?: string[]
   flaws?: string[]
@@ -74,6 +75,7 @@ export interface CreateEntityInput {
 export interface UpdateEntityInput {
   name?: string
   description?: string | null
+  image?: string | null // portrait data URL (P2-2)
   traits?: string[]
   goals?: string[]
   flaws?: string[]
@@ -173,6 +175,8 @@ export interface LedgerApi {
     merge(survivorId: string, loserId: string): Promise<Entity>
     /** Chronology: the entity's full status/lifecycle history, oldest first. */
     history(entityId: string): Promise<StatusHistoryEntry[]>
+    /** Open a native file dialog, thumbnail the pick → a portrait data URL, or null on cancel (P2-2). */
+    pickImage(): Promise<string | null>
   }
   note: {
     list(entityId: string): Promise<Note[]>
@@ -200,6 +204,7 @@ export interface LedgerApi {
   graph: {
     context(entityId: string, depth?: number): Promise<EntityContext>
     hierarchy(entityId: string, kind: HierarchyKind): Promise<HierarchyView>
+    campaign(campaignId: string): Promise<CampaignGraph>
   }
   search: {
     text(query: string, campaignId: string): Promise<EntitySearchResult[]>
@@ -308,6 +313,7 @@ export const IPC = {
   entityDelete: 'entity:delete',
   entityMerge: 'entity:merge',
   entityHistory: 'entity:history',
+  entityPickImage: 'entity:pick-image',
   noteList: 'note:list',
   noteListAll: 'note:listAll',
   noteCreate: 'note:create',
@@ -324,6 +330,7 @@ export const IPC = {
   linkListForEntity: 'link:listForEntity',
   graphContext: 'graph:context',
   graphHierarchy: 'graph:hierarchy',
+  graphCampaign: 'graph:campaign',
   searchText: 'search:text',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',

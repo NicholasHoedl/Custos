@@ -88,6 +88,7 @@ export interface Entity {
   type: EntityType
   name: string
   description: string | null
+  image: string | null // optional portrait — a base64 data URL (JPEG thumbnail); NOT embedded (P2-2)
   traits: string[] // promoted (Suggest reads these)
   goals: string[] // promoted
   flaws: string[] // promoted (ADR-026): a vice/fear/weakness — the richest roleplay hook

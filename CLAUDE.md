@@ -34,7 +34,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **11 migrations (0000–0010)**.
+  `.sql`, keep `_journal.json` + the snapshot. Currently **12 migrations (0000–0011)** — 0011 (entity
+  portrait `image`, ADR-039) is the nullable-ADD case: a clean 1-line `ALTER`, NOT the table-rebuild.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -90,8 +91,9 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
   populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
   fields but is test-only; `getHierarchy` ignores them (structural).
-- **UI label ↔ code name (ADR-024/032/036):** the nav labels are Character · Chronicle · **Sessions** ·
-  Codex · **Lore** · **Counsel** · Converse · Settings; the code names stay `recall` (Lore), `suggest`
+- **UI label ↔ code name (ADR-024/032/036/040):** the nav labels are Character · Chronicle · **Sessions** ·
+  Codex · **Web** · **Lore** · **Counsel** · Converse · Settings (9 views; **Web** is P2-3/ADR-040, `'web'`,
+  right after Codex); the code names stay `recall` (Lore), `suggest`
   (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
   (`capture/TranscribeDialog.tsx`; `views/ImportView.tsx` is deleted, `'import'` left `ViewKey`). The
@@ -190,6 +192,23 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   unchanged. e2e: `tests/e2e/palette.spec.ts` (keyless — pure nav). The dead `fontSize`/`ThemeMode`
   `AppSettings` stubs were removed (never read; app is dark-only via globals.css + hardcoded
   `Toaster theme="dark"`); the `'import'` ViewKey was already gone (ADR-036).
+- **Portraits + Web graph (docs/ROADMAP.md P2-2/P2-3, ADR-039/040):** every entity has an optional
+  **portrait** — a base64 JPEG **thumbnail** in the nullable `entity.image` column (**migration 0011**,
+  the arc's first; a 1-line `ALTER`). Set via `entity:pickImage` (`ipc/entity.ts` → Electron `nativeImage`
+  resize→JPEG, NO new dep); rendered by the shared `entities/Portrait.tsx` (rounded square + initials
+  fallback, fallen/presumed dim) in EntityDetail/Browser/EntityForm + a click-to-set header on
+  `CharacterDashboard` (via `savePromoted({image})`). **NOT embedded** (`entityText` never reads it, so no
+  re-embed) and it **rides export/import for free** (just text on `Entity`; `import-campaign` carries it in
+  the field-by-field map). Passthrough mirrors `description` (serialize/create/`updateEntity` set-if-present).
+  The **Web** view (`components/views/WebView.tsx`) draws the campaign's LIVE ties as a **d3-force** graph
+  (first viz dep) over `buildCampaignGraph(ctx, campaignId)` (`link.service.ts`: nodes=`listEntities`,
+  edges=`listLinksForCampaign` filtered to OPEN intervals with `RELATIONS[relation].forward` labels,
+  dangling-endpoint edges dropped) → `graph:campaign` IPC → `useCampaignGraph` (refetches on
+  `entitiesVersion`). Rendered as themed SVG (hand-rolled pan/zoom/node-drag; ember ring reserved for the
+  MC, everyone else muted iron — the single-accent guardrail); the sim is **guarded on
+  `activeView === 'web'`** (MainPanel keeps views mounted) — builds/reheats on activation, `stop()`s +
+  cancels rAF when hidden, positions cached in a ref so a data change doesn't scramble. Click a node →
+  `setSelectedEntity` + `setActiveView('capture')` (MC → `'character'`). No migration for the graph.
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.

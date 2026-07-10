@@ -50,6 +50,8 @@ ADR that supersedes the old one (don't edit the old one).
 | [036](036-chronicle-header-consolidation.md) | Chronicle-header consolidation: Transcribe becomes a header dialog; the session selector moves out of the Sidebar (revises ADR-032) | Accepted | 2026-07-08 |
 | [037](037-session-integrity.md) | Session integrity: a derived "unclosed" signal (no stamp column) + editable chronicle entries | Accepted | 2026-07-09 |
 | [038](038-entity-merge.md) | Entity merge: re-point only, cascade-swept dedup (no explicit pre-delete) | Accepted | 2026-07-09 |
+| [039](039-entity-portraits.md) | Entity portraits: a base64 JPEG thumbnail in a nullable column (migration 0011), not files | Accepted | 2026-07-10 |
+| [040](040-relationship-graph.md) | Relationship graph: a d3-force "Web" view over live ties (new 9th nav view) | Accepted | 2026-07-10 |
 
 ## Status legend
 
