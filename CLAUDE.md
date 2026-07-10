@@ -181,6 +181,15 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   detected via `findOpenLink` over a tx-scoped ctx); MC pointer carried before delete (PC survivor
   required); survivor fields untouched ⇒ no re-embed. UI: **Merge** action on EntityDetail →
   `MergeEntityDialog` (reuses `EntityPicker`).
+- **Command palette + removals (docs/ROADMAP.md P2-4, R-1/2/3):** **Ctrl/Cmd+K** opens a global
+  `CommandPalette` (`components/CommandPalette.tsx`, the first `CommandDialog` consumer) — Go-to any view
+  (from the shared `lib/nav-items.tsx` `NAV_ITEMS`, now the single source for Sidebar + palette), find any
+  entity by name (cmdk over `useEntities`; MC→Character, else Codex — same nav as `SearchBox`), or Add
+  entity (folds in the old quick-add). **Ctrl+K was repurposed FROM quick-add** → the palette; quick-add
+  stays reachable via the palette command + the OS-global **Ctrl+Alt+L**; **Ctrl+F** (sidebar search)
+  unchanged. e2e: `tests/e2e/palette.spec.ts` (keyless — pure nav). The dead `fontSize`/`ThemeMode`
+  `AppSettings` stubs were removed (never read; app is dark-only via globals.css + hardcoded
+  `Toaster theme="dark"`); the `'import'` ViewKey was already gone (ADR-036).
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.

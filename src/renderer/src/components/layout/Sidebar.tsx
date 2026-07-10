@@ -1,27 +1,13 @@
 import { useEffect, useState } from 'react'
-import {
-  BookOpen,
-  CalendarClock,
-  MessagesSquare,
-  MoreHorizontal,
-  NotebookPen,
-  Pencil,
-  Plus,
-  ScrollText,
-  Search,
-  Settings,
-  Sparkles,
-  Star,
-  Trash2,
-  UserRound
-} from 'lucide-react'
+import { BookOpen, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
-import { useUiStore, type ViewKey } from '@renderer/store/ui-store'
+import { useUiStore } from '@renderer/store/ui-store'
+import { NAV_ITEMS } from '@renderer/lib/nav-items'
 import { SearchBox } from '@renderer/components/capture/SearchBox'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
@@ -58,17 +44,6 @@ import {
   DropdownMenuTrigger
 } from '@renderer/components/ui/dropdown-menu'
 
-const NAV: { key: ViewKey; label: string; icon: typeof ScrollText }[] = [
-  { key: 'character', label: 'Character', icon: UserRound },
-  { key: 'journal', label: 'Chronicle', icon: NotebookPen },
-  { key: 'sessions', label: 'Sessions', icon: CalendarClock },
-  { key: 'capture', label: 'Codex', icon: ScrollText },
-  { key: 'recall', label: 'Lore', icon: Search },
-  { key: 'suggest', label: 'Counsel', icon: Sparkles },
-  { key: 'converse', label: 'Converse', icon: MessagesSquare },
-  { key: 'settings', label: 'Settings', icon: Settings }
-]
-
 export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
   const setActiveView = useUiStore((s) => s.setActiveView)
@@ -90,7 +65,7 @@ export function Sidebar() {
       </div>
 
       <nav className="mt-4 flex flex-1 flex-col gap-1 px-3">
-        {NAV.map(({ key, label, icon: Icon }) => {
+        {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
           const active = key === activeView
           return (
             <button

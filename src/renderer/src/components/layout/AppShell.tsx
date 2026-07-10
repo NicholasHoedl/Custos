@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { MainPanel } from './MainPanel'
+import { CommandPalette } from '@renderer/components/CommandPalette'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { TooltipProvider } from '@renderer/components/ui/tooltip'
 import { ledger } from '@renderer/lib/ipc'
@@ -9,18 +10,20 @@ import { useUiStore } from '@renderer/store/ui-store'
 export function AppShell() {
   const requestQuickAddFocus = useUiStore((s) => s.requestQuickAddFocus)
   const requestSearchFocus = useUiStore((s) => s.requestSearchFocus)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   // Global hotkey: main process focuses the window then asks us to focus quick-add (ADR-010).
   useEffect(() => ledger.onQuickAddFocus(() => requestQuickAddFocus()), [requestQuickAddFocus])
 
-  // In-app shortcuts: Ctrl/Cmd+K → quick-add, Ctrl/Cmd+F → search.
+  // In-app shortcuts: Ctrl/Cmd+K → command palette (P2-4; quick-add is a palette command now),
+  // Ctrl/Cmd+F → sidebar search. The OS-global quick-add hotkey (Ctrl+Alt+L) is unchanged.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return
       const key = e.key.toLowerCase()
       if (key === 'k') {
         e.preventDefault()
-        requestQuickAddFocus()
+        setPaletteOpen((o) => !o)
       } else if (key === 'f') {
         e.preventDefault()
         requestSearchFocus()
@@ -28,7 +31,7 @@ export function AppShell() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [requestQuickAddFocus, requestSearchFocus])
+  }, [requestSearchFocus])
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -48,6 +51,7 @@ export function AppShell() {
         />
       </div>
       <Toaster theme="dark" richColors position="bottom-right" />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </TooltipProvider>
   )
 }

@@ -146,12 +146,11 @@ export interface EventLogEntry {
   timestamp: number
 }
 
-export type ThemeMode = 'dark'
-export type FontSize = 'sm' | 'md' | 'lg'
+// The app is dark-only and has no font-size control; the former `theme`/`fontSize` settings were
+// declared but never read, so they were removed (ROADMAP R-1/R-2). Dark lives unconditionally in
+// globals.css; the Toaster hardcodes theme="dark".
 
 export interface AppSettings {
-  theme: ThemeMode
-  fontSize: FontSize
   recallModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestEffort: 'medium' | 'high'

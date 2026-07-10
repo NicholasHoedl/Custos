@@ -17,7 +17,7 @@ vi.mock('../../src/main/services/embedding.service', () => ({
   embed: embedFn
 }))
 vi.mock('../../src/main/services/settings.service', () => ({
-  getSettings: () => ({ recallModel: 'claude-sonnet-4-6', theme: 'dark', fontSize: 'md', hotkey: '' })
+  getSettings: () => ({ recallModel: 'claude-sonnet-4-6', hotkey: '' })
 }))
 vi.mock('../../src/main/services/claude.service', async (importOriginal) => {
   // Keep the REAL formatRelationships/formatState so the gather -> format -> pass chain is exercised;

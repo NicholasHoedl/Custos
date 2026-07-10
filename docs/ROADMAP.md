@@ -99,18 +99,18 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 - **P2-2 ☐ Entity portraits** (nullable image column + userData images dir + picker/drop-zone;
   render in EntityDetail/Browser/Character).
 - **P2-3 ☐ Relationship graph view** (read-only force layout over live ties; the data already exists).
-- **P2-4 ☐ Global command palette** (cmdk is already a dependency; entities + views + actions).
+- **P2-4 ☑ Global command palette** (cmdk is already a dependency; entities + views + actions).
 - **P2-5 ☐ List virtualization + note pagination** once a campaign crosses ~1k notes (Codex/Annals
   first; measure before building).
 - **P2-6 ☐ Close-out wizard e2e** (the most complex UI currently has none).
 
 ## R — removals (subtractions that finish the product)
 
-- **R-1 ☐ `fontSize`**: dead setting (declared + defaulted, read nowhere) — remove from `AppSettings`
+- **R-1 ☑ `fontSize`**: dead setting (declared + defaulted, read nowhere) — remove from `AppSettings`
   + defaults, or wire it. Decision: remove.
-- **R-2 ☐ `ThemeMode`**: single-variant union pretending to be a choice — collapse to a constant;
+- **R-2 ☑ `ThemeMode`**: single-variant union pretending to be a choice — collapse to a constant;
   dark IS the brand.
-- **R-3 ☐ `'import'` ViewKey**: vestigial since Transcribe left the nav (ADR-036).
+- **R-3 ☑ `'import'` ViewKey**: vestigial since Transcribe left the nav (ADR-036).
 
 ---
 
