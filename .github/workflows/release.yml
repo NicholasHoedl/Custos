@@ -1,0 +1,37 @@
+name: Release
+
+# Cut a release by pushing a version tag (e.g. `git tag v0.1.1 && git push origin v0.1.1`).
+# electron-builder builds the installer and publishes it — plus `latest.yml` + `.blockmap` (the
+# electron-updater feed) — to a GitHub Release for the tag. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # create + upload the tag's GitHub Release
+
+jobs:
+  release:
+    runs-on: windows-latest # Ledger ships Windows-only
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # postinstall runs `electron-builder install-app-deps`, compiling better-sqlite3 for the
+      # Electron ABI (VS Build Tools + Python are preinstalled on windows-latest).
+      - run: npm ci
+      # typecheck + electron-vite build → out/
+      - run: npm run build
+      # Package + publish the installer + latest.yml + blockmap to the tag's GitHub Release (draft by
+      # default — publish it to make the update live). npmRebuild=false: postinstall already rebuilt.
+      - run: npx electron-builder --publish always --config.npmRebuild=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code signing (optional, P2-1): set these two repo secrets to auto-sign. Empty ⇒ unsigned,
+          # no workflow change needed when a certificate is added later.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}

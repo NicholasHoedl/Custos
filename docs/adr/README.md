@@ -53,6 +53,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [039](039-entity-portraits.md) | Entity portraits: a base64 JPEG thumbnail in a nullable column (migration 0011), not files | Accepted | 2026-07-10 |
 | [040](040-relationship-graph.md) | Relationship graph: a d3-force "Web" view over live ties (new 9th nav view) | Accepted | 2026-07-10 |
 | [041](041-e2e-fake-ai-seam.md) | An env-gated fake-AI seam (`LEDGER_FAKE_AI`) for e2e — driving the close-out wizard offline | Accepted | 2026-07-10 |
+| [042](042-distribution-autoupdate.md) | Distribution: electron-updater auto-update via public GitHub Releases + a tag-triggered CI release, proprietary license, unsigned/cert-ready (revises ADR-020) | Accepted | 2026-07-10 |
 
 ## Status legend
 

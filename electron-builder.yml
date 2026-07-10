@@ -19,3 +19,11 @@ extraResources:
     to: drizzle
 win:
   target: nsis
+# Auto-update feed (P2-1, ADR-042). electron-builder emits latest.yml alongside the installer, and
+# `--publish always` (the CI release job) uploads them to the GitHub Release for the pushed tag.
+# electron-updater reads latest.yml from the repo's PUBLIC Releases (no auth). Owner/repo must match the
+# real GitHub repo exactly.
+publish:
+  provider: github
+  owner: NicholasHoedl
+  repo: Ledger

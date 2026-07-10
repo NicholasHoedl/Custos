@@ -9,11 +9,13 @@ import {
   FileUp,
   FolderOpen,
   KeyRound,
+  RefreshCw,
+  RotateCw,
   ScrollText
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AppSettings } from '@shared/entity-types'
-import type { AppInfo } from '@shared/ipc-types'
+import type { AppInfo, UpdateStatus } from '@shared/ipc-types'
 import { AI_FEATURE_LABELS, type AiFeature, type UsageSummary } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
 import { formatUsd } from '@renderer/lib/format'
@@ -33,6 +35,26 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 
+/** The muted status line beside the "Check for updates" button (P2-1). Empty when there's nothing to say. */
+function updateLabel(s: UpdateStatus | null): string {
+  switch (s?.state) {
+    case 'checking':
+      return 'Checking for updates…'
+    case 'available':
+      return `Downloading v${s.version ?? ''}…`
+    case 'downloading':
+      return `Downloading… ${s.percent ?? 0}%`
+    case 'not-available':
+      return 'You’re up to date.'
+    case 'disabled':
+      return s.message ?? 'Updates apply to the installed app.'
+    case 'error':
+      return s.message ?? 'Update check failed.'
+    default:
+      return '' // idle, or 'downloaded' (the button already says "Restart to update")
+  }
+}
+
 export function SettingsView() {
   const { settings, update } = useSettings()
   const { status: onb, progress, downloading, error: modelError, download } = useOnboarding()
@@ -47,6 +69,7 @@ export function SettingsView() {
   const [backingUp, setBackingUp] = useState(false)
   const [importing, setImporting] = useState(false)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
 
   useEffect(() => {
     ledger.apikey
@@ -68,6 +91,9 @@ export function SettingsView() {
       .then(setUsage)
       .catch(() => setUsage(null))
   }, [])
+
+  // Auto-update status (P2-1): the main process pushes lifecycle events (launch check + manual checks).
+  useEffect(() => ledger.onUpdateStatus(setUpdateStatus), [])
 
   async function backupNow(): Promise<void> {
     if (backingUp) return
@@ -423,6 +449,33 @@ export function SettingsView() {
         {appInfo && (
           <p className="pt-1 text-xs text-muted-foreground">Ledger v{appInfo.version}</p>
         )}
+        <div className="flex flex-wrap items-center gap-2">
+          {updateStatus?.state === 'downloaded' ? (
+            <Button size="sm" variant="outline" onClick={() => void ledger.update.install()}>
+              <RotateCw className="size-4" />
+              Restart to update{updateStatus.version ? ` (v${updateStatus.version})` : ''}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void ledger.update.check()}
+              disabled={updateStatus?.state === 'checking' || updateStatus?.state === 'downloading'}
+            >
+              <RefreshCw
+                className={`size-4 ${
+                  updateStatus?.state === 'checking' || updateStatus?.state === 'downloading'
+                    ? 'animate-spin'
+                    : ''
+                }`}
+              />
+              Check for updates
+            </Button>
+          )}
+          {updateLabel(updateStatus) && (
+            <span className="text-xs text-muted-foreground">{updateLabel(updateStatus)}</span>
+          )}
+        </div>
       </section>
 
       <Separator />

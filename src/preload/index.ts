@@ -10,6 +10,7 @@ import {
   RECAP_DONE_CHANNEL,
   RECAP_ERROR_CHANNEL,
   RENDERER_ERROR_CHANNEL,
+  UPDATE_STATUS_CHANNEL,
   type LedgerApi
 } from '@shared/ipc-types'
 
@@ -132,6 +133,10 @@ const api: LedgerApi = {
     openLogsFolder: () => ipcRenderer.invoke(IPC.appOpenLogsFolder),
     backupNow: () => ipcRenderer.invoke(IPC.appBackupNow)
   },
+  update: {
+    check: () => ipcRenderer.invoke(IPC.updateCheck),
+    install: () => ipcRenderer.invoke(IPC.updateInstall)
+  },
   log: {
     // send, not invoke: a crashing renderer must never await its own crash report
     rendererError: (report) => ipcRenderer.send(RENDERER_ERROR_CHANNEL, report)
@@ -150,7 +155,8 @@ const api: LedgerApi = {
   onRecapChunk: (callback) => subscribe(RECAP_CHUNK_CHANNEL, callback),
   onRecapDone: (callback) => subscribe(RECAP_DONE_CHANNEL, callback),
   onRecapError: (callback) => subscribe(RECAP_ERROR_CHANNEL, callback),
-  onModelDownloadProgress: (callback) => subscribe(MODEL_DOWNLOAD_PROGRESS_CHANNEL, callback)
+  onModelDownloadProgress: (callback) => subscribe(MODEL_DOWNLOAD_PROGRESS_CHANNEL, callback),
+  onUpdateStatus: (callback) => subscribe(UPDATE_STATUS_CHANNEL, callback)
 }
 
 contextBridge.exposeInMainWorld('ledger', api)

@@ -94,8 +94,12 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 
 ## P2 — scale, polish, distribution
 
-- **P2-1 ☐ ⚑ Distribution stack**: code signing (needs a cert decision), electron-updater +
-  publish config, a release job in CI (tag → build → artifact), LICENSE, `engines` field.
+- **P2-1 ☑ Distribution stack** (ADR-042). Proprietary `LICENSE` + `engines`/`repository`/`homepage`;
+  **electron-updater** auto-update against public GitHub Releases (`publish:` in electron-builder.yml →
+  `latest.yml`; packaged-only `updater.service.ts` → `UPDATE_STATUS_CHANNEL` → a "Check for updates"
+  Settings surface); a tag-triggered **release CI job** (`release.yml`, `electron-builder --publish
+  always`). **Unsigned but cert-ready** (`CSC_*` secrets auto-sign later). Activates once the repo is
+  public + a tagged release is published; see `RELEASING.md`.
 - **P2-2 ☑ Entity portraits** (ADR-039). Nullable `entity.image` column (migration 0011) holding a
   base64 JPEG **thumbnail** — chosen over a userData images dir so there's no file lifecycle and it rides
   export/import for free. `nativeImage` picker (no new dep); rendered via a shared `Portrait` in

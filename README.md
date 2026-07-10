@@ -36,7 +36,15 @@ Electron · React 19 · TypeScript · Tailwind 4 + shadcn/ui · Zustand · SQLit
 Drizzle ORM · local sentence embeddings via Transformers.js (all-MiniLM-L6-v2) · the Anthropic SDK
 (main-process only). Windows-first.
 
-## Getting started
+## Download & install
+
+Grab the latest `Ledger Setup X.Y.Z.exe` from the [Releases](https://github.com/NicholasHoedl/Ledger/releases)
+page and run it (a per-user install, no admin needed). The installer is **not yet code-signed**, so
+Windows SmartScreen may warn about an "unknown publisher" — choose **More info → Run anyway**. Once
+installed, Ledger **updates itself**: it checks for new releases on launch and installs them in the
+background, and you can check manually from **Settings → Your data → Check for updates**.
+
+## Getting started (from source)
 
 Requires Node 22 and (for the AI features) an Anthropic API key.
 
@@ -56,7 +64,7 @@ either; Lore and Counsel need both; Converse and the Character page's AI tools n
 |---|---|
 | `npm run dev` | Run the app with hot reload |
 | `npm run build` | Typecheck + build the production bundle |
-| `npm run dist` | Build a signed Windows installer into `dist/` |
+| `npm run dist` | Build the Windows installer into `dist/` (unsigned by default — see [`RELEASING.md`](RELEASING.md)) |
 | `npm test` | Run the unit + integration suite (Vitest, under Electron-as-Node) |
 | `npm run test:e2e` | Build + run the Playwright end-to-end tests |
 | `npm run typecheck` | Type-check the main + renderer projects |
@@ -85,4 +93,6 @@ Everything is stored under the app's user-data directory (`%APPDATA%\Ledger` on 
 
 ## License
 
-MIT.
+**Proprietary — © 2026 Nicholas Hoedl, all rights reserved.** The source is available for reference only;
+it is not open-source. You may download and run official prebuilt releases for personal use, but you may
+not reuse, modify, or redistribute the code without written permission. See [`LICENSE`](LICENSE).

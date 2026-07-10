@@ -223,6 +223,19 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   run and under vitest (env unset → short-circuits before `app.isPackaged`). `close-out.spec.ts` drives
   the locked close-out wizard through both tiers this way (plants a dummy key via `ledger.apikey.set` +
   reloads so `keyReady` refetches). **10 e2e specs currently green.**
+- **Distribution + auto-update (docs/ROADMAP.md P2-1, ADR-042):** `npm run dist` builds the NSIS installer
+  (`Ledger Setup X.Y.Z.exe`) via `electron-builder.yml`; the `publish: github` block makes it also emit
+  `latest.yml` (the electron-updater feed). **Auto-update is PACKAGED-ONLY** — `services/updater.service.ts`
+  (`initAutoUpdater`/`checkForUpdates`/`quitAndInstall`) guards on `!app.isPackaged`, so it no-ops in dev
+  and e2e (the Settings control reports `disabled`); it's wired via `ipc/update.ts` `registerUpdateHandlers(send)`
+  (called from `handlers.ts`), pushing `UpdateStatus` on `UPDATE_STATUS_CHANNEL` (mirrors
+  `onModelDownloadProgress`) to the **Settings "Your data"** "Check for updates" / "Restart to update"
+  controls. electron-updater is a CJS dep imported named (`import { autoUpdater } from 'electron-updater'`)
+  — same interop as `import { app } from 'electron'`. **License is proprietary** (`package.json` `UNLICENSED`
+  + `LICENSE`; source-available, not open-source). Builds are **unsigned** unless `CSC_LINK`+`CSC_KEY_PASSWORD`
+  are set (electron-builder auto-signs; the release CI passes them through). Releases: push a `v*` tag →
+  `.github/workflows/release.yml` runs `electron-builder --publish always` → a DRAFT GitHub Release (publish
+  it to go live; **Releases must be PUBLIC** for token-free update). Full runbook in `RELEASING.md`.
 
 ## Git
 Work lands on `main`. A remote (`origin`) is configured, but the GitHub repo may not exist yet, so

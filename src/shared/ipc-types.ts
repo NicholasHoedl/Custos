@@ -270,6 +270,13 @@ export interface LedgerApi {
     /** On-demand snapshot — the same WAL-safe VACUUM INTO as the launch backup (P0-2). */
     backupNow(): Promise<BackupNowResult>
   }
+  update: {
+    /** Manually check for an update (Settings button). Progress arrives via `onUpdateStatus`. A no-op
+     *  that reports `disabled` in dev/unpackaged builds (P2-1). */
+    check(): Promise<void>
+    /** Quit and install a downloaded update (the "Restart to update" button). */
+    install(): Promise<void>
+  }
   log: {
     /** Fire-and-forget: renderer crashes land in the main-process log (P0-3). */
     rendererError(report: RendererErrorReport): void
@@ -289,6 +296,8 @@ export interface LedgerApi {
   onRecapDone(callback: (done: RecapDone) => void): () => void
   onRecapError(callback: (err: RecapError) => void): () => void
   onModelDownloadProgress(callback: (progress: ModelDownloadProgress) => void): () => void
+  /** Subscribe to auto-update lifecycle events (P2-1). Returns an unsubscribe fn. */
+  onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
 }
 
 /** Channel names — the single source of truth shared by the preload and the main-process handlers. */
@@ -362,7 +371,9 @@ export const IPC = {
   appOpenDataFolder: 'app:open-data-folder',
   appOpenLogsFolder: 'app:open-logs-folder',
   appBackupNow: 'app:backup-now',
-  usageSummary: 'usage:summary'
+  usageSummary: 'usage:summary',
+  updateCheck: 'update:check',
+  updateInstall: 'update:install'
 } as const
 
 /** One-way channel: main -> renderer, asking the UI to focus the quick-add bar. */
@@ -397,3 +408,19 @@ export const RECAP_DONE_CHANNEL = 'recap:done'
 export const RECAP_ERROR_CHANNEL = 'recap:error'
 /** One-way: main -> renderer, embedding-model download progress (onboarding). */
 export const MODEL_DOWNLOAD_PROGRESS_CHANNEL = 'onboarding:model-progress'
+
+/** One-way: main -> renderer, auto-update lifecycle (P2-1, ADR-042). Drives the Settings update UI. */
+export const UPDATE_STATUS_CHANNEL = 'update:status'
+
+/** Auto-update status pushed to the renderer. `checking`/`available`/`downloading`/`downloaded` are the
+ *  happy path; `not-available` = up to date; `disabled` = dev/unpackaged (updates apply to the installed
+ *  app only); `error` carries a human message (e.g. no releases published yet — benign). */
+export interface UpdateStatus {
+  state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'disabled' | 'error'
+  /** The available/downloaded release version (for `available`/`downloaded`). */
+  version?: string
+  /** Download percentage 0–100 (for `downloading`). */
+  percent?: number
+  /** A short human-readable line (for `error`/`disabled`). */
+  message?: string
+}
