@@ -26,6 +26,7 @@ import {
   type RecallContext
 } from './claude.service'
 import { classifyError, isOnline } from './ai-util'
+import { FAKE_RECALL_TEXT, fakeAiEnabled } from './ai-fake'
 
 type Send = (channel: string, payload: unknown) => void
 
@@ -63,7 +64,8 @@ export async function ask(
 ): Promise<void> {
   const { requestId, query, campaignId, pcId, mode } = req
   try {
-    if (!isModelReady()) {
+    // e2e fake-AI seam (ADR-043): bypass the model gate; retrieval below skips embed/dense and keeps fuzzy.
+    if (!isModelReady() && !fakeAiEnabled()) {
       send(RECALL_ERROR_CHANNEL, {
         requestId,
         kind: 'no_model',
@@ -74,8 +76,11 @@ export async function ask(
 
     // Chronology (ADR-017): when asOfSession is set, clamp retrieval + reconstructed state to ≤ N.
     const asOf = req.asOfSession
-    const queryVec = await embed(query)
-    const denseChunks = store.search(queryVec, campaignId, TOP_K, asOf)
+    let denseChunks: RetrievedChunk[] = []
+    if (!fakeAiEnabled()) {
+      const queryVec = await embed(query)
+      denseChunks = store.search(queryVec, campaignId, TOP_K, asOf)
+    }
     // Hybrid retrieval: dense embeddings miss a misspelled proper noun ("glastav" → "Glasstaff").
     // Fuzzy-match the query against entity NAMES and fold those entities in (description + a few notes)
     // so the thing the player named always surfaces, even when the spelling is off.
@@ -180,18 +185,27 @@ export async function ask(
     const state = formatState(anchorLabel, stateItems, asOf !== undefined)
 
     let cost: AiRunCost | undefined
-    const sources = await claudeRecall({
-      query,
-      chunks,
-      relationships,
-      state,
-      mode: effectiveMode,
-      context,
-      model: getSettings().recallModel,
-      onText: (text) => send(RECALL_CHUNK_CHANNEL, { requestId, text }),
-      onCost: (c) => (cost = c), // per-run cost rides the done event (P0-4)
-      signal
-    })
+    const onText = (text: string): void => send(RECALL_CHUNK_CHANNEL, { requestId, text })
+    // e2e fake-AI seam (ADR-043): emit canned prose through onText, and return the REAL fuzzy-grounded
+    // sources (chunksToSources over the chunks retrieved above) so the Sources list is genuine.
+    let sources: RecallSource[]
+    if (fakeAiEnabled()) {
+      onText(FAKE_RECALL_TEXT)
+      sources = chunksToSources(chunks)
+    } else {
+      sources = await claudeRecall({
+        query,
+        chunks,
+        relationships,
+        state,
+        mode: effectiveMode,
+        context,
+        model: getSettings().recallModel,
+        onText,
+        onCost: (c) => (cost = c), // per-run cost rides the done event (P0-4)
+        signal
+      })
+    }
     send(RECALL_DONE_CHANNEL, { requestId, mode: effectiveMode, sources, reason: 'ok', cost })
   } catch (err) {
     if (signal.aborted) return // user cancelled — swallow

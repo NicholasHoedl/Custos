@@ -8,6 +8,7 @@ import { getEntity } from './entity.service'
 import { getSettings } from './settings.service'
 import { deriveProfileCall, isAvailable } from './claude.service'
 import { classifyError, isOnline } from './ai-util'
+import { fakeAiEnabled, fakeDerive } from './ai-fake'
 
 /**
  * Clean the model's raw output into a DerivedProfile — strings trimmed, list items trimmed + de-duped +
@@ -87,7 +88,8 @@ export async function deriveProfile(
         signal
       })
     // One retry: the model occasionally returns malformed structured output.
-    let profile = validateDerived(await callOnce())
+    // e2e fake-AI seam (ADR-043): canned profile (already the validated shape); no retry under the flag.
+    let profile = fakeAiEnabled() ? fakeDerive() : validateDerived(await callOnce())
     if (!profile) profile = validateDerived(await callOnce())
     if (!profile) return { ok: false, reason: 'invalid' }
     return { ok: true, profile }

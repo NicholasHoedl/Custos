@@ -6,6 +6,7 @@ import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { getEntity } from './entity.service'
 import { complete } from './claude.service'
+import { fakeAiEnabled, fakePersona } from './ai-fake'
 import { getSettings } from './settings.service'
 import { now } from './serialize'
 
@@ -119,7 +120,9 @@ export async function generatePersona(ctx: DbContext, entityId: string): Promise
   if (!e) throw new Error('Entity not found')
   if (e.type !== 'pc') throw new Error('Personas are only for player characters')
   const model = getSettings().recallModel
-  const brief = await complete(PERSONA_SYSTEM, personaUserPrompt(e), model)
+  // e2e fake-AI seam (ADR-043): Counsel/Converse/Recall trigger persona generation before their own
+  // faked call, so this real `complete()` must be faked too or they'd 401 in the keyless harness.
+  const brief = fakeAiEnabled() ? fakePersona() : await complete(PERSONA_SYSTEM, personaUserPrompt(e), model)
   const ts = now()
   const row: PersonaRow = {
     entityId,

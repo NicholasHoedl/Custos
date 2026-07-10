@@ -23,6 +23,7 @@ import {
   type SuggestContext
 } from './claude.service'
 import { classifyError, isOnline } from './ai-util'
+import { fakeAiEnabled, fakeConverse } from './ai-fake'
 
 function fail(reason: ConverseFailureReason): ConverseResult {
   return { ok: false, reason }
@@ -156,7 +157,8 @@ export async function converse(
         signal
       })
     // One retry: the model occasionally returns too few or duplicate-tag questions.
-    let out = validateConverse(await callOnce())
+    // e2e fake-AI seam (ADR-043): canned questions; the retry path is unreachable under the flag.
+    let out = validateConverse(fakeAiEnabled() ? fakeConverse() : await callOnce())
     if (!out) out = validateConverse(await callOnce())
     if (!out) return fail('invalid')
     return { ok: true, questions: out, cost }

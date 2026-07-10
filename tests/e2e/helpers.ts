@@ -34,3 +34,24 @@ export function cleanup(userDataDir: string): void {
     // WAL/lock files can linger briefly on Windows; a leftover temp dir is harmless.
   }
 }
+
+// ---- Shared drive-path helpers for the AI-lens specs (fake-AI seam, ADR-041/043) ----
+
+/** Create a campaign + its mandatory main character via the New-campaign dialog. */
+export async function createCampaign(page: Page, name: string, mainCharacter: string): Promise<void> {
+  await page.getByRole('button', { name: 'New campaign' }).click()
+  await page.getByLabel('Name', { exact: true }).fill(name)
+  await page.getByLabel('Main character').fill(mainCharacter)
+  await page.getByRole('button', { name: 'Create' }).click()
+}
+
+/** Plant a dummy API key (the lenses gate on key PRESENCE, not validity) and reload so the views'
+ *  `useOnboarding` refetches `keyReady` (and, under LEDGER_FAKE_AI, `modelReady`). */
+export async function plantKeyAndReload(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    (
+      window as unknown as { ledger: { apikey: { set(k: string): Promise<void> } } }
+    ).ledger.apikey.set('sk-ant-test')
+  )
+  await page.reload()
+}

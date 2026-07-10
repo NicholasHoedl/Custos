@@ -36,6 +36,7 @@ import {
 } from './claude.service'
 import { gatherPinned, resolveScene } from './scene.service'
 import { classifyError, isOnline } from './ai-util'
+import { fakeAiEnabled, fakeDirections, fakeSuggest } from './ai-fake'
 
 const TOP_K = 8
 const TAG_SET = new Set<string>(SUGGEST_TAGS)
@@ -136,7 +137,8 @@ export async function suggest(
   // Chronology (ADR-017): clamp retrieval + reconstructed state to ≤ N when as-of is set.
   const asOf = req.asOfSession
   try {
-    if (!isModelReady()) return fail('no_model')
+    // e2e fake-AI seam (ADR-043): bypass the model gate; retrieval below skips embed/dense and keeps fuzzy.
+    if (!isModelReady() && !fakeAiEnabled()) return fail('no_model')
     if (!pcId) return fail('no_pc')
     const pc = getEntity(ctx, pcId)
     if (!pc || pc.type !== 'pc') return fail('no_pc')
@@ -149,8 +151,12 @@ export async function suggest(
 
     // Directions mode allows an empty situation; fall back to the PC's name so retrieval still runs.
     const queryText = situation.trim() || pc.name
-    const situationVec = await embed(queryText)
-    const denseChunks = store.search(situationVec, campaignId, TOP_K, asOf)
+    // e2e fake-AI seam (ADR-043): skip embeddings/dense (no model on disk); keep the model-free fuzzy match.
+    let denseChunks: RetrievedChunk[] = []
+    if (!fakeAiEnabled()) {
+      const situationVec = await embed(queryText)
+      denseChunks = store.search(situationVec, campaignId, TOP_K, asOf)
+    }
     // Hybrid retrieval (same as Recall): fold in entities whose NAME the query fuzzily matches.
     const fuzzy = store.fuzzyEntityChunks(
       campaignId,
@@ -263,7 +269,7 @@ export async function suggest(
           signal
         })
       // One retry: the model occasionally returns too few usable suggestions.
-      let suggestions = validateDirections(await callOnce())
+      let suggestions = validateDirections(fakeAiEnabled() ? fakeDirections() : await callOnce())
       if (!suggestions) suggestions = validateDirections(await callOnce())
       if (!suggestions) return fail('invalid')
       return { ok: true, mode: 'directions', suggestions, cost }
@@ -285,7 +291,7 @@ export async function suggest(
         signal
       })
     // One retry: the model occasionally returns fewer than 6 or a duplicate primary tag.
-    let recs = validateMoment(await callOnce())
+    let recs = validateMoment(fakeAiEnabled() ? fakeSuggest() : await callOnce())
     if (!recs) recs = validateMoment(await callOnce())
     if (!recs) return fail('invalid')
     return { ok: true, mode: 'attitudes', recommendations: recs, cost }

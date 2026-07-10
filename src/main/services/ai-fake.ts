@@ -1,6 +1,9 @@
 import { app } from 'electron'
 import type { RawExtraction } from '@shared/import-types'
 import type { RawEnrichment } from '@shared/enrich-types'
+import type { MomentSuggestion, StorySuggestion } from '@shared/suggest-types'
+import type { ConverseQuestion } from '@shared/converse-types'
+import type { DerivedProfile } from '@shared/derive-profile-types'
 
 // TEST-ONLY fake-AI seam (ROADMAP P2-6, ADR-041). When `LEDGER_FAKE_AI` is set AND the app is not
 // packaged, the two "Close out session" AI calls — tier-1 extraction (import.service) and tier-2
@@ -53,3 +56,64 @@ export function fakeEnrichment(subjectId: string): RawEnrichment {
     fieldChanges: [{ entityRef: subjectId, field: 'traits', op: 'add', value: 'Stubbed by e2e' }]
   }
 }
+
+// ---- All-lenses coverage (ADR-043): canned output for the remaining AI lenses. Each matches the exact
+// pre-validation shape the lens's validator expects. ----
+
+/**
+ * Canned persona brief. Counsel/Converse/Recall call `generatePersona → complete()` (a real Claude call)
+ * before their own model call; faking it here lets those lenses run under the seam without a 401.
+ */
+export function fakePersona(): string {
+  return 'A steady, plain-spoken adventurer who leads with curiosity and keeps their word — watches before acting, speaks briefly, and trusts earned loyalty over charm.'
+}
+
+/** Counsel "in the moment": EXACTLY 6 options with DISTINCT primary tags spanning the three pillars —
+ *  the minimum `validateMoment` accepts. */
+export function fakeSuggest(): MomentSuggestion[] {
+  return [
+    { primaryTag: 'diplomatic', secondaryTags: [], pillar: 'social', action: 'Offer a calm compromise that gives them a way to save face.', mechanic: 'Persuasion (CHA) vs. their Insight', teamwork: null, rationale: 'De-escalates without conceding anything real.' },
+    { primaryTag: 'cautious', secondaryTags: [], pillar: 'exploration', action: 'Hang back and read the room before committing to anything.', mechanic: 'Insight (WIS) to gauge the threat', teamwork: null, rationale: 'Buys information before the situation hardens.' },
+    { primaryTag: 'bold', secondaryTags: [], pillar: 'combat', action: 'Step between the threat and your ally, weapon ready.', mechanic: 'Athletics (STR) to hold the line', teamwork: null, rationale: 'Seizes the initiative and shields the group.' },
+    { primaryTag: 'deceptive', secondaryTags: [], pillar: 'social', action: 'Feign agreement to draw out what they really want.', mechanic: 'Deception (CHA) vs. their Insight', teamwork: null, rationale: 'Turns the exchange into a source of intel.' },
+    { primaryTag: 'investigative', secondaryTags: [], pillar: 'exploration', action: 'Search the scene for the detail everyone else missed.', mechanic: 'Investigation (INT) of the surroundings', teamwork: null, rationale: 'A concrete clue reframes the whole choice.' },
+    { primaryTag: 'protective', secondaryTags: [], pillar: 'combat', action: 'Ready an action to shield whoever is most exposed.', mechanic: 'Perception (WIS) to watch for the first move', teamwork: 'Signal an ally to fall back to cover.', rationale: 'Keeps the most fragile member of the party alive.' }
+  ]
+}
+
+/** Counsel "what's next": ≥3 grouped story directions (survives `validateDirections`). */
+export function fakeDirections(): StorySuggestion[] {
+  return [
+    { category: 'quest', suggestion: 'Follow the unpaid debt back to whoever is really collecting it.', rationale: 'Ties the open thread to a face the party can confront.' },
+    { category: 'npc', suggestion: 'Pay the tavern-keeper a second visit — they hinted at more.', rationale: 'A warm contact is the cheapest lead available.' },
+    { category: 'location', suggestion: 'Scout the road out of town before the next nightfall.', rationale: 'Sets up the journey and surfaces an ambush or an ally.' }
+  ]
+}
+
+/** Converse: 4 in-character questions with DISTINCT tags, funnel-ordered rapport → secret (survives
+ *  `validateConverse`, floor 4). */
+export function fakeConverse(): ConverseQuestion[] {
+  return [
+    { question: 'It has been a long road for you — how are you holding up, truly?', tag: 'rapport', read: 'Opens warmly to earn a little trust before pressing.' },
+    { question: 'What first brought you to this place?', tag: 'open-probe', read: 'A low-cost prompt that lets them choose what to reveal.' },
+    { question: 'When all of this is over, what are you actually after?', tag: 'motivation', read: 'Tests whether their stated aims match their real ones.' },
+    { question: 'What is the one thing you are hoping no one here finds out?', tag: 'secret-seeking', read: 'A high-cost probe — worth the risk only after some rapport.' }
+  ]
+}
+
+/** Draft step 1: a non-empty derived profile (survives `validateDerived`). */
+export function fakeDerive(): DerivedProfile {
+  return {
+    description: 'A wandering problem-solver shaped by a hard childhood and a stubborn sense of fairness.',
+    traits: ['resourceful', 'guarded'],
+    goals: ['find out who burned the old district'],
+    flaws: ['trusts too slowly to ask for help'],
+    voiceExamples: ["I'll hear you out. That's not the same as agreeing."]
+  }
+}
+
+/** Streamed prose for the two streaming lenses — emitted via the service's existing `onText` callback. */
+export const FAKE_RECALL_TEXT =
+  'From what the party has recorded, the trail points back to a single unpaid debt and the person quietly calling it in.'
+export const FAKE_RECAP_TEXT =
+  'The session opened in the tavern, where the party struck a wary bargain with a stranger and agreed to look into a debt no one wanted to claim.'

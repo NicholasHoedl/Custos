@@ -220,9 +220,16 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `LEDGER_FAKE_AI`, and `src/main/services/ai-fake.ts` (`fakeAiEnabled` = env `&& !app.isPackaged`) makes
   `import.service.extract` / `enrich.service.enrichEntity` return canned proposals + `ai-util.isOnline`
   return true — the real IPC + validators + DB apply still run. The seam is inert in any normal/packaged
-  run and under vitest (env unset → short-circuits before `app.isPackaged`). `close-out.spec.ts` drives
-  the locked close-out wizard through both tiers this way (plants a dummy key via `ledger.apikey.set` +
-  reloads so `keyReady` refetches). **10 e2e specs currently green.**
+  run and under vitest (env unset → short-circuits before `app.isPackaged`). **The seam covers EVERY AI
+  lens now (ADR-043):** `ai-fake.ts` also has `fakeSuggest`/`fakeDirections` (Counsel), `fakeConverse`,
+  `fakeDerive` (Draft), `fakePersona`, and `FAKE_RECALL_TEXT`/`FAKE_RECAP_TEXT`, branched in the matching
+  service after its guards (Transcribe reuses `fakeExtraction`). Two wrinkles: (1) Counsel/Converse/Recall
+  call `generatePersona → complete()` first, so `persona.service` fakes that too; (2) Counsel/Recall gate
+  on `isModelReady()` — `ipc/onboarding.ts` reports `modelReady || fakeAiEnabled()` (button enables) and the
+  services skip `embed`/dense but KEEP the model-free `fuzzyEntityChunks` (real grounding). Streaming lenses
+  (Recall/Recap) emit canned prose via the existing `onText`. Test helpers `createCampaign` /
+  `plantKeyAndReload` (`helpers.ts`); one spec per lens (`suggest`/`converse`/`recall`/`recap`/`transcribe`/
+  `draft`/`close-out`). **16 e2e specs currently green.**
 - **Distribution + auto-update (docs/ROADMAP.md P2-1, ADR-042):** `npm run dist` builds the NSIS installer
   (`Ledger Setup X.Y.Z.exe`) via `electron-builder.yml`; the `publish: github` block makes it also emit
   `latest.yml` (the electron-updater feed). **Auto-update is PACKAGED-ONLY** — `services/updater.service.ts`

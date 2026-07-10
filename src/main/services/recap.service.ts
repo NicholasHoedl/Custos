@@ -17,6 +17,7 @@ import {
   type RecapInput
 } from './claude.service'
 import { classifyError, isOnline } from './ai-util'
+import { FAKE_RECAP_TEXT, fakeAiEnabled } from './ai-fake'
 
 type Send = (channel: string, payload: unknown) => void
 
@@ -95,15 +96,13 @@ export async function generateRecap(
     }
 
     let full = ''
-    await claudeRecap({
-      input,
-      model: getSettings().recallModel,
-      onText: (text) => {
-        full += text
-        send(RECAP_CHUNK_CHANNEL, { requestId, text })
-      },
-      signal
-    })
+    const onText = (text: string): void => {
+      full += text
+      send(RECAP_CHUNK_CHANNEL, { requestId, text })
+    }
+    // e2e fake-AI seam (ADR-043): emit canned prose through the same onText → the persist + done below run real.
+    if (fakeAiEnabled()) onText(FAKE_RECAP_TEXT)
+    else await claudeRecap({ input, model: getSettings().recallModel, onText, signal })
     updateSession(ctx, sessionId, { summary: full.trim() })
     send(RECAP_DONE_CHANNEL, { requestId, sessionId, reason: 'ok' })
   } catch (err) {
