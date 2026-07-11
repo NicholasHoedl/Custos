@@ -41,7 +41,7 @@ rename point, compile-guarded by exhaustive typing.
 | Add entity | **Inscribe** | inscribe an entry into the Codex |
 | Notes | **Annals** | free-form records |
 | Recap | **Previously…** | a "previously on…" of a session (lives in Sessions, ADR-032) |
-| Import | **Transcribe** | the Keeper copies your scattered pages (top-level, ADR-032) |
+| Import | **Transcribe** | the Keeper copies your scattered pages (a Chronicle-header dialog, ADR-036) |
 | Campaign | **Campaign** (kept) | the ADR-024 "Saga" rename was reverted (ADR-029) |
 | Draft (derive tool) | **Draft from backstory** | turns a backstory into profile + world (ADR-032) |
 | Session | **Session** (kept) | — |

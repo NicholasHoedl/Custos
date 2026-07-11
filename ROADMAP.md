@@ -3,12 +3,16 @@
 **Version:** 0.1 (MVP Planning)
 **Date:** 2026-06-25 · **Status updated:** 2026-07-02
 **Status:** ✅ **Shipped — all phases (P0–P3) complete.** This is now the *historical* MVP plan,
-kept in place because ADRs and SPEC reference its item codes (P0-01…P3-04). Current product scope
-lives in **`SPEC.md` §10 (Delivered beyond the MVP)** and **`docs/adr/`** — development continued
-past this plan with: current scene (ADR-015), many-to-many notes, the multi-tag Suggest overhaul
-(ADR-016, superseding the 4-of-7 model written below), session recap (ADR-013), paste-and-extract
-import (ADR-014), chronology / as-of reconstruction (ADR-017), and the backfill interview (ADR-018).
-The Phase 4+ section below remains the deferred-ideas backlog.
+kept in place because ADRs and SPEC reference its item codes (P0-01…P3-04). **Current + forward product
+scope lives in [`docs/ROADMAP.md`](docs/ROADMAP.md) (the post-MVP "professionalization" arc, P0–P2),
+`SPEC.md` §10 (Delivered beyond the MVP), and `docs/adr/`** — development continued past this plan with:
+current scene (ADR-015), many-to-many notes, the multi-tag Suggest overhaul (ADR-016, superseding the
+4-of-7 model written below), session recap (ADR-013), paste-and-extract import (ADR-014), chronology /
+as-of reconstruction (ADR-017), the backfill interview (ADR-018), and the whole audit arc (ADRs 037–043:
+session integrity, entity merge, portraits, the Web graph, distribution/auto-update, the fake-AI e2e seam).
+**⚠ The Phase 4+ backlog below is partly stale** — several items listed as "deferred" have since shipped
+(electron-updater auto-update, model-selection UI, session recap, campaign export + import, entity
+images/portraits). Trust `docs/ROADMAP.md` + `SPEC.md` §10 over it for what's actually built.
 
 ---
 
@@ -354,7 +358,7 @@ These are listed in approximate priority order for planning reference. None are 
 
 ## ADR List
 
-These are written as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md) — each records the decision, alternatives, and rationale. *(Historical note: the table below lists the ten ADRs planned for the MVP. The ADR set has since grown to 001–018+, and statuses have moved — e.g. ADR-009 is superseded by ADR-016, ADR-003 refined by ADR-012. The authoritative index is [`docs/adr/README.md`](docs/adr/README.md).)*
+These are written as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md) — each records the decision, alternatives, and rationale. *(Historical note: the table below lists the ten ADRs planned for the MVP. The ADR set has since grown to 001–043, and statuses have moved — e.g. ADR-009 is superseded by ADR-016, ADR-003 refined by ADR-012. The authoritative index is [`docs/adr/README.md`](docs/adr/README.md).)*
 
 | ID | Title | When to write |
 |---|---|---|

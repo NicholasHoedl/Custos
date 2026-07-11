@@ -205,6 +205,7 @@ Campaign
   id           UUID PK
   name         TEXT NOT NULL
   description  TEXT
+  mainCharacterId  TEXT FK → Entity.id (nullable, ON DELETE SET NULL) — the campaign's mandatory main character, created atomically with the campaign; the sole in-character lens (ADR-029/030; column main_character_id)
   createdAt    INTEGER (unix ms)
   updatedAt    INTEGER (unix ms)
 
@@ -231,6 +232,7 @@ Entity
   goals        TEXT (JSON array of strings — for NPC / PC)
   flaws        TEXT (JSON array of strings — a vice/fear/weakness for PC/NPC/faction; feeds persona + Counsel, ADR-026)
   voice_examples TEXT (JSON array of strings — MAIN-CHARACTER-ONLY sample lines; grounds Counsel/Converse voice, ADR-029)
+  attributes   TEXT (JSON object — the open bag of type-specific fields; edited add/cut/alter via changeset, ADR-028)
   status       TEXT ('active' | 'inactive' | 'dead' | 'resolved' | ...) — free-text
   lifecycle    TEXT ('active' | 'ended' | 'presumed_ended' | 'unknown') NOT NULL — coarse in-play flag (ADR-017, ADR-021)
   createdAt    INTEGER (unix ms)
@@ -260,8 +262,8 @@ EntityLink
   toDisposition   TEXT (nullable — how `to` feels about `from`; per-direction so asymmetry lives on one edge) — ADR-033
   confidence   TEXT ('confirmed' | 'rumored' | 'suspected') NOT NULL default 'confirmed' — the AI hedges on it (ADR-033)
   campaignId   UUID FK → Campaign.id
-  startSession INTEGER (nullable — session # the link formed; NULL = pre-tracking) — ADR-017
-  endSession   INTEGER (nullable — NULL = live; set on "sever" to close the validity interval) — ADR-017
+  startSessionNumber INTEGER (nullable — session # the link formed; NULL = pre-tracking; column start_session_number) — ADR-017
+  endSessionNumber   INTEGER (nullable — NULL = live; set on "sever" to close the validity interval; column end_session_number) — ADR-017
 
   # A tie serves four jobs (ADR-033): AI grounding (formatRelationships → the prompt — the ONLY path the
   # edge graph reaches the model), hierarchy traversal (located_in/member_of CTEs), the in-character sense
@@ -283,9 +285,18 @@ StatusHistory   (append-only status/lifecycle trail — ADR-017; drives "as of s
   status              TEXT (nullable)
   sinceSessionNumber  INTEGER (nullable — NULL = pre-tracking baseline)
   recordedAt          INTEGER (unix ms)
+
+PcPersona   (cached, user-editable in-character brief for a PC — ADR-030; the Recall/Counsel/Converse voice)
+  entityId    UUID FK → Entity.id (PK); table pc_persona
+  brief       TEXT
+  edited      INTEGER (0/1 — the user hand-edited the brief)
+  stale       INTEGER (0/1 — the PC's source fields changed since generation)
+  sourceHash  TEXT (hash of the PC's fields; flips `stale` when it changes)
+  model       TEXT
+  createdAt / updatedAt  INTEGER (unix ms)
 ```
 
-> Chronology note (ADR-017): session **numbers** are denormalized into `EntityLink.start/endSession`
+> Chronology note (ADR-017): session **numbers** are denormalized into `EntityLink.start/endSessionNumber`
 > and `StatusHistory.sinceSessionNumber` so as-of reconstruction is a join-free integer comparison.
 > A partial unique index keeps at most one *open* link per (from, to, relation).
 
@@ -482,21 +493,23 @@ Implementation notes:
 
 For Suggest with Opus 4.8, use adaptive thinking: `thinking: { type: "adaptive" }` together with `output_config: { effort: "high" }`. Opus 4.8 does **not** accept `thinking: { type: "enabled", budget_tokens: N }` — that returns a 400; a fixed thinking budget is replaced by adaptive thinking plus the `effort` parameter (`low` | `medium` | `high` | `max`). This improves reasoning quality for the "what would my character do?" question. Drop `effort` to `medium` if latency is too high at the table.
 
-### Converse Output Model (ADR-025)
+### Converse Output Model (ADR-025, reshaped by ADR-034)
 
 **Converse** helps a player prepare to *talk* to a character: given the active PC (the asker) and a chosen
-**target** entity, it returns a **briefing** (`known` / `openSuspected` / `connections`) plus in-character
-**`questions`** to draw the target out. It **mirrors Suggest's mechanism** — a single, non-streaming
-structured-output call (`structuredObjectCall` → a validated object; no citations) reusing the same
-`suggestModel` / `suggestEffort` settings — so there is **no new model, no schema, and no settings change**.
+**target** entity, it returns **questions only** — a spread of tagged, in-character `questions` the asker
+could pose to draw the target out, each `{ question, tag, read }` over a 14-tag taxonomy. **ADR-034 dropped
+the earlier `known`/`openSuspected`/`connections` briefing** — the questions are the whole product now. It
+**mirrors Suggest's mechanism** — a single, non-streaming structured-output call (`structuredArrayCall` → a
+validated array; no citations) reusing the same `suggestModel` / `suggestEffort` settings — so there is
+**no new model and no settings change**.
 
 Where it *differs* from Suggest: grounding is **direct fetch, not retrieval** (no embedding model). The
-target's notes come from `getEntityContext(target, 1)`; its **connections** and the asker↔target tie come
-from `listForEntity(…, asOf)`, which is as-of-correct via `isIntervalLiveAt` (ADR-017) — that split is the
-one real design call, because `getEntityContext` has no as-of support. Status resolves through
-`resolveEntityState(target, asOf)`, and the asker's voice through the PC persona. Since JSON Schema can't
-bound array length, the service **validates/coerces** the result and fails only when *everything* is empty
-(a sparse target legitimately yields a questions-only briefing). Full rationale in ADR-025.
+target's notes come from `getEntityContext(target, 1, asOf)` — now **as-of-clamped** (ADR-034 closed the
+as-of leak); its connections and the asker↔target tie come from `listForEntity(…, asOf)`, as-of-correct via
+`isIntervalLiveAt` (ADR-017). Status resolves through `resolveEntityState(target, asOf)`, and the asker's
+voice through the PC persona. Since JSON Schema can't bound array length, the service **validates/coerces**
+the result (distinct tags, floor 4 / cap 6, retry-once) and fails only when *everything* is empty. Full
+rationale in **ADR-034** (which revises ADR-025's output).
 
 ---
 
@@ -505,6 +518,13 @@ bound array length, the service **validates/coerces** the result and fails only 
 All communication between renderer and main process goes through typed IPC channels defined in a shared `src/shared/ipc-types.ts`. The renderer calls `window.ledger.*` (the contextBridge API); the main process handles via `ipcMain.handle()`.
 
 ### Channel Inventory (MVP)
+
+> **Illustrative MVP subset — the shipped surface is much larger.** `src/shared/ipc-types.ts` (the `IPC`
+> map) is authoritative. Channels added since this snapshot include `update:check`/`update:install` +
+> the `update:status` push (auto-update, ADR-042), `graph:campaign` (Web graph, ADR-040), `entity:pick-image`
+> (portraits, ADR-039), `entity:merge` (ADR-038), `campaign:import`/`export`, `usage:summary`, the `app:*`
+> shell channels (info/backup/folders), `event:update`/`delete`, `enrich:*`, `persona:*`, `recap:*`, and the
+> per-lens `*:cancel` channels.
 
 ```typescript
 // src/shared/ipc-types.ts (conceptual)
@@ -547,16 +567,19 @@ All communication between renderer and main process goes through typed IPC chann
 ## 8. Folder / Module Structure
 
 > **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
-> Notably: the renderer groups feature panes under `components/views/` (`CharacterView`, `JournalView`,
-> `SessionsView`, `WebView` [the relationship graph, ADR-040], `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`,
-> `SettingsView`, `NotesView` — top-level per ADR-032; Codex slimmed to Inscribe + Annals;
+> Notably: the renderer groups feature panes under `components/views/` — the **nine nav views** are
+> `CharacterView`, `JournalView` [Chronicle], `SessionsView`, `CaptureView` [Codex — Inscribe + Annals panes],
+> `WebView` [the relationship graph, ADR-040], `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`,
+> and `SettingsView`. (`NotesView` is the **Annals** pane rendered inside Codex, not a top-level view;
 > **Transcribe is no longer a view** — ADR-036 moved it into `components/capture/TranscribeDialog.tsx`,
 > opened from the Chronicle header, which also hosts the relocated active-session switcher
 > `components/sessions/SessionControl.tsx`), with a shared
 > `components/chrome.tsx` and a top-level `components/ErrorBoundary.tsx`, plus `components/capture/`,
 > `components/entities/`, and `components/layout/`. Main-process `services/` grew to include
-> `chronology`, `scene`, `recap`, `persona`, `link`, `graph`, `embedding-index`, `session`, and
-> `enrich` (the per-entity **Illuminate** tier-2 pass, ADR-035 — `ipc/enrich.ts`, channels
+> `chronology`, `scene`, `recap`, `persona`, `link` (also holds `buildCampaignGraph` for the Web view —
+> there is no `graph.service`, only `ipc/graph.ts`), `embedding-index`, `session`, `merge` (ADR-038),
+> `usage` (P0-4), `import-campaign` + `export` (P0-2), `updater` (ADR-042), `ai-fake` (the e2e seam,
+> ADR-041/043), and `enrich` (the per-entity **Illuminate** tier-2 pass, ADR-035 — `ipc/enrich.ts`, channels
 > `enrich:touched`/`enrich:entity`, reviewed via `components/sessions/EnrichDialog.tsx`)
 > services; `db/` adds `backup.ts`. The **Journal** (the reworked
 > `components/capture/EventFeed.tsx`, surfaced top-level as `JournalView`) is the primary capture
@@ -746,7 +769,7 @@ per-campaign session persistence. See ADR-020.
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
 
 > **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
-> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–036**, with status changes (e.g.
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–043**, with status changes (e.g.
 > ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
 > (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
 > 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes),

@@ -114,6 +114,11 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
   env-gated `LEDGER_FAKE_AI` (+ `!app.isPackaged`) branch at the two close-out call sites returns canned
   proposals so the wizard runs offline/keyless while the real IPC + validators + DB apply still execute.
   `close-out.spec.ts`: the full both-tier happy path + the reject/lock-exit path.
+- **P2-7 ☑ Fake-AI e2e coverage for ALL lenses** (ADR-043, follow-on to P2-6). Extended the seam from the
+  close-out's two calls to every AI lens — Transcribe · Counsel · Converse · Recall · Recap · Draft — with
+  one canned builder + branch per lens (plus a faked `generatePersona` and a `modelReady`-under-fake hook
+  that keeps the model-free fuzzy retrieval real for Counsel/Recall). One spec per lens; the e2e suite grew
+  **10 → 16** tests. Every AI surface now has an offline regression net.
 
 ## R — removals (subtractions that finish the product)
 

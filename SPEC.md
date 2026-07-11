@@ -312,8 +312,9 @@ listed in §4.
 Chronicle header, ADR-036**) — turns pasted text —
 session notes, a chat log, another player's write-up — into reviewed, deduped **entities, notes, and
 status changes** (tier-1 'capture' extraction, ADR-035), applied in one transaction and **tied to a
-session you choose** (the current one, a specific past session, or undated). (Distinct from the
-still-deferred campaign *file* export/import in §4 — this is text ingestion, not save-file portability.)
+session you choose** (the current one, a specific past session, or undated). (Distinct from whole-campaign
+*file* export/import — shipped separately in **P0-2** via `export.service` + `import-campaign.service` — this
+is text ingestion, not save-file portability.)
 
 **Two-tier extraction, "Close out session" & "Illuminate"** (ADR-035/036) — the AI note-taker was split
 to stop one overloaded call doing five jobs, and extraction became a deliberate ritual. **Chronicle
@@ -377,7 +378,8 @@ backups (`VACUUM INTO`, keep 5, in `userData/backups`); a persistent main-proces
 (`electron-log` → `userData/logs/main.log`) and logged WAL-checkpoint failures; a startup
 migration-failure recovery dialog; a React error boundary + a renderer IPC error-toast audit; and
 per-campaign session persistence. Shipped alongside **CI** (GitHub Actions: typecheck + lint + tests
-on Windows) and a signed **NSIS installer** (`npm run dist`).
+on Windows) and an **unsigned (cert-ready) NSIS installer** (`npm run dist`). *(Auto-update was layered on
+later — ADR-042, revising ADR-020's deferral; see "Distribution & auto-update" below.)*
 
 **Grim visual identity** (ADR-024) — the renderer was re-themed from the original cool cyan/slate to a grim
 dark-fantasy **"Ash & Ember"** palette (warm charcoal, bone, a dying-ember accent, dried-blood death), with
@@ -448,6 +450,33 @@ relationships as a force-directed graph (d3-force layout, rendered as themed SVG
 (with their portrait clipped in, fallen ones dimmed); edges are open ties labelled by relation. Pan, zoom,
 drag a node to reposition, and click a node to open it. Read-only — a visual index over data that already
 existed, needing no migration.
+
+**Session integrity** (ADR-037) — a session is flagged "unclosed" when its newest chronicle entry is newer
+than its newest note (a *derived* signal — no stamp column); the count badges the **Close out session**
+button and the Sessions rows so nothing is forgotten. Chronicle entries also became **editable and
+deletable** in place, independent of what a past close-out already extracted.
+
+**Entity merge** (ADR-038) — a duplicate entity can be merged into another: its notes, relationships,
+chronology, and event references are re-pointed onto the survivor in one transaction, then it is deleted
+(colliding junction/link rows are left for the delete cascade — no explicit pre-delete racing the unique
+index). A **Merge** action on the entity detail opens a picker. Re-point-only, so the survivor's own fields
+and embeddings are untouched.
+
+**Command palette** — a global **⌘/Ctrl+K** palette (cmdk) to jump to any view, find any entity by name, or
+add one. `Ctrl+K` was repurposed from quick-add to the palette; quick-add stays reachable via the palette
+and the OS-global `Ctrl+Alt+L`.
+
+**Distribution & auto-update** (ADR-042) — the app updates itself. `npm run dist` builds the NSIS installer
+plus the `latest.yml` update feed; a tag-triggered CI job (`release.yml`) publishes them to GitHub
+Releases; and a packaged-only **electron-updater** checks on launch and from **Settings → Your data → Check
+for updates**. The license is **proprietary** (`UNLICENSED` — source-available, not open-source); builds are
+**unsigned** until a code-signing cert is added (`CSC_*` secrets). Full runbook in `RELEASING.md`.
+
+**End-to-end tests for the AI flows** (ADR-041/043) — an env-gated **fake-AI seam** (`LEDGER_FAKE_AI`,
+inert in dev/packaged/unit runs) makes every AI lens return canned output at its service call site, so
+Playwright can drive the close-out wizard and all six lenses (Counsel, Converse, Recall, Recap, Transcribe,
+Draft) **offline and deterministically** — the real IPC, validators, and DB writes still run. It exercises
+the plumbing, not the model's answer quality (that still needs a live key). 16 e2e specs currently green.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, and map attachments. The nearest queued follow-up is an

@@ -10,7 +10,7 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 ## The three pillars
 
 - **Codex** — entry of entities (a full per-type profile form), notes, and links, organized per
-  campaign and session. A global hotkey / `Ctrl+K` opens the add-entity form from anywhere.
+  campaign and session. An OS-global hotkey (`Ctrl+Alt+L`) opens the add-entity form from anywhere.
 - **Lore** — ask a natural-language question; get a cited, streamed answer synthesized from the
   relevant notes (semantic search over local embeddings).
 - **Counsel** — in-character ideas for the moment (six tagged options in your main character's voice) or
@@ -27,8 +27,10 @@ status changes, then straight into Illuminate — in one review wizard built for
 hosts the session switcher and the paste-and-extract **Transcribe** dialog, which can tie an import to
 any session or none), **Sessions** (browse each session with its summary, a "previously on…" recap, and
 **Illuminate** — a review-gated pass where the Keeper re-reads everything known about each entity the
-session touched and fills in the profile details and relationship ties the notes support), and
-chronology throughout (the world reconstructed "as of session N" with no future-knowledge leak).
+session touched and fills in the profile details and relationship ties the notes support), the **Web**
+view (a live force-directed graph of the campaign's relationships), a global **command palette**
+(`Ctrl+K` — jump to any view or find any entity), and chronology throughout (the world reconstructed
+"as of session N" with no future-knowledge leak).
 
 ## Stack
 
@@ -69,7 +71,11 @@ either; Lore and Counsel need both; Converse and the Character page's AI tools n
 | `npm run test:e2e` | Build + run the Playwright end-to-end tests |
 | `npm run typecheck` | Type-check the main + renderer projects |
 | `npm run lint` | ESLint |
+| `npm run format` | Format the codebase with Prettier |
 | `npm run db:generate` | Generate a new Drizzle migration from schema changes |
+| `npm run rebuild` | Rebuild the native `better-sqlite3` binding for the current Electron ABI |
+| `npm start` | Preview the built production bundle (`electron-vite preview`) |
+| `npm run test:watch` | Run the Vitest suite in watch mode |
 
 ## Your data
 
@@ -81,12 +87,16 @@ Everything is stored under the app's user-data directory (`%APPDATA%\Ledger` on 
 - `logs/main.log` — the main-process log (rotates at 1 MiB).
 - `models/` — the downloaded embedding model.
 - `anthropic.key.enc` — your encrypted API key.
+- `usage.json` — AI token-usage + cost totals in monthly buckets (the Settings "AI usage" card).
+- `window-state.json` — the persisted window position and size.
 
 ## Documentation
 
 - [`SPEC.md`](SPEC.md) — product spec; §10 lists everything delivered beyond the MVP.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — system architecture and module layout.
-- [`ROADMAP.md`](ROADMAP.md) — the (shipped) MVP plan and the deferred backlog.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — the current roadmap (the post-MVP "professionalization" arc, P0–P2).
+- [`ROADMAP.md`](ROADMAP.md) — the original, now-historical MVP plan (kept because the ADRs and SPEC cite
+  its item codes; superseded for forward planning by `docs/ROADMAP.md`).
 - [`docs/adr/`](docs/adr/README.md) — Architecture Decision Records: the *why* behind the
   significant choices.
 - [`docs/design/`](docs/design) — design docs for the larger features (e.g. Chronology).
