@@ -161,4 +161,8 @@ export interface AppSettings {
   extractionModel: 'claude-sonnet-4-6' | 'claude-opus-4-8' | 'claude-haiku-4-5'
   extractionEffort: 'medium' | 'high'
   hotkey: string
+  /** First-run tutorial (ADR-044): the player's name (used for the Keeper's greeting) and whether the
+   *  forced onboarding wizard has been completed. Both optional so old settings.json files stay valid. */
+  userName?: string
+  tutorialCompleted?: boolean
 }

@@ -14,13 +14,15 @@ export interface LaunchedApp {
 
 // Launch the built app against a throwaway userData dir so each run gets a clean, migrated DB and an
 // isolated single-instance lock (so it won't collide with a running dev instance or a sibling spec).
-// `fakeAi` sets LEDGER_FAKE_AI so the main process serves canned AI (ADR-041) — used by the close-out
-// spec to drive the wizard deterministically without a key or network.
-export async function launchApp(opts?: { fakeAi?: boolean }): Promise<LaunchedApp> {
+// `fakeAi` sets LEDGER_FAKE_AI so the main process serves canned AI (ADR-041). By default we set
+// LEDGER_SKIP_TUTORIAL so the forced first-run wizard (ADR-044) doesn't block every spec — pass
+// `{ tutorial: true }` to opt IN (the tutorial spec).
+export async function launchApp(opts?: { fakeAi?: boolean; tutorial?: boolean }): Promise<LaunchedApp> {
   const userDataDir = mkdtempSync(join(tmpdir(), 'ledger-e2e-'))
   const env = {
     ...process.env,
-    ...(opts?.fakeAi ? { LEDGER_FAKE_AI: '1' } : {})
+    ...(opts?.fakeAi ? { LEDGER_FAKE_AI: '1' } : {}),
+    ...(opts?.tutorial ? {} : { LEDGER_SKIP_TUTORIAL: '1' })
   } as Record<string, string>
   const app = await electron.launch({ args: [MAIN, `--user-data-dir=${userDataDir}`], env })
   const page = await app.firstWindow()

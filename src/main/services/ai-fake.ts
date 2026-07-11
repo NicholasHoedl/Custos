@@ -20,6 +20,15 @@ export function fakeAiEnabled(): boolean {
 }
 
 /**
+ * e2e seam (ADR-044): treat the forced first-run tutorial as already done so a fresh test DB (no
+ * settings.json → `tutorialCompleted` false) doesn't block every spec behind the overlay. `launchApp` sets
+ * `LEDGER_SKIP_TUTORIAL` by default; the tutorial spec omits it. Same packaged-off guard as the AI seam.
+ */
+export function tutorialSkipped(): boolean {
+  return !!process.env['LEDGER_SKIP_TUTORIAL'] && !app.isPackaged
+}
+
+/**
  * Tier-1 (capture) canned output: one new NPC + one note tagging it (`#0`). Non-empty so the tier-1
  * `ChangesetReview` renders the Entities + Annals sections; the distinct name means use-import defaults
  * it to "create" (no fuzzy match against the campaign's lone main character).

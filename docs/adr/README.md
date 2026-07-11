@@ -55,6 +55,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [041](041-e2e-fake-ai-seam.md) | An env-gated fake-AI seam (`LEDGER_FAKE_AI`) for e2e — driving the close-out wizard offline | Accepted | 2026-07-10 |
 | [042](042-distribution-autoupdate.md) | Distribution: electron-updater auto-update via public GitHub Releases + a tag-triggered CI release, proprietary license, unsigned/cert-ready (revises ADR-020) | Accepted | 2026-07-10 |
 | [043](043-fake-ai-all-lenses.md) | The fake-AI e2e seam extended to every AI lens (persona + model-gate/fuzzy-retrieval handling); extends ADR-041 | Accepted | 2026-07-10 |
+| [044](044-first-run-tutorial.md) | Forced first-run tutorial (guided modal wizard); hard-required validated key + real close-out; navbar reorder (revises ADR-030); multi-provider deferred | Accepted | 2026-07-11 |
 
 ## Status legend
 

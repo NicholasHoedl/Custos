@@ -11,7 +11,11 @@ export function useOnboarding(): {
   download: () => void
   refresh: () => void
 } {
-  const [status, setStatus] = useState<OnboardingStatus>({ keyReady: false, modelReady: false })
+  const [status, setStatus] = useState<OnboardingStatus>({
+    keyReady: false,
+    modelReady: false,
+    tutorialDone: true // assume done until the status loads, so no component flashes the tutorial gate
+  })
   const [progress, setProgress] = useState<ModelDownloadProgress | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)

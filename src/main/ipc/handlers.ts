@@ -50,7 +50,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerGraphHandlers(ctx)
   registerSearchHandlers(ctx)
   registerSettingsHandlers()
-  registerOnboardingHandlers(send, reindex)
+  registerOnboardingHandlers(ctx, send, reindex)
   registerRecallHandlers(ctx, store, send)
   registerRecapHandlers(ctx, send)
   registerSuggestHandlers(ctx, store)

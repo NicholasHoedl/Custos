@@ -12,7 +12,8 @@ const DEFAULTS: AppSettings = {
   // medium effort is ~a quarter of Opus-high's cost per close-out with little quality to lose there.
   extractionModel: 'claude-sonnet-4-6',
   extractionEffort: 'medium',
-  hotkey: DEFAULT_HOTKEY
+  hotkey: DEFAULT_HOTKEY,
+  tutorialCompleted: false // forced first-run tutorial (ADR-044); flips true on completion
 }
 
 function settingsPath(): string {

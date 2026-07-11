@@ -67,6 +67,8 @@ export interface PersonaBrief {
 export interface OnboardingStatus {
   keyReady: boolean
   modelReady: boolean
+  /** First-run tutorial (ADR-044): the forced wizard is done (persisted flag) or skipped (e2e). */
+  tutorialDone: boolean
 }
 
 /** Embedding-model download progress (onboarding). */

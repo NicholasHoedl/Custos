@@ -120,6 +120,18 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
   that keeps the model-free fuzzy retrieval real for Counsel/Recall). One spec per lens; the e2e suite grew
   **10 → 16** tests. Every AI surface now has an offline regression net.
 
+## Post-audit features (beyond the original P0–P2 arc)
+
+- **☑ Forced first-run tutorial** (ADR-044). A non-skippable guided modal wizard on first launch: name →
+  campaign → main character → session → a real chronicle entry → a hard-required, **live-validated**
+  Anthropic key → a **real** close-out → a tool tour → finish, leaving a usable campaign. Reorders the
+  navbar to the teaching sequence (Chronicle first; revises ADR-030). Gated by a persisted
+  `tutorialCompleted` flag; auto-skipped in e2e via `LEDGER_SKIP_TUTORIAL`. e2e: `tutorial.spec.ts` (17 specs).
+- **☐ Multi-provider AI (OpenAI + Gemini)** — a large, deferred architecture project: abstract the
+  Anthropic-only `claude.service` behind a provider interface (three SDKs; per-provider structured output,
+  streaming, model catalogs, pricing, key storage + validation). Prompted by the tutorial's "support
+  Gemini/OpenAI keys" ask; explicitly split out of ADR-044 to keep that change clean. Not started.
+
 ## R — removals (subtractions that finish the product)
 
 - **R-1 ☑ `fontSize`**: dead setting (declared + defaulted, read nowhere) — remove from `AppSettings`
