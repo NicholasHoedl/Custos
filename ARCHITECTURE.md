@@ -1,7 +1,7 @@
 # Ledger — Architecture Document
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25 · **Last currency review:** 2026-07-01
+**Date:** 2026-06-25 · **Last currency review:** 2026-07-12 (through ADR-045)
 **Status:** Implemented — this is the original MVP architecture plan. Several subsystems have since
 evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
 store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest uses a **multi-tag, 6-option**
@@ -12,7 +12,17 @@ scene, session recap, paste-and-extract import, PC persona) live in ADR-013–01
 ADR-017, with **event re-scope to world history** (ADR-019) and an **operational-hardening** layer — DB
 backups, logging, crash recovery (ADR-020); then **journal-driven capture** (ADR-022) and **capture/UI
 refinements** (ADR-023, which retired the backfill interview — its changeset engine folded into Import) —
-on top. The
+on top. **A large post-MVP arc then followed (ADR-024–045)** — summarized here so a fresh reader knows the
+plan below is far from the whole story: the grim "Ash & Ember" re-theme (024); the Converse question lens
+(025/034) and Counsel v2 (026); scene-is-Counsel-only (027); changeset field-changes + dedup (028/031);
+main-character single lens · Voice Examples · derive-from-backstory + a dedicated **Character page** (029/030);
+per-direction **tie enrichment** (033); **two-tier extraction** with the Chronicle **close-out** ritual and
+manual **Illuminate** (035), plus the Chronicle-header consolidation (036); **session integrity** + editable
+chronicle entries (037); entity **merge** (038); entity **portraits** (039); the **"Web"** relationship graph
+(040); an env-gated **fake-AI e2e seam** (041/043); the **electron-updater** distribution stack + proprietary
+license (042); and a **forced first-run tutorial** (setup-only) with an always-available **Quickstart guide**
+(044/045). See [`docs/adr/README.md`](docs/adr/README.md) for the authoritative current index (**ADR-001–045**).
+The
 data model and module sections below are reconciled to match; older narrative sections remain
 MVP-era where the ADRs supersede them.
 
@@ -566,7 +576,10 @@ All communication between renderer and main process goes through typed IPC chann
 
 ## 8. Folder / Module Structure
 
-> **This is the original planned layout; the shipped tree differs — the code is the source of truth.**
+> **This is the original planned MVP layout; the shipped tree differs substantially. Treat the specific
+> filenames in the tree below as illustrative — several no longer exist (the renderer moved to a view-based
+> layout; e.g. `RecallPanel.tsx`/`SuggestPanel.tsx`/`QuickAddBar.tsx` are gone). Read `src/` directly and
+> CLAUDE.md's "Layout (three process zones)" as the source of truth.**
 > Notably: the renderer groups feature panes under `components/views/` — the **nine nav views** are
 > `CharacterView`, `JournalView` [Chronicle], `SessionsView`, `CaptureView` [Codex — Inscribe + Annals panes],
 > `WebView` [the relationship graph, ADR-040], `RecallView` [Lore], `SuggestView` [Counsel], `ConverseView`,
@@ -651,7 +664,7 @@ ledger/
 │   │   └── db/
 │   │       ├── index.ts               # DB connection singleton
 │   │       ├── schema.ts              # Drizzle schema definitions
-│   │       └── migrations/            # Drizzle migration files
+│   │       └── migrations/            # (as-built: migrations live in `drizzle/` at the repo ROOT, not here)
 │   │
 │   ├── preload/
 │   │   └── index.ts                   # contextBridge exposes window.ledger
@@ -769,7 +782,7 @@ per-campaign session persistence. See ADR-020.
 These decisions are formalized as full Architecture Decision Records in [`docs/adr/`](docs/adr/README.md). Summary:
 
 > **This table is the original 10-ADR candidate list (pre-Phase-0).** The authoritative, current index
-> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–043**, with status changes (e.g.
+> is [`docs/adr/README.md`](docs/adr/README.md) — now **ADR-001–045**, with status changes (e.g.
 > ADR-009 **superseded by ADR-016**; ADR-003 refined by ADR-012). Post-MVP ADRs: 013 (recap), 014
 > (import), 015 (scene), 016 (Suggest v2), 017 (chronology), 018 (backfill), 019 (event re-scope),
 > 020 (operational hardening), 021 (creature type · note confidence · campaign-lore notes),
@@ -778,7 +791,12 @@ These decisions are formalized as full Architecture Decision Records in [`docs/a
 > 027 (scene Counsel-only), 028 (changeset field changes), 029 (main character overhaul — mandatory
 > single lens · Voice Examples · derive-from-backstory), 030 (Character page + unified persona), 031
 > (changeset dedup hardening), 032 (UX consolidation — nav restructure · Lore/Draft/Keeper naming ·
-> shared failure copy · note/tie editability).
+> shared failure copy · note/tie editability), 033 (per-direction tie enrichment + confidence),
+> 034 (Converse v2 — questions-only), 035 (two-tier extraction + close-out/Illuminate), 036 (Chronicle-header
+> consolidation), 037 (session integrity + editable chronicle entries), 038 (entity merge), 039 (entity
+> portraits — migration 0011), 040 (relationship "Web" graph), 041 (fake-AI e2e seam), 042 (distribution +
+> auto-update + proprietary license), 043 (fake-AI seam for all lenses), 044 (forced first-run tutorial),
+> 045 (tutorial trim + Quickstart guide).
 
 | # | Decision | Status |
 |---|---|---|

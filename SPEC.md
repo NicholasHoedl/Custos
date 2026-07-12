@@ -476,7 +476,7 @@ for updates**. The license is **proprietary** (`UNLICENSED` — source-available
 inert in dev/packaged/unit runs) makes every AI lens return canned output at its service call site, so
 Playwright can drive the close-out wizard and all six lenses (Counsel, Converse, Recall, Recap, Transcribe,
 Draft) **offline and deterministically** — the real IPC, validators, and DB writes still run. It exercises
-the plumbing, not the model's answer quality (that still needs a live key). 16 e2e specs currently green.
+the plumbing, not the model's answer quality (that still needs a live key). 17 e2e specs currently green.
 
 **Forced first-run tutorial** (ADR-044, trimmed by ADR-045) — first launch drops the user into a
 **non-skippable guided wizard** instead of a blank app: it asks their name, creates a campaign + main

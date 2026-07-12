@@ -1,7 +1,7 @@
 # Ledger — project guide for coding agents
 
 Local-first desktop app for tracking a tabletop RPG campaign with a time-aware, AI-backed memory
-(Character · Chronicle · Sessions · Codex · Lore · Counsel · Converse · Transcribe — see the label↔code-name
+(Chronicle · Sessions · Character · Codex · Web · Lore · Counsel · Converse — see the label↔code-name
 note below; chronology is time-aware throughout). This file is the fast
 orientation for an agent with fresh context — it complements, and does not repeat, the human docs:
 
@@ -91,9 +91,9 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
   populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
   fields but is test-only; `getHierarchy` ignores them (structural).
-- **UI label ↔ code name (ADR-024/032/036/040):** the nav labels are Character · Chronicle · **Sessions** ·
-  Codex · **Web** · **Lore** · **Counsel** · Converse · Settings (9 views; **Web** is P2-3/ADR-040, `'web'`,
-  right after Codex); the code names stay `recall` (Lore), `suggest`
+- **UI label ↔ code name (ADR-024/032/036/040/044):** the nav labels are Chronicle · Sessions · Character ·
+  Codex · **Web** · Lore · Counsel · Converse · Settings (9 views, Chronicle-first per ADR-044; **Web** is
+  P2-3/ADR-040, `'web'`, right after Codex); the code names stay `recall` (Lore), `suggest`
   (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
   (`capture/TranscribeDialog.tsx`; `views/ImportView.tsx` is deleted, `'import'` left `ViewKey`). The
@@ -134,7 +134,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (Counsel/Converse) + `buildSystem` (Recall) via `voiceExamplesBlock`. Grandfathered null-MC campaigns show
   "Set a main character". (Campaign wording reverted from the ADR-024 "Saga".)
 - **Character page + ONE persona generator (ADR-030).** The main character is managed on a dedicated
-  **Character page** (`views/CharacterView.tsx`, FIRST in the nav; a bespoke two-column
+  **Character page** (`views/CharacterView.tsx`, third in the nav — was first per ADR-030, reordered
+  Chronicle-first by ADR-044; a bespoke two-column
   `CharacterDashboard.tsx` — NOT an `EntityDetail` reuse — with silent blur-autosave text fields
   [attributes re-read fresh before writing since updateEntity REPLACES], promoted lists edited via a
   per-card `ListEditDialog` popup [read-only chips otherwise], and a backstory-coupled **two-step Suggest**:
@@ -229,7 +230,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   services skip `embed`/dense but KEEP the model-free `fuzzyEntityChunks` (real grounding). Streaming lenses
   (Recall/Recap) emit canned prose via the existing `onText`. Test helpers `createCampaign` /
   `plantKeyAndReload` (`helpers.ts`); one spec per lens (`suggest`/`converse`/`recall`/`recap`/`transcribe`/
-  `draft`/`close-out`). **16 e2e specs currently green.**
+  `draft`/`close-out`). **17 e2e specs currently green** (17 tests across 13 spec files).
 - **Distribution + auto-update (docs/ROADMAP.md P2-1, ADR-042):** `npm run dist` builds the NSIS installer
   (`Ledger Setup X.Y.Z.exe`) via `electron-builder.yml`; the `publish: github` block makes it also emit
   `latest.yml` (the electron-updater feed). **Auto-update is PACKAGED-ONLY** — `services/updater.service.ts`
