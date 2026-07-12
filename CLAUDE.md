@@ -243,20 +243,27 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   are set (electron-builder auto-signs; the release CI passes them through). Releases: push a `v*` tag →
   `.github/workflows/release.yml` runs `electron-builder --publish always` → a DRAFT GitHub Release (publish
   it to go live; **Releases must be PUBLIC** for token-free update). Full runbook in `RELEASING.md`.
-- **Forced first-run tutorial (ADR-044):** a non-skippable guided wizard (`components/onboarding/
-  TutorialOverlay.tsx`) mounted in `AppShell` above the app, gated on `onboarding:status.tutorialDone`
-  (`getSettings().tutorialCompleted || tutorialSkipped()`). It creates a real campaign+MC+session, has the
-  user add a chronicle entry, **hard-requires + live-validates** an Anthropic key (`apikey.set` +
-  `apikey.validate`), runs the **real** `CloseOutDialog` (portals above the z-40 overlay), tours the tools,
-  then writes `tutorialCompleted` + dismisses the legacy `OnboardingChecklist`/`LoopExplainer`. AppShell
-  disables Ctrl+K/F while it's active + renders a blank canvas until the status loads (no flash). **Navbar
-  reordered** (`NAV_ITEMS`): **Chronicle · Sessions · Character · Codex · Web · Lore · Counsel · Converse ·
-  Settings** (revises ADR-030's Character-first). **e2e:** `launchApp` sets `LEDGER_SKIP_TUTORIAL` BY
-  DEFAULT so the other 16 specs aren't blocked (`ai-fake.tutorialSkipped` = env `&& !app.isPackaged`);
-  `launchApp({ tutorial: true, fakeAi: true })` drives `tutorial.spec.ts` (the `apikey:validate` handler
-  returns valid under `fakeAiEnabled`). **17 e2e specs.** New `AppSettings` fields: `userName?`,
-  `tutorialCompleted?`. Multi-provider (OpenAI/Gemini) keys were asked for but **deferred** — a separate
-  AI-backend project (docs/ROADMAP.md).
+- **Forced first-run tutorial (ADR-044, trimmed by ADR-045):** a non-skippable guided wizard
+  (`components/onboarding/TutorialOverlay.tsx`) mounted in `AppShell` above the app, gated on
+  `onboarding:status.tutorialDone` (`getSettings().tutorialCompleted || tutorialSkipped() ||
+  listCampaigns(ctx).length > 0` — the last clause treats any existing-data user as already-onboarded). It
+  creates a real campaign+MC+session and **hard-requires + live-validates** an Anthropic key (`apikey.set` +
+  `apikey.validate`; the step shows numbered "how to get a key" instructions), tours the tools, then writes
+  `tutorialCompleted` + dismisses the legacy `OnboardingChecklist`/`LoopExplainer`. Flow is **setup-only** —
+  welcome → campaign → character → session → apikey → tour ×3 → done (9 steps). **ADR-045 removed the
+  chronicle-entry + close-out/Illuminate steps**; the capture→close-out loop is now taught by the
+  **always-available Quickstart guide** (`components/onboarding/QuickstartGuide.tsx`) opened from a
+  `HelpCircle` **"Guide"** button at the **bottom of the Sidebar** (below the flex-1 nav; sits under the
+  z-40 overlay, so it's post-onboarding only). Tool blurbs · tour groups · loop steps · get-a-key steps
+  live in ONE shared **`lib/guide-content.tsx`** (consumed by the tour, the guide, `LoopExplainer`, and the
+  key step, so they never drift). AppShell disables Ctrl+K/F while active + renders a blank canvas until the
+  status loads (no flash). **Navbar** (`NAV_ITEMS`): **Chronicle · Sessions · Character · Codex · Web · Lore
+  · Counsel · Converse · Settings** (revises ADR-030's Character-first). **e2e:** `launchApp` sets
+  `LEDGER_SKIP_TUTORIAL` BY DEFAULT so the other 16 specs aren't blocked (`ai-fake.tutorialSkipped` = env
+  `&& !app.isPackaged`); `launchApp({ tutorial: true, fakeAi: true })` drives `tutorial.spec.ts` (the
+  `apikey:validate` handler returns valid under `fakeAiEnabled`). **17 e2e specs.** `AppSettings` fields:
+  `userName?`, `tutorialCompleted?`. Multi-provider (OpenAI/Gemini) keys were asked for but **deferred** — a
+  separate AI-backend project (docs/ROADMAP.md).
 
 ## Git
 Work lands on `main`. A remote (`origin`) is configured, but the GitHub repo may not exist yet, so

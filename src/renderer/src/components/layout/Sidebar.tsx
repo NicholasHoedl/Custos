@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { BookOpen, HelpCircle, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
@@ -43,6 +43,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@renderer/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import { QuickstartGuide } from '@renderer/components/onboarding/QuickstartGuide'
 
 export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
@@ -84,7 +86,33 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      <QuickstartButton />
     </aside>
+  )
+}
+
+// An out-of-the-way help affordance pinned to the bottom of the sidebar (below the flex-1 nav). Opens the
+// always-available Quickstart guide (ADR-045) — the reference the trimmed first-run tutorial points to.
+function QuickstartButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-2 border-t border-border/60 px-3 py-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <HelpCircle className="size-4" />
+            Guide
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Quickstart guide</TooltipContent>
+      </Tooltip>
+      <QuickstartGuide open={open} onOpenChange={setOpen} />
+    </div>
   )
 }
 

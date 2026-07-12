@@ -122,11 +122,16 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 
 ## Post-audit features (beyond the original P0–P2 arc)
 
-- **☑ Forced first-run tutorial** (ADR-044). A non-skippable guided modal wizard on first launch: name →
-  campaign → main character → session → a real chronicle entry → a hard-required, **live-validated**
-  Anthropic key → a **real** close-out → a tool tour → finish, leaving a usable campaign. Reorders the
-  navbar to the teaching sequence (Chronicle first; revises ADR-030). Gated by a persisted
-  `tutorialCompleted` flag; auto-skipped in e2e via `LEDGER_SKIP_TUTORIAL`. e2e: `tutorial.spec.ts` (17 specs).
+- **☑ Forced first-run tutorial** (ADR-044, trimmed by ADR-045). A non-skippable guided modal wizard on
+  first launch — **setup-only** after ADR-045: name → campaign → main character → session → a hard-required,
+  **live-validated** Anthropic key (with "how to get a key" steps) → a tool tour → finish, leaving a usable
+  campaign. Reorders the navbar to the teaching sequence (Chronicle first; revises ADR-030). Gated by a
+  persisted `tutorialCompleted` flag (or any existing campaign); auto-skipped in e2e via
+  `LEDGER_SKIP_TUTORIAL`. e2e: `tutorial.spec.ts` (17 specs).
+- **☑ Quickstart guide** (ADR-045). An always-available reference dialog — the core loop, every tool, and
+  getting-started/key instructions — opened from an out-of-the-way "Guide" button at the bottom of the
+  sidebar. Backstops the capture→close-out loop teaching that the trimmed tutorial no longer runs; content
+  (tool blurbs · loop steps · key steps) is shared from `lib/guide-content.tsx`.
 - **☐ Multi-provider AI (OpenAI + Gemini)** — a large, deferred architecture project: abstract the
   Anthropic-only `claude.service` behind a provider interface (three SDKs; per-provider structured output,
   streaming, model catalogs, pricing, key storage + validation). Prompted by the tutorial's "support

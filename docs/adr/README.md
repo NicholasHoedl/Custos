@@ -56,6 +56,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [042](042-distribution-autoupdate.md) | Distribution: electron-updater auto-update via public GitHub Releases + a tag-triggered CI release, proprietary license, unsigned/cert-ready (revises ADR-020) | Accepted | 2026-07-10 |
 | [043](043-fake-ai-all-lenses.md) | The fake-AI e2e seam extended to every AI lens (persona + model-gate/fuzzy-retrieval handling); extends ADR-041 | Accepted | 2026-07-10 |
 | [044](044-first-run-tutorial.md) | Forced first-run tutorial (guided modal wizard); hard-required validated key + real close-out; navbar reorder (revises ADR-030); multi-provider deferred | Accepted | 2026-07-11 |
+| [045](045-tutorial-trim-quickstart-guide.md) | Trim the first-run tutorial (drop chronicle-entry + close-out steps) + an always-available Quickstart guide from a sidebar button (revises ADR-044) | Accepted | 2026-07-12 |
 
 ## Status legend
 

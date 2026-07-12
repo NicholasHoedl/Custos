@@ -478,14 +478,19 @@ Playwright can drive the close-out wizard and all six lenses (Counsel, Converse,
 Draft) **offline and deterministically** — the real IPC, validators, and DB writes still run. It exercises
 the plumbing, not the model's answer quality (that still needs a live key). 16 e2e specs currently green.
 
-**Forced first-run tutorial** (ADR-044) — first launch drops the user into a **non-skippable guided
-wizard** instead of a blank app: it asks their name, creates a campaign + main character + first session,
-has them write a real chronicle entry, requires and **live-validates** an Anthropic API key, walks them
-through a **real** close-out (the actual locked wizard), and tours every tool — finishing with a usable
-campaign on the Chronicle. The navbar is reordered to the sequence it teaches (Chronicle · Sessions ·
-Character · Codex · Web · Lore · Counsel · Converse · Settings). A persisted flag shows it once. (Accepting
-OpenAI/Gemini keys was requested alongside it but **deferred** as a separate multi-provider AI-backend
-project.)
+**Forced first-run tutorial** (ADR-044, trimmed by ADR-045) — first launch drops the user into a
+**non-skippable guided wizard** instead of a blank app: it asks their name, creates a campaign + main
+character + first session, requires and **live-validates** an Anthropic API key (with numbered "how to get
+a key" instructions), and tours every tool — finishing with a usable campaign on the Chronicle. It's
+**setup-only**: ADR-045 removed the earlier add-a-chronicle-entry and real-close-out steps. The navbar is
+reordered to the sequence it teaches (Chronicle · Sessions · Character · Codex · Web · Lore · Counsel ·
+Converse · Settings). A persisted flag (or any existing campaign) shows it once. (Accepting OpenAI/Gemini
+keys was requested alongside it but **deferred** as a separate multi-provider AI-backend project.)
+
+**Quickstart guide** (ADR-045) — an always-available reference to the core loop (Chronicle → Close out →
+Illuminate → Ask), every tool, and how to get set up (including where to get an API key), opened from an
+out-of-the-way **"Guide"** button at the bottom of the sidebar. It's where the capture→close-out loop is
+taught now that the first-run tutorial no longer runs it.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, and map attachments. The nearest queued follow-up is an

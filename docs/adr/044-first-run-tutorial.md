@@ -8,6 +8,12 @@ it creates a real campaign + main character + session, teaches the capture→clo
 first). Verified: typecheck + lint + 263 unit + **17 e2e** (the new `tutorial.spec.ts` drives the whole
 flow under the fake-AI seam; the other 16 auto-skip it).
 
+> **Revised by [ADR-045](045-tutorial-trim-quickstart-guide.md) (2026-07-12):** the chronicle-entry and
+> real-close-out steps described below were later **removed** — the first-run tutorial is now **setup-only**
+> (it still creates the campaign + main character + session and requires a live-validated key), and the
+> capture→close-out loop is taught by the always-available **Quickstart guide** instead. The rest of this
+> ADR stands as the original decision.
+
 **Date:** 2026-07-11
 **Deciders:** Solo developer
 

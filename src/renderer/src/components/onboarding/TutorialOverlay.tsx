@@ -7,59 +7,37 @@ import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useSettings } from '@renderer/hooks/use-settings'
 import { NAV_ITEMS, type NavItem } from '@renderer/lib/nav-items'
-import { CloseOutDialog } from '@renderer/components/capture/CloseOutDialog'
+import {
+  ANTHROPIC_CONSOLE_LABEL,
+  ANTHROPIC_CONSOLE_URL,
+  API_KEY_STEPS,
+  TOOL_BLURBS,
+  TOUR_GROUPS
+} from '@renderer/lib/guide-content'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
-import { Textarea } from '@renderer/components/ui/textarea'
 import { Banner } from '@renderer/components/chrome'
 
-// The forced first-run tutorial (ADR-044) — a non-skippable, guided modal wizard mounted in AppShell.
-// It creates a real campaign + main character + session, teaches the capture→close-out loop by running a
-// REAL close-out, and tours every tool. There is no close/Esc/skip; only Back and the step's primary
-// action advance. On finish it persists `tutorialCompleted`, retires the legacy onboarding cards, and
-// lands the user on the Chronicle with a campaign, character, and Session 1 ready to write into.
+// The forced first-run tutorial (ADR-044, trimmed by ADR-045) — a non-skippable, guided modal wizard
+// mounted in AppShell. It creates a real campaign + main character + first session, requires a live-validated
+// Anthropic key, and tours every tool. There is no close/Esc/skip; only Back and the step's primary action
+// advance. On finish it persists `tutorialCompleted`, retires the legacy onboarding cards, and lands the
+// user on the Chronicle with a campaign, character, and Session 1 ready to write into. The capture→close-out
+// loop is no longer run here (that was cut) — it's taught by the always-available Quickstart guide instead.
 
 const STEPS = [
   'welcome',
   'campaign',
   'character',
   'session',
-  'chronicle',
   'apikey',
-  'closeout',
   'tour-capture',
   'tour-world',
   'tour-ask',
   'done'
 ] as const
 type Step = (typeof STEPS)[number]
-
-/** One-line "what it's for" per nav view, keyed by NAV_ITEMS.key — used by the tool tour. */
-const TOOL_BLURBS: Record<string, string> = {
-  journal:
-    "Jot what happens as you play — one plain line at a time. You'll spend most of your time here.",
-  sessions:
-    'Each game night is a session. Review it, get a "previously on…" recap, and run Illuminate to enrich your world from its notes.',
-  character:
-    "Your main character's home — their profile, backstory, persona, and voice (the voice the Keeper speaks in).",
-  capture:
-    'Your world library: every person, place, faction, quest, and item. Browse, edit, and inscribe new entries.',
-  web: "A living map of how everyone and everything connects — a force-directed graph of your campaign's relationships.",
-  recall:
-    'Ask a question in plain language; get a cited answer drawn from your own notes. (Needs the search model — download it in Settings.)',
-  suggest:
-    'Stuck in the moment? Get in-character ideas for what your character might do — tagged and grounded in the scene.',
-  converse:
-    'About to talk to someone? Get a spread of in-character questions to draw them out, from safe openers to pointed probes.'
-}
-
-const TOUR_GROUPS: Record<'tour-capture' | 'tour-world' | 'tour-ask', { title: string; keys: string[] }> =
-  {
-    'tour-capture': { title: 'Capture the story', keys: ['journal', 'sessions'] },
-    'tour-world': { title: 'Your world', keys: ['character', 'capture', 'web'] },
-    'tour-ask': { title: 'Ask the Keeper', keys: ['recall', 'suggest', 'converse'] }
-  }
 
 export function TutorialOverlay({ onDone }: { onDone: () => void }) {
   const setActiveCampaign = useAppStore((s) => s.setActiveCampaign)
@@ -77,14 +55,11 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
   const [mcName, setMcName] = useState('')
   const [campaignId, setCampaignId] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [entries, setEntries] = useState<string[]>([])
-  const [entryDraft, setEntryDraft] = useState('')
 
   const [keyDraft, setKeyDraft] = useState('')
   const [validating, setValidating] = useState(false)
   const [keyError, setKeyError] = useState<string | null>(null)
 
-  const [closeOutOpen, setCloseOutOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   // Auto-create the first session once the campaign exists and we reach the session step.
@@ -119,22 +94,6 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
       advance()
     } catch (e) {
       toast.error('Could not create the campaign', { description: String(e) })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function addEntry(): Promise<void> {
-    const content = entryDraft.trim()
-    if (!content || !session) return
-    setBusy(true)
-    try {
-      await ledger.event.create({ sessionId: session.id, content })
-      setEntries((e) => [...e, content])
-      setEntryDraft('')
-      bumpSessions()
-    } catch (e) {
-      toast.error('Could not add the entry', { description: String(e) })
     } finally {
       setBusy(false)
     }
@@ -177,8 +136,6 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
         return mcName.trim().length > 0
       case 'session':
         return session !== null
-      case 'chronicle':
-        return entries.length > 0
       default:
         return true
     }
@@ -214,16 +171,10 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
             setCampaignName={setCampaignName}
             mcName={mcName}
             setMcName={setMcName}
-            entries={entries}
-            entryDraft={entryDraft}
-            setEntryDraft={setEntryDraft}
-            addEntry={addEntry}
             keyDraft={keyDraft}
             setKeyDraft={setKeyDraft}
             keyError={keyError}
-            busy={busy}
             session={session}
-            onOpenCloseOut={() => setCloseOutOpen(true)}
           />
         </div>
 
@@ -241,10 +192,6 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
               {validating && <Loader2 className="size-4 animate-spin" />}
               Verify &amp; continue
             </Button>
-          ) : step === 'closeout' ? (
-            <span className="text-xs text-muted-foreground">
-              Open the close-out to continue — it advances when you finish.
-            </span>
           ) : step === 'done' ? (
             <Button onClick={() => void finish()}>Start writing</Button>
           ) : step === 'character' ? (
@@ -259,19 +206,6 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
           )}
         </footer>
       </div>
-
-      {/* The REAL close-out wizard, opened from step 7. Radix portals it above this z-40 overlay. On close
-          (done or its own graceful exit) we advance — never trapping the user. */}
-      {step === 'closeout' && session && (
-        <CloseOutDialog
-          session={session}
-          open={closeOutOpen}
-          onOpenChange={(o) => {
-            setCloseOutOpen(o)
-            if (!o) advance()
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -284,16 +218,10 @@ function StepBody(props: {
   setCampaignName: (v: string) => void
   mcName: string
   setMcName: (v: string) => void
-  entries: string[]
-  entryDraft: string
-  setEntryDraft: (v: string) => void
-  addEntry: () => void
   keyDraft: string
   setKeyDraft: (v: string) => void
   keyError: string | null
-  busy: boolean
   session: Session | null
-  onOpenCloseOut: () => void
 }): React.ReactElement {
   const { step } = props
   switch (step) {
@@ -363,43 +291,26 @@ function StepBody(props: {
           </p>
         </Field>
       )
-    case 'chronicle':
-      return (
-        <Field
-          title="As you play, jot what happens — one line at a time."
-          hint="This is the Chronicle. Plain notes; the Keeper turns them into structured memory later. Add at least one to continue."
-        >
-          <Textarea
-            rows={2}
-            value={props.entryDraft}
-            onChange={(e) => props.setEntryDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') props.addEntry()
-            }}
-            placeholder="e.g. The party met Aldric in the tavern and struck a deal."
-          />
-          <div className="flex justify-end">
-            <Button size="sm" onClick={props.addEntry} disabled={!props.entryDraft.trim() || props.busy}>
-              Add
-            </Button>
-          </div>
-          {props.entries.length > 0 && (
-            <ul className="space-y-1 rounded-md border border-border bg-background/50 p-2">
-              {props.entries.map((e, i) => (
-                <li key={i} className="text-sm text-foreground/90">
-                  • {e}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Field>
-      )
     case 'apikey':
       return (
         <Field
           title="Ledger's memory is powered by Claude."
-          hint="Paste your Anthropic API key. It's stored encrypted on this device and only ever used to call Anthropic. This step is required to continue."
+          hint="The Keeper needs an Anthropic API key to answer with Lore, Counsel, and Converse. It's stored encrypted on this device and only ever used to call Anthropic. This step is required to continue."
         >
+          <p className="text-sm font-medium text-foreground">No key yet? Here's how:</p>
+          <ol className="list-decimal space-y-1.5 rounded-md border border-border bg-background/50 py-2 pl-7 pr-3 text-sm text-muted-foreground">
+            {API_KEY_STEPS.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+          <a
+            href={ANTHROPIC_CONSOLE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+          >
+            Open {ANTHROPIC_CONSOLE_LABEL} <ExternalLink className="size-3" />
+          </a>
           <Label htmlFor="tut-key">Anthropic API key</Label>
           <Input
             id="tut-key"
@@ -409,28 +320,11 @@ function StepBody(props: {
             onChange={(e) => props.setKeyDraft(e.target.value)}
             placeholder="sk-ant-…"
           />
-          <a
-            href="https://console.anthropic.com/settings/keys"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-          >
-            Get a key at console.anthropic.com <ExternalLink className="size-3" />
-          </a>
           {props.keyError && (
             <Banner tone="destructive" icon={<AlertTriangle className="size-4" />}>
               {props.keyError}
             </Banner>
           )}
-        </Field>
-      )
-    case 'closeout':
-      return (
-        <Field
-          title="Now turn your log into memory: close out the session."
-          hint="The Keeper reads your whole chronicle and proposes the entities, notes, and status changes to record — then Illuminate fills in relationships. You review everything before it's saved."
-        >
-          <Button onClick={props.onOpenCloseOut}>Close out session</Button>
         </Field>
       )
     case 'tour-capture':
@@ -441,11 +335,13 @@ function StepBody(props: {
       return (
         <Field
           title={`You're all set${props.name.trim() ? `, ${props.name.trim()}` : ''}.`}
-          hint={`Your campaign "${props.campaignName}" is ready with ${props.mcName} and Session ${props.session?.number ?? 1}. Jump into the Chronicle and start writing — the loop you just learned is the whole rhythm of the tool.`}
+          hint={`Your campaign "${props.campaignName}" is ready with ${props.mcName} and Session ${props.session?.number ?? 1}. Jump into the Chronicle and start jotting what happens at the table.`}
         >
           <p className="text-sm text-muted-foreground">
-            The AI lenses (Lore, Counsel, Converse) and the search model can be tuned any time in
-            Settings.
+            When you're ready to turn your notes into memory, the{' '}
+            <span className="font-medium text-foreground">Quickstart guide</span> (bottom-left of the
+            sidebar) walks through the whole loop — and the AI lenses and search model can be tuned any
+            time in Settings.
           </p>
         </Field>
       )
