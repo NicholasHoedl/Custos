@@ -7,9 +7,8 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
-const { buildConverseSystem, buildConverseUserContent, confidenceTag } = await import(
-  '../../../src/main/services/claude.service'
-)
+const { buildConverseSystem, buildConverseUserContent, confidenceTag } =
+  await import('../../../src/main/services/claude.service')
 
 const TARGET = {
   name: 'Glasstaff',
@@ -22,14 +21,15 @@ const TARGET = {
 }
 
 describe('converse prompt assembly', () => {
-  it('system carries the campaign + persona brief (cached at the end) and the Converse instructions', () => {
+  it('system carries the campaign + persona + the MC voice examples (ADR-049) and the Converse instructions', () => {
     const sys = buildConverseSystem({
       campaignName: 'Phandelver',
       campaignDescription: 'a frontier town',
       pcName: 'Vargas',
       pcRace: 'elf',
       pcClass: 'wizard',
-      persona: 'THE-CHARACTER-BRIEF'
+      persona: 'THE-CHARACTER-BRIEF',
+      voiceExamples: ['Coin first, questions later.']
     })
     const text = sys.map((b) => b.text).join('\n')
     expect(text).toContain('Phandelver')
@@ -39,7 +39,11 @@ describe('converse prompt assembly', () => {
     expect(text).toContain('secret-seeking') // a tag from the question vocabulary
     expect(text).toContain('FUNNEL') // the funnel/trust-cost spread rule
     expect(text).toContain('elf wizard') // race/class stated for prompt parity
-    // The cacheable breakpoint is on the last (persona) block.
+    // Unlike Counsel, Converse RESTORES the MC voice examples — its questions are dialogue in the PC's
+    // voice (ADR-049).
+    expect(text).toContain('Voice examples')
+    expect(text).toContain('Coin first, questions later.')
+    // The cacheable breakpoint rides the last block (the voice block carries its own).
     expect(sys[sys.length - 1].cache_control).toEqual({ type: 'ephemeral' })
   })
 
@@ -128,5 +132,24 @@ describe('converse prompt assembly', () => {
     expect(all).toContain('smooth-talker')
     expect(all).toContain('serve the Black Spider')
     expect(all).toContain('vain')
+  })
+
+  it('folds the conversation-so-far into a follow-up block when history is given (ADR-049)', () => {
+    const content = buildConverseUserContent({
+      target: TARGET,
+      notes: [],
+      connections: null,
+      tie: null,
+      history: ['He admitted he owes the Zhentarim.', 'He swears he is done with them.'],
+      anchorLabel: 'Session 3',
+      asOf: false,
+      pcName: 'Vargas'
+    })
+    const all = content.map((b) => ('text' in b ? b.text : '')).join('\n')
+    expect(all).toContain('conversation so far') // the follow-up grounding block
+    expect(all).toContain('He admitted he owes the Zhentarim.')
+    expect(all).toContain('He swears he is done with them.')
+    // With history, the closing ask ships FOLLOW-UP questions.
+    expect((content[content.length - 1] as { text: string }).text).toContain('follow-up questions')
   })
 })

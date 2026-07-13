@@ -428,7 +428,7 @@ Anthropic's `ephemeral` cache defaults to a **5-minute** TTL; pass `cache_contro
 |---|---|---|
 | Recall synthesis | `claude-sonnet-4-6` | Lower latency/cost; configurable to Opus |
 | Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 4-option narrative "in the moment" — ADR-048 — + open-ended "directions" — ADR-016) |
-| Converse | `claude-opus-4-8` | Third AI lens; **reuses the Suggest model + effort setting**; single-shot structured, direct-fetch grounding (ADR-025) |
+| Converse | `claude-opus-4-8` | Third AI lens; **reuses the Suggest model + effort setting** (per-query Quick/Deep — ADR-049); single-shot structured per turn with a **follow-up loop** (ADR-049), direct-fetch grounding (ADR-025) |
 | Auto-tagging (future) | `claude-haiku-4-5` | Background task, latency-insensitive |
 
 ### ClaudeService Interface (main process only)
@@ -505,7 +505,7 @@ Implementation notes:
 
 For Suggest with Opus 4.8, use adaptive thinking: `thinking: { type: "adaptive" }` together with `output_config: { effort: "high" }`. Opus 4.8 does **not** accept `thinking: { type: "enabled", budget_tokens: N }` — that returns a 400; a fixed thinking budget is replaced by adaptive thinking plus the `effort` parameter (`low` | `medium` | `high` | `max`). This improves reasoning quality for the "what would my character do?" question. Drop `effort` to `medium` if latency is too high at the table.
 
-### Converse Output Model (ADR-025, reshaped by ADR-034)
+### Converse Output Model (ADR-025 → ADR-034 → ADR-049 follow-up loop + speed)
 
 **Converse** helps a player prepare to *talk* to a character: given the active PC (the asker) and a chosen
 **target** entity, it returns **questions only** — a spread of tagged, in-character `questions` the asker

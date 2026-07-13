@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  BookPlus,
   Check,
   ChevronsUpDown,
+  Copy,
   KeyRound,
   MessagesSquare,
   RotateCcw,
@@ -18,7 +20,7 @@ import {
   converseTagLabel,
   type ConverseFailureReason,
   type ConverseQuestion,
-  type ConverseResult
+  type ConverseTurn
 } from '@shared/converse-types'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
@@ -39,7 +41,7 @@ import {
   CommandList
 } from '@renderer/components/ui/command'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
-import { LensResultBar } from '@renderer/components/lens/LensResultBar'
+import { useLensSave } from '@renderer/components/lens/LensResultBar'
 import { LensIdle } from '@renderer/components/lens/LensIdle'
 import { CONVERSE_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
@@ -50,9 +52,12 @@ import { Banner, EmptyState, PaneBody, PaneHeader, SetupCard } from '@renderer/c
 // You talk WITH a character (an NPC or a fellow PC), never a place/faction/item.
 const CHARACTER_TYPES = ['npc', 'pc'] as const
 
+type Speed = 'quick' | 'deep'
+
 // Converse (the third AI lens): pick a character to talk WITH; Converse proposes a spread of tagged,
 // in-character QUESTIONS your active PC could ask to draw them out — funnel-ordered from rapport to
-// sensitive. Single-shot, grounded by direct fetch — mirrors Counsel's shell (no model needed). ADR-034.
+// sensitive. A follow-up loop (ADR-049) continues the conversation: feed back what they said and get
+// follow-ups grounded in it. Single-shot per turn, grounded by direct fetch (no model needed). ADR-034.
 export function ConverseView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
@@ -63,22 +68,26 @@ export function ConverseView() {
   const { sessions } = useSessions(activeCampaignId)
   const [targetId, setTargetId] = useState<string | null>(null)
   const [thread, setThread] = useState('')
+  const [speed, setSpeed] = useState<Speed>('quick')
   const [asOf, setAsOf] = useState<number | null>(null)
   const [asked, setAsked] = useState<{ name: string; focus: string }>({ name: '', focus: '' })
   const { entries: recent, remember } = useLensHistory()
-  const rememberedRef = useRef<ConverseResult | null>(null)
+  const rememberedRef = useRef(0)
 
-  // Snapshot the spread into history once it's ready (P1-1).
+  // Snapshot each completed turn's spread into the cross-session lens history (P1-1). Resets when the
+  // thread is cleared (Reset) so a fresh conversation re-remembers correctly.
   useEffect(() => {
-    const r = converse.result
-    if (converse.status === 'done' && r?.ok && r !== rememberedRef.current) {
-      rememberedRef.current = r
+    const n = converse.turns.length
+    if (n < rememberedRef.current) rememberedRef.current = 0
+    while (rememberedRef.current < n) {
+      const t = converse.turns[rememberedRef.current]
       remember(
         `Questions for ${asked.name || 'them'}`,
-        converseProse(asked.name || 'them', asked.focus || undefined, r.questions)
+        converseProse(asked.name || 'them', asked.focus || undefined, t.questions)
       )
+      rememberedRef.current++
     }
-  }, [converse.status, converse.result, asked, remember])
+  }, [converse.turns, asked, remember])
 
   if (!activeCampaignId) {
     return (
@@ -94,17 +103,14 @@ export function ConverseView() {
   )
   const hasPc = Boolean(activePcId)
   const thinking = converse.status === 'thinking'
+  const active = converse.turns.length > 0
   const canSubmit = onb.keyReady && hasPc && !thinking && Boolean(targetId)
   const target = entities.find((e) => e.id === targetId) ?? null
-  const prose =
-    converse.status === 'done' && converse.result?.ok
-      ? converseProse(asked.name || 'them', asked.focus || undefined, converse.result.questions)
-      : null
 
   function submit() {
     if (!canSubmit || !targetId) return
     setAsked({ name: target?.name ?? 'them', focus: thread.trim() })
-    converse.ask(targetId, thread, asOf ?? undefined)
+    converse.ask(targetId, thread, { asOfSession: asOf ?? undefined, speed })
   }
 
   return (
@@ -155,6 +161,7 @@ export function ConverseView() {
           />
         ) : null}
 
+        {/* Start a conversation: who, an optional thread, speed + as-of. */}
         <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
           <TargetPicker targets={targets} value={targetId} onChange={setTargetId} />
           <Textarea
@@ -170,30 +177,37 @@ export function ConverseView() {
             }}
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
-            {thinking ? (
-              <Button variant="outline" size="sm" onClick={converse.cancel}>
-                Stop
-              </Button>
-            ) : (
-              <Button size="sm" onClick={submit} disabled={!canSubmit}>
-                Prepare questions
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <SpeedToggle speed={speed} setSpeed={setSpeed} />
+              <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+            </div>
+            <Button size="sm" onClick={submit} disabled={!canSubmit}>
+              {active ? 'New conversation' : 'Prepare questions'}
+            </Button>
           </div>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto">
-          {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
-
-          {converse.status === 'idle' && (
+        {/* The conversation thread — oldest first, the follow-up composer at the bottom. */}
+        <div className="flex-1 space-y-6 overflow-y-auto">
+          {!active && converse.status === 'idle' && (
             <LensIdle starters={CONVERSE_STARTERS} recent={recent} onPick={setThread} />
           )}
 
+          {converse.turns.map((turn, i) => (
+            <TurnBlock key={i} targetName={asked.name || 'them'} focus={asked.focus} turn={turn} />
+          ))}
+
           {thinking && (
-            <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
-              <MessagesSquare className="size-4 animate-pulse text-primary" />
-              Weighing what to ask {target?.name ?? 'them'}…
+            <div className="flex flex-col items-center gap-2 pt-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MessagesSquare className="size-4 animate-pulse text-primary" />
+                {active
+                  ? `Thinking of follow-ups for ${target?.name ?? 'them'}…`
+                  : `Weighing what to ask ${target?.name ?? 'them'}…`}
+              </div>
+              <Button variant="outline" size="sm" onClick={converse.cancel}>
+                Stop
+              </Button>
             </div>
           )}
 
@@ -203,21 +217,129 @@ export function ConverseView() {
             </Banner>
           )}
 
-          {converse.status === 'done' && converse.result && !converse.result.ok && (
-            <FailureBanner reason={converse.result.reason} />
-          )}
+          {converse.failure && <FailureBanner reason={converse.failure} />}
 
-          {converse.status === 'done' && converse.result?.ok && (
-            <QuestionSpread questions={converse.result.questions} />
-          )}
-
-          {converse.status === 'done' && converse.result?.ok && converse.result.cost && (
-            <p className="text-right font-mono text-[10px] text-muted-foreground">
-              {formatRunCost(converse.result.cost)}
-            </p>
-          )}
+          {active && !thinking && <FollowUpBox onSend={converse.followUp} />}
         </div>
       </PaneBody>
+    </div>
+  )
+}
+
+/** Quick (Sonnet — table-fast) vs Deep (the Settings "Counsel model" — fuller reasoning). Per-query. */
+function SpeedToggle({ speed, setSpeed }: { speed: Speed; setSpeed: (s: Speed) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
+      <button
+        type="button"
+        onClick={() => setSpeed('quick')}
+        title="Sonnet — faster questions at the table"
+        className={cn(
+          'rounded px-2 py-1 transition-colors',
+          speed === 'quick'
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Quick
+      </button>
+      <button
+        type="button"
+        onClick={() => setSpeed('deep')}
+        title="Your Settings model — fuller reasoning"
+        className={cn(
+          'rounded px-2 py-1 transition-colors',
+          speed === 'deep'
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Deep
+      </button>
+    </div>
+  )
+}
+
+/** The "continue the conversation" composer: paraphrase what the target said → follow-up questions. */
+function FollowUpBox({ onSend }: { onSend: (answer: string) => void }) {
+  const [answer, setAnswer] = useState('')
+  function send() {
+    const a = answer.trim()
+    if (!a) return
+    onSend(a)
+    setAnswer('')
+  }
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
+      <p className="inscribed text-[10px]">Continue — what did they say?</p>
+      <Textarea
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        rows={2}
+        placeholder="Paraphrase their answer — the next questions build on it. e.g. He admits he owes the Zhentarim, but swears he's done with them."
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            send()
+          }
+        }}
+      />
+      <div className="flex justify-end">
+        <Button size="sm" onClick={send} disabled={!answer.trim()}>
+          Follow up
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** One turn in the thread: the target's answer that prompted it (for follow-ups), the funnel-ordered
+ *  spread, and per-turn Copy/Inscribe. */
+function TurnBlock({
+  targetName,
+  focus,
+  turn
+}: {
+  targetName: string
+  focus: string
+  turn: ConverseTurn
+}) {
+  const { copy, inscribe } = useLensSave()
+  const prose = converseProse(targetName, focus || undefined, turn.questions)
+  return (
+    <div className="space-y-3">
+      {turn.answer && (
+        <div className="rounded-md border-l-2 border-primary/40 bg-muted/20 py-1.5 pl-3 pr-2 text-sm leading-relaxed text-foreground/80">
+          <span className="inscribed mr-1.5 text-[10px]">They said</span>
+          {turn.answer}
+        </div>
+      )}
+      <QuestionSpread questions={turn.questions} />
+      <div className="flex items-center justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => copy(prose)}
+        >
+          <Copy className="size-3.5" />
+          Copy
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => inscribe(prose)}
+        >
+          <BookPlus className="size-3.5" />
+          Inscribe
+        </Button>
+      </div>
+      {turn.cost && (
+        <p className="text-right font-mono text-[10px] text-muted-foreground">
+          {formatRunCost(turn.cost)}
+        </p>
+      )}
     </div>
   )
 }
@@ -317,7 +439,7 @@ function QuestionCard({ q }: { q: ConverseQuestion }) {
           {CONVERSE_COST_LABELS[meta.cost]}
         </span>
       </div>
-      <p className="text-[15px] leading-relaxed text-foreground/90">{q.question}</p>
+      <p className="text-[15px] leading-relaxed text-foreground/90">{`"${q.question}"`}</p>
       <p className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">{q.read}</p>
     </div>
   )

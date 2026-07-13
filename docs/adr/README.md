@@ -60,6 +60,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [046](046-web-graph-per-type-color.md) | Per-type color + icon on the Web graph, MC keeps a distinct ember ring (revises ADR-040's node styling; scoped exception to ADR-024) | Accepted | 2026-07-12 |
 | [047](047-ui-cohesion-header-nav.md) | UI cohesion: one compact-toolbar page header (PaneHeader/PaneBody, drop PaneShell), grouped sidebar nav, AI-lens starter idle states, Codex adopts the per-type visuals | Accepted | 2026-07-12 |
 | [048](048-counsel-narrative-cards.md) | Counsel "in the moment": four narrative cards (title + plain-English explanation + tags), drop pillar/mechanic/teamwork, no combat-turn tactics (supersedes ADR-026's mechanics layer) | Accepted | 2026-07-12 |
+| [049](049-converse-follow-up-loop.md) | Converse: a follow-up loop (feed the answer back → follow-up questions) + a Quick/Deep speed toggle + restored MC voice (fixes the ADR-048 voice drop); extends ADR-034 | Accepted | 2026-07-13 |
 
 ## Status legend
 

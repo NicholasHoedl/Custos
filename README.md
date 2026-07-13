@@ -21,7 +21,8 @@ play and the voice the Keeper speaks in; a dashboard manages their profile, pers
 a **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties your
 backstory implies — all review-gated), **Converse** (pick a character to talk *with* — an NPC or a fellow
 party member — and get a spread of tagged, in-character questions to draw them out, from safe openers to
-pointed probes; name a thread to steer them), the **Chronicle** (jot plain lines of what happened; when
+pointed probes; name a thread to steer them, then feed back what they say for follow-ups), the **Chronicle**
+(jot plain lines of what happened; when
 the night is over, **Close out session** runs the Keeper over the whole log — entities, notes, and
 status changes, then straight into Illuminate — in one review wizard built for volume; the header also
 hosts the session switcher and the paste-and-extract **Transcribe** dialog, which can tie an import to

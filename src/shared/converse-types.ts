@@ -20,6 +20,12 @@ export interface ConverseRequest {
   focus?: string
   /** Chronology (ADR-017): reconstruct "as of" this session NUMBER (notes + state + ties clamped ≤ N). */
   asOfSession?: number
+  /** Per-query speed: 'quick' = Sonnet + medium effort (table-fast); 'deep'/unset = the Settings model +
+   *  effort. Mirrors Recall/Counsel's speed toggle. */
+  speed?: 'quick' | 'deep'
+  /** Follow-up loop (ADR-049): what the TARGET has said so far this conversation, oldest-first (newest
+   *  last). Present → the model returns follow-up questions that build on those answers. */
+  history?: string[]
 }
 
 // The question-type taxonomy (ADR-034). Each suggestion gets ONE tag naming the KIND of question. The
@@ -134,3 +140,14 @@ export type ConverseFailureReason =
 export type ConverseResult =
   | { ok: true; questions: ConverseQuestion[]; cost?: AiRunCost }
   | { ok: false; reason: ConverseFailureReason; message?: string }
+
+/**
+ * One turn in a Converse thread (ADR-049, the follow-up loop). `answer` is what the target said that
+ * prompted this spread — null for the opening spread. Renderer-facing state (mirrors RecallTurn); never
+ * crosses IPC.
+ */
+export interface ConverseTurn {
+  answer: string | null
+  questions: ConverseQuestion[]
+  cost?: AiRunCost
+}

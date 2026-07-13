@@ -30,15 +30,15 @@ function fail(reason: ConverseFailureReason): ConverseResult {
 }
 
 const TAG_SET = new Set<string>(CONVERSE_TAGS)
-// A spread wants variety, not padding: at most 6 questions, and at least 4 must survive to be usable.
-const CONVERSE_CAP = 6
+// The spread is FOUR focused questions (cap 4, floor 4 → exactly four survive), mirroring Counsel.
+const CONVERSE_CAP = 4
 const CONVERSE_FLOOR = 4
 
 /**
  * Enforce what the JSON schema can't (ADR-034): a spread of questions with DISTINCT tags and a non-empty
  * question + read. Mirrors suggest's validateMoment — drops entries with an unknown tag, empty text, or a
- * repeated tag; caps at 6. Returns null if fewer than 4 usable distinct-tag questions survive (the caller
- * then retries once, then fails). Distinct tags keep the spread varied instead of six shades of one probe.
+ * repeated tag; caps at 4. Returns null if fewer than 4 usable distinct-tag questions survive (the caller
+ * then retries once, then fails). Distinct tags keep the spread varied instead of four shades of one probe.
  */
 function validateConverse(raw: ConverseQuestion[]): ConverseQuestion[] | null {
   const seen = new Set<string>()
@@ -118,7 +118,10 @@ export async function converse(
       24
     )
     const tie = formatRelationships([
-      { name: pc.name, views: listForEntity(ctx, pcId, asOf).filter((v) => v.other.id === targetId) }
+      {
+        name: pc.name,
+        views: listForEntity(ctx, pcId, asOf).filter((v) => v.other.id === targetId)
+      }
     ])
 
     const anchorLabel =
@@ -131,7 +134,12 @@ export async function converse(
               : null
           })()
 
-    const { suggestModel, suggestEffort } = getSettings()
+    // Per-query speed (ADR-049): 'quick' runs Sonnet + medium for a table-fast spread; 'deep'/unset uses
+    // the Settings model/effort (shared with Counsel).
+    const settings = getSettings()
+    const quick = req.speed === 'quick'
+    const suggestModel = quick ? 'claude-sonnet-4-6' : settings.suggestModel
+    const suggestEffort: 'medium' | 'high' = quick ? 'medium' : settings.suggestEffort
     let cost: AiRunCost | undefined // sums across the retry (P0-4)
     const callOnce = (): Promise<ConverseQuestion[]> =>
       claudeConverse({
@@ -148,6 +156,7 @@ export async function converse(
         connections,
         tie,
         focus,
+        history: req.history,
         anchorLabel,
         asOf: asOf !== undefined,
         context,

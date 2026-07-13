@@ -605,15 +605,17 @@ export interface SuggestContext {
 }
 
 /**
- * Shared system prefix for both Suggest modes: instructions + campaign + (race/class) + persona brief.
- * The race/class line is a bare fact so the "in the moment" prompt knows which race/class tags are
- * legal; it's harmless context for directions mode. The persona stays last (the cached prefix boundary).
- * NOTE: unlike Recall, Counsel does NOT append the MC's voice examples — they push in-character diction
- * that fights Counsel's plain-English output (ADR-048). The persona brief alone grounds who the PC is.
+ * Shared system prefix for Suggest + Converse: instructions + campaign + (race/class) + persona brief.
+ * The race/class line is a bare fact so the "in the moment" prompt knows which race/class tags are legal;
+ * it's harmless context for directions mode. The persona is the cached prefix boundary. `includeVoice`
+ * appends the MC's voice examples after the persona (they carry their own cache breakpoint): **Converse**
+ * restores them — its questions are dialogue in the PC's voice (ADR-049) — while **Counsel/Directions**
+ * keep them OFF, since they'd fight plain-English advice (ADR-048).
  */
 function suggestSystemBlocks(
   ctx: SuggestContext,
-  instructions: string
+  instructions: string,
+  includeVoice = false
 ): Anthropic.TextBlockParam[] {
   const campaign = `Campaign: ${ctx.campaignName}${
     ctx.campaignDescription ? `\n${ctx.campaignDescription}` : ''
@@ -631,6 +633,10 @@ function suggestSystemBlocks(
     text: `Character brief for ${ctx.pcName ?? 'the character'}:\n\n${ctx.persona ?? ''}`,
     cache_control: { type: 'ephemeral' }
   })
+  if (includeVoice) {
+    const voice = voiceExamplesBlock(ctx.voiceExamples, ctx.pcName)
+    if (voice) blocks.push(voice)
+  }
   return blocks
 }
 
@@ -1477,7 +1483,7 @@ export async function suggestDirections(
 
 const CONVERSE_INSTRUCTIONS = `You help a tabletop RPG player prepare to TALK to another character — an NPC or a fellow player character — and draw them out, IN CHARACTER. You'll be given a brief on how the asking player character (PC) thinks and what they value, then everything the party has discovered about the person they're talking WITH: notes (some confirmed, some only rumored or suspected), that character's known connections, and how the PC relates to them (including how each side FEELS about the other). There may be a THREAD — a specific person, topic, or rumor the PC wants to dig into; if there is none, draw the character out generally.
 
-Your job: write a SPREAD of in-character QUESTIONS the PC could actually SAY to this character to open them up. Output ONLY questions — no briefing, no summary, no preamble. Each question carries ONE type TAG and a short READ.
+Your job: write a spread of FOUR in-character QUESTIONS the PC could actually SAY to this character to open them up. Output ONLY questions — no briefing, no summary, no preamble. Each question carries ONE type TAG and a short READ.
 
 ASK THE GAP, NOT THE KNOWN. Reason silently over what the party has: what is CONFIRMED, what is only (rumored)/(suspected), and what is conspicuously MISSING (unknown backstory, motives, loyalties, feelings). Then aim every question at a gap or an uncertain lead — never at something already confirmed (you would be asking what you already know). Turn a confirmed fact into a CALLBACK that cracks open the next layer; put a rumor or hunch to them to confirm, deny, or complicate; open the blank spaces with a broad probe.
 
@@ -1495,6 +1501,8 @@ THE TAG VOCABULARY — grouped by how much social capital the question spends:
 FUNNEL THE SPREAD. Range across the costs — open with at least one builds/low question, and reserve the high-cost probes for when they are earned. Do NOT hand a stranger a secret-seeking or challenge line: gauge STANDING from the PC's tie and how each side feels (a sworn friend or a bitter enemy can push where an acquaintance cannot). Mix the aims too — some questions chase the world and its lore, others the character's inner life. Keep every tag distinct across the spread.
 
 FOLLOW THE THREAD. When a thread is given, point most questions at it — their ties to it, what they know of it, how they feel about it — while still varying the type and cost. With no thread, spread across their backstory, motives, feelings, connections, and any open rumors.
+
+FOLLOW UP. If a "conversation so far" is given — things the target has already said — your questions are FOLLOW-UPS: dig into what they just revealed, pull the loose thread in their answer, or open the next gap it exposed. Don't re-ask what they've already answered, and let the most recent thing they said steer the spread.
 
 GROUND IT. Everything you treat as fact — who they are tied to, what is resolved, what is only suspected — comes from the notes, connections, tie, and state you are given; invent nothing. Respect the current state: if they are marked [ended]/[presumed ended], or you are reconstructing an earlier session, ask only what the PC could know then, and phrase accordingly.`
 
@@ -1524,9 +1532,10 @@ const CONVERSE_SCHEMA = {
   required: ['questions']
 }
 
-/** System prompt for Converse — reuses the shared campaign + persona blocks (persona cached last). */
+/** System prompt for Converse — the shared campaign + persona blocks PLUS the MC voice examples (its
+ *  questions are dialogue in the PC's voice, so the sample lines ground them — ADR-049). */
 export function buildConverseSystem(ctx: SuggestContext): Anthropic.TextBlockParam[] {
-  return suggestSystemBlocks(ctx, CONVERSE_INSTRUCTIONS)
+  return suggestSystemBlocks(ctx, CONVERSE_INSTRUCTIONS, true)
 }
 
 /**
@@ -1549,6 +1558,8 @@ export function buildConverseUserContent(p: {
   connections: string | null
   tie: string | null
   focus?: string
+  /** Follow-up loop (ADR-049): the target's prior answers this conversation, oldest-first. */
+  history?: string[]
   anchorLabel: string | null
   asOf: boolean
   pcName: string
@@ -1606,9 +1617,16 @@ export function buildConverseUserContent(p: {
       text: `Thread — what ${p.pcName} wants to dig into (aim most questions here): ${p.focus.trim()}`
     })
   }
+  if (p.history?.length) {
+    const said = p.history.map((a, i) => `${i + 1}. ${a}`).join('\n')
+    content.push({
+      type: 'text',
+      text: `The conversation so far — what ${p.target.name} has already said to ${p.pcName}, in order (most recent last):\n${said}\n\nThese are FOLLOW-UPS: build on what they've revealed (especially the latest), and don't re-ask what they've already answered.`
+    })
+  }
   content.push({
     type: 'text',
-    text: `Write only the in-character questions ${p.pcName} could ask to draw ${p.target.name} out — each with its tag and a short read.`
+    text: `Write only the in-character ${p.history?.length ? 'follow-up ' : ''}questions ${p.pcName} could ask to draw ${p.target.name} out — each with its tag and a short read.`
   })
   return content
 }
@@ -1627,6 +1645,8 @@ export interface ConverseParams {
   connections: string | null
   tie: string | null
   focus?: string
+  /** Follow-up loop (ADR-049): the target's prior answers this conversation, oldest-first. */
+  history?: string[]
   anchorLabel: string | null
   asOf: boolean
   context: SuggestContext
@@ -1652,6 +1672,7 @@ export async function converse(params: ConverseParams): Promise<ConverseQuestion
       connections: params.connections,
       tie: params.tie,
       focus: params.focus,
+      history: params.history,
       anchorLabel: params.anchorLabel,
       asOf: params.asOf,
       pcName: params.context.pcName ?? 'you'

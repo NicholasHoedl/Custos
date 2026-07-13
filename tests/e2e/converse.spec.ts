@@ -39,4 +39,14 @@ test('Converse: preparing questions for a target returns a tagged spread', async
   // A canned question + its tag label prove the spread rendered (exact — "rapport" also appears in a read).
   await expect(page.getByText('What first brought you to this place?')).toBeVisible()
   await expect(page.getByText('Rapport', { exact: true })).toBeVisible()
+
+  // Follow-up loop (ADR-049): paraphrase what they "said" → a fresh spread of follow-ups (the fake seam
+  // returns the canned four regardless; speed is transparent). The answer shows in the thread, and the
+  // canned question now appears twice — once per turn — proving the follow-up spread rendered.
+  await page
+    .getByPlaceholder(/Paraphrase their answer/)
+    .fill('She admits she is worried about a missing friend.')
+  await page.getByRole('button', { name: 'Follow up' }).click()
+  await expect(page.getByText('She admits she is worried about a missing friend.')).toBeVisible()
+  await expect(page.getByText('What first brought you to this place?')).toHaveCount(2)
 })

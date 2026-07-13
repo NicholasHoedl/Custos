@@ -33,7 +33,11 @@ import { updatePersona } from '../../src/main/services/persona.service'
 import { converse } from '../../src/main/services/converse.service'
 
 /** A question item in the model's array response (ADR-034: questions only, each { question, tag, read }). */
-const Q = (tag: string, question: string, read: string): { tag: string; question: string; read: string } => ({
+const Q = (
+  tag: string,
+  question: string,
+  read: string
+): { tag: string; question: string; read: string } => ({
   question,
   tag,
   read
@@ -84,7 +88,11 @@ describe('converse pipeline (mocked AI)', () => {
       toEntityId: glasstaff.id,
       relation: 'enemy_of'
     })
-    createNote(ctx, { campaignId, entityIds: [glasstaff.id], content: 'Glasstaff led the Redbrands.' })
+    createNote(ctx, {
+      campaignId,
+      entityIds: [glasstaff.id],
+      content: 'Glasstaff led the Redbrands.'
+    })
     createNote(ctx, {
       campaignId,
       entityIds: [glasstaff.id],
@@ -126,6 +134,21 @@ describe('converse pipeline (mocked AI)', () => {
     expect(call.tie).toContain('Glasstaff') // the asker's OWN tie to the target
     expect(call.model).toBe('claude-opus-4-8')
     expect(call.effort).toBe('high')
+  })
+
+  it('speed "quick" runs Sonnet + medium (default rides the Settings model/effort) — ADR-049', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
+    createSession(ctx, { campaignId })
+    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
+    updatePersona(ctx, pc.id, 'BRIEF')
+    const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Glasstaff' })
+    claudeConverse.mockResolvedValue(OK)
+
+    await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id, speed: 'quick' }, sig())
+    const call = claudeConverse.mock.calls[0][0] as { model: string; effort: string }
+    expect(call.model).toBe('claude-sonnet-4-6')
+    expect(call.effort).toBe('medium')
   })
 
   it('as-of: a tie severed by session N drops out of the connections at N', async () => {
@@ -174,13 +197,15 @@ describe('converse pipeline (mocked AI)', () => {
 
     // As of Session 1: the pre-tracking baseline note is in; the session-2 note must NOT leak.
     await converse(ctx, { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 1 }, sig())
-    const at1 = (claudeConverse.mock.calls.at(-1)![0] as { notes: Array<{ content: string }> }).notes
+    const at1 = (claudeConverse.mock.calls.at(-1)![0] as { notes: Array<{ content: string }> })
+      .notes
     expect(at1.some((n) => n.content.includes('BASELINE'))).toBe(true)
     expect(at1.some((n) => n.content.includes('LATER'))).toBe(false)
 
     // "Now" (no as-of): both notes present.
     await converse(ctx, { campaignId, pcId: pc.id, targetId: iarno.id }, sig())
-    const now = (claudeConverse.mock.calls.at(-1)![0] as { notes: Array<{ content: string }> }).notes
+    const now = (claudeConverse.mock.calls.at(-1)![0] as { notes: Array<{ content: string }> })
+      .notes
     expect(now.some((n) => n.content.includes('BASELINE'))).toBe(true)
     expect(now.some((n) => n.content.includes('LATER'))).toBe(true)
   })
@@ -236,7 +261,7 @@ describe('converse pipeline (mocked AI)', () => {
     if (!bad.ok) expect(bad.reason).toBe('invalid')
   })
 
-  it('validates the spread: drops invalid tags, blank text, and duplicate tags; caps at 6', async () => {
+  it('validates the spread: drops invalid tags, blank text, and duplicate tags; caps at 4', async () => {
     const ctx = makeTestDb()
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId })
@@ -253,17 +278,17 @@ describe('converse pipeline (mocked AI)', () => {
       { question: 'q3', tag: 'backstory-dig', read: 'r' },
       { question: 'q4', tag: 'rumor-test', read: 'r' },
       { question: 'q5', tag: 'motivation', read: 'r' },
-      { question: 'q6', tag: 'callback', read: 'r' },
+      { question: 'q6', tag: 'callback', read: 'r' }, // beyond the first 4 valid distinct → capped out
       { question: 'q7', tag: 'flatter', read: 'r' },
-      { question: 'q8', tag: 'challenge', read: 'r' } // 7th valid distinct → capped out
+      { question: 'q8', tag: 'challenge', read: 'r' }
     ])
 
     const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
     expect(res.ok).toBe(true)
     if (res.ok) {
-      expect(res.questions).toHaveLength(6) // capped at 6
+      expect(res.questions).toHaveLength(4) // capped at 4
       const tags = res.questions.map((q) => q.tag)
-      expect(new Set(tags).size).toBe(6) // all distinct
+      expect(new Set(tags).size).toBe(4) // all distinct
       expect(tags).not.toContain('not-a-tag')
     }
   })
@@ -276,10 +301,7 @@ describe('converse pipeline (mocked AI)', () => {
     updatePersona(ctx, pc.id, 'BRIEF')
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Iarno' })
 
-    claudeConverse.mockResolvedValue([
-      Q('open-probe', 'q1', 'r'),
-      Q('lore', 'q2', 'r')
-    ]) // only 2 < floor 4
+    claudeConverse.mockResolvedValue([Q('open-probe', 'q1', 'r'), Q('lore', 'q2', 'r')]) // only 2 < floor 4
 
     const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
     expect(res.ok).toBe(false)
