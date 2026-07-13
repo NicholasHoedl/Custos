@@ -57,6 +57,8 @@ ADR that supersedes the old one (don't edit the old one).
 | [043](043-fake-ai-all-lenses.md) | The fake-AI e2e seam extended to every AI lens (persona + model-gate/fuzzy-retrieval handling); extends ADR-041 | Accepted | 2026-07-10 |
 | [044](044-first-run-tutorial.md) | Forced first-run tutorial (guided modal wizard); hard-required validated key + real close-out; navbar reorder (revises ADR-030); multi-provider deferred | Accepted | 2026-07-11 |
 | [045](045-tutorial-trim-quickstart-guide.md) | Trim the first-run tutorial (drop chronicle-entry + close-out steps) + an always-available Quickstart guide from a sidebar button (revises ADR-044) | Accepted | 2026-07-12 |
+| [046](046-web-graph-per-type-color.md) | Per-type color + icon on the Web graph, MC keeps a distinct ember ring (revises ADR-040's node styling; scoped exception to ADR-024) | Accepted | 2026-07-12 |
+| [047](047-ui-cohesion-header-nav.md) | UI cohesion: one compact-toolbar page header (PaneHeader/PaneBody, drop PaneShell), grouped sidebar nav, AI-lens starter idle states, Codex adopts the per-type visuals | Accepted | 2026-07-12 |
 
 ## Status legend
 

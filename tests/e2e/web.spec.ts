@@ -34,7 +34,6 @@ test('web: renders the relationship graph with a node per entity', async () => {
   // Open Web from the sidebar. The header copy is unique to the view.
   await page.getByRole('button', { name: 'Web' }).click()
   await expect(page.getByRole('heading', { name: 'Web' })).toBeVisible()
-  await expect(page.getByText('The campaign’s living relationships')).toBeVisible()
 
   // The SVG canvas renders, with a node label per entity and the entity/tie counter.
   const svg = page.locator('svg.size-full')

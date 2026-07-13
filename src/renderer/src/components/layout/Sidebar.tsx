@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { BookOpen, HelpCircle, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign } from '@shared/entity-types'
@@ -7,7 +7,7 @@ import { cn } from '@renderer/lib/utils'
 import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { NAV_ITEMS } from '@renderer/lib/nav-items'
+import { NAV_ITEMS, NAV_GROUP_LABELS } from '@renderer/lib/nav-items'
 import { SearchBox } from '@renderer/components/capture/SearchBox'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
@@ -67,9 +67,28 @@ export function Sidebar() {
       </div>
 
       <nav className="mt-4 flex flex-1 flex-col gap-1 px-3">
-        {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+        {NAV_ITEMS.flatMap((item, i) => {
+          const { key, label, icon: Icon, group } = item
+          const prevGroup = NAV_ITEMS[i - 1]?.group
           const active = key === activeView
-          return (
+          const nodes: ReactNode[] = []
+          // Emit a section heading before the first item of each group — except Settings, which is
+          // set off by a plain divider rather than a heading.
+          if (group !== prevGroup) {
+            nodes.push(
+              group === 'settings' ? (
+                <div key="settings-sep" className="mt-1 border-t border-border/60 pt-2" />
+              ) : (
+                <div
+                  key={group + '-h'}
+                  className="inscribed px-3 pt-3 text-xs text-muted-foreground"
+                >
+                  {NAV_GROUP_LABELS[group]}
+                </div>
+              )
+            )
+          }
+          nodes.push(
             <button
               key={key}
               onClick={() => setActiveView(key)}
@@ -84,6 +103,7 @@ export function Sidebar() {
               {label}
             </button>
           )
+          return nodes
         })}
       </nav>
 
@@ -293,8 +313,8 @@ function CreateCampaignDialog({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Every campaign has one main character — the hero you play and whose voice the Keeper speaks in.
-              You can flesh out their profile afterward.
+              Every campaign has one main character — the hero you play and whose voice the Keeper
+              speaks in. You can flesh out their profile afterward.
             </p>
           </div>
           <div className="space-y-1.5">
@@ -533,7 +553,10 @@ function MainCharacterBadge({ campaignId }: { campaignId: string }) {
       className="flex w-full items-center gap-1.5 rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/40 hover:bg-muted/60"
     >
       <Star
-        className={cn('size-4 shrink-0', mc ? 'fill-primary text-primary' : 'text-muted-foreground')}
+        className={cn(
+          'size-4 shrink-0',
+          mc ? 'fill-primary text-primary' : 'text-muted-foreground'
+        )}
         aria-hidden
       />
       {mc ? (

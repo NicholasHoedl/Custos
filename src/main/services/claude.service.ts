@@ -103,6 +103,8 @@ Why it works: it FLOWS as one unbroken thought — no lists, no labels, no inven
 
 const FACTUAL_INSTRUCTIONS = `You are a campaign-notes assistant for a tabletop RPG. Answer the question using ONLY the retrieved notes, the current-state block, and the relationships provided. Be direct, concise, and neutral. Do not speculate or invent anything they do not support. Treat the current-state block as the present: completed or failed quests and dead, defeated, or disbanded entities are RESOLVED — describe them as done, not ongoing. If the notes do not contain the answer, say so plainly. Write in plain prose — no bullet points, numbered lists, headings, or markdown. Do not add inline citations — the application displays sources separately. A "present scene" block may state where the party is, the time, who's present and who they're facing, the active quest, and the scene mode — treat it as the present moment.`
 
+const FACTUAL_CONCISE_INSTRUCTIONS = `You are a campaign-notes assistant for a tabletop RPG, answering AT THE TABLE — be fast and TIGHT. Answer using ONLY the retrieved notes, the current-state block, and the relationships provided. Give the shortest complete answer: the key facts in 1–3 sentences, no preamble and no restating the question. Treat the current-state block as the present — resolved quests and dead, defeated, or disbanded entities are DONE. If the notes don't contain the answer, say so in one line. Plain prose only — no bullet points, lists, headings, markdown, or inline citations (the app shows sources separately).`
+
 export interface RecallContext {
   campaignName: string
   campaignDescription: string | null
@@ -127,7 +129,11 @@ function voiceExamplesBlock(
 }
 
 /** The system prompt: stable, cacheable prefix = instructions + few-shot + campaign + persona brief. */
-export function buildSystem(mode: RecallMode, ctx: RecallContext): Anthropic.TextBlockParam[] {
+export function buildSystem(
+  mode: RecallMode,
+  ctx: RecallContext,
+  concise = false
+): Anthropic.TextBlockParam[] {
   if (mode === 'in_character' && ctx.persona) {
     const campaign = `Campaign: ${ctx.campaignName}${
       ctx.campaignDescription ? `\n${ctx.campaignDescription}` : ''
@@ -146,7 +152,13 @@ export function buildSystem(mode: RecallMode, ctx: RecallContext): Anthropic.Tex
     if (voice) blocks.push(voice)
     return blocks
   }
-  return [{ type: 'text', text: FACTUAL_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
+  return [
+    {
+      type: 'text',
+      text: concise ? FACTUAL_CONCISE_INSTRUCTIONS : FACTUAL_INSTRUCTIONS,
+      cache_control: { type: 'ephemeral' }
+    }
+  ]
 }
 
 /**
@@ -176,10 +188,7 @@ export function formatRelationships(
       // Orient the per-direction disposition for `name`: near = how name feels about other.
       const near = v.direction === 'out' ? v.link.fromDisposition : v.link.toDisposition
       const far = v.direction === 'out' ? v.link.toDisposition : v.link.fromDisposition
-      const feelings = [
-        near && `${name} feels ${near}`,
-        far && `${v.other.name} feels ${far}`
-      ]
+      const feelings = [near && `${name} feels ${near}`, far && `${v.other.name} feels ${far}`]
         .filter(Boolean)
         .join('; ')
       const feel = feelings ? ` — ${feelings}` : ''
@@ -303,7 +312,11 @@ export function buildUserContent(
  *  asserting it as fact (ADR-021). 'confirmed' (the default) gets no suffix. Shared by Recall/Suggest
  *  (via `chunkTitle`) and Converse (its notes come straight off the target, not via retrieval). */
 export function confidenceTag(confidence: NoteConfidence): string {
-  return confidence === 'rumored' ? ' · (rumored)' : confidence === 'suspected' ? ' · (suspected)' : ''
+  return confidence === 'rumored'
+    ? ' · (rumored)'
+    : confidence === 'suspected'
+      ? ' · (suspected)'
+      : ''
 }
 
 /** The citeable document title for a chunk, suffixed with its epistemic tag. Entity chunks are 'confirmed'. */
@@ -325,7 +338,10 @@ function mapSources(message: Anthropic.Message, chunks: RetrievedChunk[]): Recal
   }
   const selected =
     cited.size > 0
-      ? [...cited].sort((a, b) => a - b).map((i) => chunks[i]).filter(Boolean)
+      ? [...cited]
+          .sort((a, b) => a - b)
+          .map((i) => chunks[i])
+          .filter(Boolean)
       : chunks
   const seen = new Set<string>()
   const out: RecallSource[] = []
@@ -363,6 +379,9 @@ export interface RecallParams {
   mode: RecallMode
   context: RecallContext
   model: string
+  concise?: boolean
+  /** Follow-up loop (overhaul): prior turns as plain text, prepended before the latest question. */
+  history?: { question: string; answer: string }[]
   onText: (text: string) => void
   /** Per-run cost, fired after the stream completes (P0-4) — rides the renderer's done event. */
   onCost?: (cost: AiRunCost) => void
@@ -373,20 +392,20 @@ export interface RecallParams {
 export async function recall(params: RecallParams): Promise<RecallSource[]> {
   const c = getClient()
   if (!c) throw new Error('no_key')
+  const history: Anthropic.MessageParam[] = (params.history ?? []).flatMap((t) => [
+    { role: 'user' as const, content: t.question },
+    { role: 'assistant' as const, content: t.answer }
+  ])
   const stream = c.messages.stream(
     {
       model: params.model,
       max_tokens: 2000,
-      system: buildSystem(params.mode, params.context),
+      system: buildSystem(params.mode, params.context, params.concise),
       messages: [
+        ...history,
         {
           role: 'user',
-          content: buildUserContent(
-            params.query,
-            params.chunks,
-            params.relationships,
-            params.state
-          )
+          content: buildUserContent(params.query, params.chunks, params.relationships, params.state)
         }
       ]
     },
@@ -575,7 +594,15 @@ const SUGGEST_SCHEMA = {
           teamwork: { type: 'string' },
           rationale: { type: 'string' }
         },
-        required: ['primaryTag', 'secondaryTags', 'pillar', 'action', 'mechanic', 'teamwork', 'rationale']
+        required: [
+          'primaryTag',
+          'secondaryTags',
+          'pillar',
+          'action',
+          'mechanic',
+          'teamwork',
+          'rationale'
+        ]
       }
     }
   },
@@ -746,7 +773,9 @@ async function structuredCall(opts: StructuredCallOpts): Promise<Record<string, 
 }
 
 /** Returns the array at `arrayKey` (UNVALIDATED — callers enforce count/shape rules). */
-async function structuredArrayCall<T>(opts: StructuredCallOpts & { arrayKey: string }): Promise<T[]> {
+async function structuredArrayCall<T>(
+  opts: StructuredCallOpts & { arrayKey: string }
+): Promise<T[]> {
   const parsed = await structuredCall(opts)
   const arr = parsed[opts.arrayKey]
   if (!Array.isArray(arr)) throw new Error('unparseable')
@@ -806,7 +835,9 @@ export interface DeriveProfileParams {
 }
 
 /** Single-shot structured call. Returns the raw (UNVALIDATED) object; derive-profile.service cleans it. */
-export async function deriveProfileCall(params: DeriveProfileParams): Promise<Record<string, unknown>> {
+export async function deriveProfileCall(
+  params: DeriveProfileParams
+): Promise<Record<string, unknown>> {
   const { ctx } = params
   const lines = [`Name: ${ctx.name}`]
   if (ctx.ancestry) lines.push(`Ancestry: ${ctx.ancestry}`)
@@ -818,7 +849,9 @@ export async function deriveProfileCall(params: DeriveProfileParams): Promise<Re
     model: params.model,
     effort: params.effort,
     schema: DERIVE_PROFILE_SCHEMA,
-    system: [{ type: 'text', text: DERIVE_PROFILE_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }],
+    system: [
+      { type: 'text', text: DERIVE_PROFILE_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }
+    ],
     content: [
       {
         type: 'text',
@@ -1016,7 +1049,9 @@ export function buildExtractionUserContent(
     // Surface entities whose name appears in the text first, then cap — keeps the list bounded + relevant.
     const lower = text.toLowerCase()
     const mentioned = (name: string): boolean => lower.includes(name.toLowerCase())
-    const ranked = [...existing].sort((a, b) => (mentioned(a.name) ? 0 : 1) - (mentioned(b.name) ? 0 : 1))
+    const ranked = [...existing].sort(
+      (a, b) => (mentioned(a.name) ? 0 : 1) - (mentioned(b.name) ? 0 : 1)
+    )
     const list = ranked
       .slice(0, 100)
       .map((e) => {
@@ -1415,7 +1450,9 @@ export interface SuggestDirectionsParams {
 }
 
 /** Open-ended directions call. Returns raw suggestions (caller validates count/shape). */
-export async function suggestDirections(params: SuggestDirectionsParams): Promise<StorySuggestion[]> {
+export async function suggestDirections(
+  params: SuggestDirectionsParams
+): Promise<StorySuggestion[]> {
   return structuredArrayCall<StorySuggestion>({
     feature: 'counsel',
     onUsage: params.onUsage,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookCheck, FileInput, Pencil, Trash2 } from 'lucide-react'
+import { BookCheck, FileInput, NotebookPen, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { EventLogEntry } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
@@ -7,6 +7,7 @@ import { useEvents, useSessions, useUnclosedSessions } from '@renderer/hooks/use
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTime } from '@renderer/lib/format'
+import { PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { TranscribeDialog } from '@renderer/components/capture/TranscribeDialog'
@@ -111,53 +112,52 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-        <div className="min-w-0">
-          <h2 className="font-display text-xl font-semibold text-foreground">Chronicle</h2>
-          <p className="text-xs text-muted-foreground">
-            {restoring
-              ? 'Restoring session…'
-              : !sessionId
-                ? 'Start a session to begin your chronicle.'
-                : 'Jot what happened — plain log lines. Close out the session to record what they imply.'}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {activeCampaignId && <SessionControl campaignId={activeCampaignId} className="w-64" />}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => setTranscribeOpen(true)}
-          >
-            <FileInput className="size-3.5" />
-            Transcribe
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!activeSession}
-            onClick={() => setCloseOutOpen(true)}
-          >
-            <BookCheck className="size-3.5" />
-            Close out session
-            {unclosed > 0 && (
-              <span
-                className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
-                title={`${unclosed} ${unclosed === 1 ? 'entry' : 'entries'} to close out`}
-              >
-                {unclosed}
-              </span>
-            )}
-          </Button>
-        </div>
-      </div>
+      <PaneHeader
+        icon={NotebookPen}
+        title="Chronicle"
+        action={
+          <>
+            {activeCampaignId && <SessionControl campaignId={activeCampaignId} className="w-64" />}
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setTranscribeOpen(true)}
+            >
+              <FileInput className="size-3.5" />
+              Transcribe
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!activeSession}
+              onClick={() => setCloseOutOpen(true)}
+            >
+              <BookCheck className="size-3.5" />
+              Close out session
+              {unclosed > 0 && (
+                <span
+                  className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
+                  title={`${unclosed} ${unclosed === 1 ? 'entry' : 'entries'} to close out`}
+                >
+                  {unclosed}
+                </span>
+              )}
+            </Button>
+          </>
+        }
+      />
 
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {!sessionId && !restoring && activeCampaignId ? (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
             <p className="text-sm text-foreground">Start a session to begin your chronicle.</p>
-            <Button size="sm" className="mt-2" onClick={() => void startSession()} disabled={starting}>
+            <Button
+              size="sm"
+              className="mt-2"
+              onClick={() => void startSession()}
+              disabled={starting}
+            >
               {starting ? 'Starting…' : 'Start session'}
             </Button>
           </div>
@@ -189,10 +189,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
               }
             }}
           />
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              Entries save as-is — Close out session to extract them.
-            </span>
+          <div className="mt-2 flex items-center justify-end gap-2">
             <Button size="sm" onClick={() => void submit()} disabled={!text.trim() || busy}>
               Add
             </Button>
@@ -202,7 +199,11 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
 
       <TranscribeDialog open={transcribeOpen} onOpenChange={setTranscribeOpen} />
       {activeSession && (
-        <CloseOutDialog session={activeSession} open={closeOutOpen} onOpenChange={setCloseOutOpen} />
+        <CloseOutDialog
+          session={activeSession}
+          open={closeOutOpen}
+          onOpenChange={setCloseOutOpen}
+        />
       )}
       <DeleteEventDialog
         event={confirmingDelete}

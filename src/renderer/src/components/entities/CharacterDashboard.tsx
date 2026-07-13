@@ -62,7 +62,9 @@ export function CharacterDashboard({
 
   if (!entity) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading…</div>
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        Loading…
+      </div>
     )
   }
 
@@ -121,8 +123,9 @@ export function CharacterDashboard({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header: name + type/status + Delete (editing is inline; no Edit dialog here). */}
-      <div className="flex items-start justify-between gap-3 border-b border-border p-4">
+      {/* Identity block (content, not a chrome bar — the page header is the "Character" toolbar above):
+          portrait + type/status + name + Delete. */}
+      <div className="flex items-start justify-between gap-3 border-b border-border/50 p-4">
         <div className="flex min-w-0 gap-3">
           <button
             type="button"
@@ -144,30 +147,32 @@ export function CharacterDashboard({
             </span>
           </button>
           <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
-              {ENTITY_TYPE_LABELS.pc}
-            </span>
-            {entity.status && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {entity.status}
+            <div className="flex items-center gap-2">
+              <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
+                {ENTITY_TYPE_LABELS.pc}
               </span>
-            )}
-            {(fallen || presumed) && (
-              <span className="inscribed text-[11px] text-blood">{LIFECYCLE_LABELS[entity.lifecycle]}</span>
-            )}
-          </div>
-          <h2
-            className={cn(
-              'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
-              fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
-              presumed && 'italic text-foreground/60'
-            )}
-          >
-            {entity.name}
-            {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
-            {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
-          </h2>
+              {entity.status && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {entity.status}
+                </span>
+              )}
+              {(fallen || presumed) && (
+                <span className="inscribed text-[11px] text-blood">
+                  {LIFECYCLE_LABELS[entity.lifecycle]}
+                </span>
+              )}
+            </div>
+            <h2
+              className={cn(
+                'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
+                fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
+                presumed && 'italic text-foreground/60'
+              )}
+            >
+              {entity.name}
+              {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
+              {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
+            </h2>
           </div>
         </div>
         <Button
@@ -235,7 +240,9 @@ export function CharacterDashboard({
                       className="size-3.5 accent-primary"
                       checked={presumed}
                       onChange={(e) =>
-                        void savePromoted({ lifecycle: e.target.checked ? 'presumed_ended' : 'ended' })
+                        void savePromoted({
+                          lifecycle: e.target.checked ? 'presumed_ended' : 'ended'
+                        })
                       }
                     />
                     Presumed / unconfirmed
@@ -332,8 +339,9 @@ export function CharacterDashboard({
             <AlertDialogTitle className="font-display">Delete {entity.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes your main character
-              {notes.length > 0 && `, its ${notes.length} note${notes.length === 1 ? '' : 's'}`}, and all
-              of its relationships. The campaign will need a new main character. This can’t be undone.
+              {notes.length > 0 && `, its ${notes.length} note${notes.length === 1 ? '' : 's'}`},
+              and all of its relationships. The campaign will need a new main character. This can’t
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -475,10 +483,11 @@ function SuggestInfo() {
     <InfoPopover label="About Draft from backstory">
       <p className="text-sm font-medium text-foreground">What drafting does</p>
       <p className="text-muted-foreground">
-        Reads the backstory and proposes, in two reviewed steps: first this character&apos;s profile —
-        description, traits, goals, flaws, voice examples (the persona is rebuilt from what you accept)
-        — then world material: new people, places, and factions, notes, and relationship ties, added as
-        undated pre-campaign background. Nothing is written until you approve each item.
+        Reads the backstory and proposes, in two reviewed steps: first this character&apos;s profile
+        — description, traits, goals, flaws, voice examples (the persona is rebuilt from what you
+        accept) — then world material: new people, places, and factions, notes, and relationship
+        ties, added as undated pre-campaign background. Nothing is written until you approve each
+        item.
       </p>
       <p className="text-sm font-medium text-foreground">Get the best results</p>
       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">

@@ -2,9 +2,10 @@ import type { Lifecycle } from './entity-types'
 
 // The single status→lifecycle mapping, shared by the main process (entity/import/chronology services) and
 // the renderer (the merged Status control derives lifecycle for a free-text status). It MUST keep mirroring
-// the SQL `CASE` in migration 0005 so backfilled rows and runtime writes agree.
+// the SQL `CASE` in migration 0005 so backfilled rows and runtime writes agree — the chronology.service
+// test reads that migration's SQL and asserts this exact keyword set, so the two can't silently drift.
 
-const ENDED_KEYWORDS = [
+export const ENDED_KEYWORDS = [
   'dead',
   'deceased',
   'destroyed',

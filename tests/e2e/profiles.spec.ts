@@ -53,9 +53,10 @@ test('per-type profile editor: chips, custom status, type-specific field', async
 
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // Detail view reflects all of it.
-  await expect(page.getByText('loyal')).toBeVisible()
+  // Detail view reflects all of it. Exact match — the lens views are mounted (hidden), and their idle
+  // starter chips contain substrings like "loyalty" and "Cornered and outnumbered…".
+  await expect(page.getByText('loyal', { exact: true })).toBeVisible()
   await expect(page.getByText('gruff')).toHaveCount(0)
-  await expect(page.getByText('Cornered')).toBeVisible()
+  await expect(page.getByText('Cornered', { exact: true })).toBeVisible()
   await expect(page.getByText('Half-orc')).toBeVisible()
 })

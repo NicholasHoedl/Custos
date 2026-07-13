@@ -54,6 +54,21 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Belt-and-suspenders with setWindowOpenHandler: keep the main frame ON the app. A single-page app never
+  // does a real navigation in normal use, so any will-navigate/redirect is an injected redirect or an
+  // in-place external link — deny it, and route genuine web URLs to the system browser instead.
+  const isInternalUrl = (target: string): boolean => {
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    return is.dev && devUrl ? target.startsWith(devUrl) : target.startsWith('file://')
+  }
+  const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
+    if (isInternalUrl(url)) return
+    event.preventDefault()
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+  }
+  mainWindow.webContents.on('will-navigate', guardNavigation)
+  mainWindow.webContents.on('will-redirect', guardNavigation)
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {

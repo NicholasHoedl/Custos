@@ -20,7 +20,8 @@ import type {
   RecallChunk,
   RecallDone,
   RecallError,
-  RecallRequest
+  RecallRequest,
+  RecallSourcesEvent
 } from './recall-types'
 import type { ConverseRequest, ConverseResult } from './converse-types'
 import type { DeriveProfileRequest, DeriveProfileResult } from './derive-profile-types'
@@ -289,6 +290,7 @@ export interface LedgerApi {
   onQuickAddFocus(callback: () => void): () => void
   /** Streaming Recall events (filter by requestId in the renderer). Each returns an unsubscribe fn. */
   onRecallChunk(callback: (chunk: RecallChunk) => void): () => void
+  onRecallSources(callback: (ev: RecallSourcesEvent) => void): () => void
   onRecallDone(callback: (done: RecallDone) => void): () => void
   onRecallError(callback: (err: RecallError) => void): () => void
   /** Streaming Recap events (filter by requestId). Each returns an unsubscribe fn. */
@@ -400,6 +402,7 @@ export type BackupNowResult = { ok: true; path: string } | { ok: false; error: s
 
 // ---- One-way streaming channels: main -> renderer (Recall). Payloads are requestId-tagged. ----
 export const RECALL_CHUNK_CHANNEL = 'stream:chunk'
+export const RECALL_SOURCES_CHANNEL = 'stream:sources'
 export const RECALL_DONE_CHANNEL = 'stream:done'
 export const RECALL_ERROR_CHANNEL = 'stream:error'
 // ---- One-way streaming channels: main -> renderer (Recap). Payloads are requestId-tagged. ----
@@ -416,7 +419,14 @@ export const UPDATE_STATUS_CHANNEL = 'update:status'
  *  happy path; `not-available` = up to date; `disabled` = dev/unpackaged (updates apply to the installed
  *  app only); `error` carries a human message (e.g. no releases published yet — benign). */
 export interface UpdateStatus {
-  state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'disabled' | 'error'
+  state:
+    | 'checking'
+    | 'available'
+    | 'not-available'
+    | 'downloading'
+    | 'downloaded'
+    | 'disabled'
+    | 'error'
   /** The available/downloaded release version (for `available`/`downloaded`). */
   version?: string
   /** Download percentage 0–100 (for `downloading`). */

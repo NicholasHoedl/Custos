@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Download, KeyRound, RotateCcw, Search, WifiOff } from 'lucide-react'
-import type { RecallSource } from '@shared/recall-types'
+import {
+  AlertTriangle,
+  BookPlus,
+  Copy,
+  Download,
+  KeyRound,
+  RotateCcw,
+  Search,
+  WifiOff
+} from 'lucide-react'
+import type { RecallSource, RecallTurn } from '@shared/recall-types'
+import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useRecall } from '@renderer/hooks/use-recall'
@@ -11,18 +21,22 @@ import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { PromptStarters } from '@renderer/components/recall/PromptStarters'
-import { LensResultBar } from '@renderer/components/lens/LensResultBar'
+import { useLensSave } from '@renderer/components/lens/LensResultBar'
+import { LensIdle } from '@renderer/components/lens/LensIdle'
+import { RECALL_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { recallProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
 import {
   Banner,
   EmptyState,
+  PaneBody,
   PaneHeader,
-  PaneShell,
   ProgressBar,
   SetupCard
 } from '@renderer/components/chrome'
+
+type Speed = 'quick' | 'deep'
 
 export function RecallView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
@@ -30,20 +44,24 @@ export function RecallView() {
   const { status: onb, progress, downloading, error: setupError, download } = useOnboarding()
   const recall = useRecall()
   const [query, setQuery] = useState('')
-  const [askedQuery, setAskedQuery] = useState('')
+  const [speed, setSpeed] = useState<Speed>('quick')
   const { sessions } = useSessions(activeCampaignId)
   const { entities } = useEntities(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
   const { entries: recent, remember } = useLensHistory()
-  const rememberedRef = useRef<string | null>(null)
+  const rememberedRef = useRef(0)
 
-  // Snapshot the answer to the lens history once it finishes streaming (P1-1).
+  // Snapshot each completed turn's answer into the cross-session lens history (P1-1). Resets when the
+  // transcript is cleared (Reset) so a fresh conversation re-remembers correctly.
   useEffect(() => {
-    if (recall.status === 'done' && recall.answer && recall.answer !== rememberedRef.current) {
-      rememberedRef.current = recall.answer
-      remember(askedQuery || 'Lore', recallProse(askedQuery, recall.answer))
+    const n = recall.turns.length
+    if (n < rememberedRef.current) rememberedRef.current = 0
+    while (rememberedRef.current < n) {
+      const t = recall.turns[rememberedRef.current]
+      if (t.answer) remember(t.question || 'Lore', recallProse(t.question, t.answer))
+      rememberedRef.current++
     }
-  }, [recall.status, recall.answer, askedQuery, remember])
+  }, [recall.turns, remember])
 
   if (!activeCampaignId) {
     return (
@@ -54,24 +72,23 @@ export function RecallView() {
   }
 
   const streaming = recall.status === 'streaming'
-  const prose = recall.status === 'done' && recall.answer ? recallProse(askedQuery, recall.answer) : null
+  const hasThread = recall.turns.length > 0
 
   function submit() {
     if (!query.trim() || streaming || !onb.modelReady) return
     // In-character Recall is disabled in the UI for now (the logic stays in recall.service); ask
-    // factually. Restore the mode toggle below to bring it back.
-    setAskedQuery(query.trim())
-    recall.ask(query, 'factual', asOf ?? undefined)
+    // factually. The speed toggle picks Quick (Sonnet + concise) vs Deep (the Settings model + full).
+    recall.ask(query, { asOfSession: asOf ?? undefined, speed })
+    setQuery('')
   }
 
   return (
-    <PaneShell size="reading">
+    <div className="flex h-full flex-col">
       <PaneHeader
+        icon={Search}
         title="Lore"
-        size="lg"
-        description="Ask in plain language — answered from your annals."
         action={
-          (query.trim().length > 0 || recall.status !== 'idle') && (
+          (query.trim().length > 0 || hasThread || recall.status !== 'idle') && (
             <Button
               variant="ghost"
               size="sm"
@@ -87,108 +104,198 @@ export function RecallView() {
           )
         }
       />
-
-      {!onb.modelReady ? (
-        <SetupCard
-          icon={<Download className="size-4" />}
-          title={setupError ? 'Model download failed' : 'Finish setup: download the local search model'}
-          body={setupError ?? 'A one-time ~30 MB download enables offline semantic search.'}
-          action={
-            progress?.status === 'downloading' || downloading ? (
-              <ProgressBar progress={progress} />
-            ) : (
-              <Button size="sm" onClick={download}>
-                {setupError ? 'Retry' : 'Download model'}
-              </Button>
-            )
-          }
-        />
-      ) : !onb.keyReady ? (
-        <SetupCard
-          icon={<KeyRound className="size-4" />}
-          title="Add your API key to synthesize answers"
-          body="Without a key you'll still get the relevant notes — the Keeper writes the answer."
-          action={
-            <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
-              Open Settings
-            </Button>
-          }
-        />
-      ) : null}
-
-      <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-        <Textarea
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          rows={2}
-          placeholder="e.g. Who is Glastav, and what should we make of him?"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault()
-              submit()
+      <PaneBody size="reading">
+        {!onb.modelReady ? (
+          <SetupCard
+            icon={<Download className="size-4" />}
+            title={
+              setupError ? 'Model download failed' : 'Finish setup: download the local search model'
             }
-          }}
-        />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <PromptStarters entities={entities} onUse={(q) => setQuery(q)} />
-            <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+            body={setupError ?? 'A one-time ~30 MB download enables offline semantic search.'}
+            action={
+              progress?.status === 'downloading' || downloading ? (
+                <ProgressBar progress={progress} />
+              ) : (
+                <Button size="sm" onClick={download}>
+                  {setupError ? 'Retry' : 'Download model'}
+                </Button>
+              )
+            }
+          />
+        ) : !onb.keyReady ? (
+          <SetupCard
+            icon={<KeyRound className="size-4" />}
+            title="Add your API key to synthesize answers"
+            body="Without a key you'll still get the relevant notes — the Keeper writes the answer."
+            action={
+              <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
+                Open Settings
+              </Button>
+            }
+          />
+        ) : null}
+
+        <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
+          <Textarea
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            rows={2}
+            placeholder={
+              hasThread
+                ? 'Ask a follow-up — it stays in context…'
+                : 'e.g. Who is Glastav, and what should we make of him?'
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <PromptStarters entities={entities} onUse={(q) => setQuery(q)} />
+              <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+              <SpeedToggle speed={speed} setSpeed={setSpeed} />
+            </div>
+            {streaming ? (
+              <Button variant="outline" size="sm" onClick={recall.cancel}>
+                Stop
+              </Button>
+            ) : (
+              <Button size="sm" onClick={submit} disabled={!query.trim() || !onb.modelReady}>
+                {hasThread ? 'Follow up' : 'Ask'}
+              </Button>
+            )}
           </div>
-          {streaming ? (
-            <Button variant="outline" size="sm" onClick={recall.cancel}>
-              Stop
-            </Button>
-          ) : (
-            <Button size="sm" onClick={submit} disabled={!query.trim() || !onb.modelReady}>
-              Ask
-            </Button>
+        </div>
+
+        {/* Transcript — the in-flight turn (newest) on top, then completed turns newest-first. */}
+        <div className="flex-1 space-y-6 overflow-y-auto">
+          {(streaming || recall.error) && (
+            <div className="space-y-3">
+              {recall.question && (
+                <p className="text-sm font-medium text-foreground/70">{recall.question}</p>
+              )}
+              {recall.error ? (
+                <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+                  {['no_model', 'no_key', 'bad_key', 'offline'].includes(recall.error.kind)
+                    ? reasonCopy(recall.error.kind)
+                    : `Something went wrong: ${recall.error.message}`}
+                </Banner>
+              ) : (
+                <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                  {recall.answer}
+                  <span className="ml-0.5 animate-pulse text-primary">▌</span>
+                </div>
+              )}
+              {recall.sources.length > 0 && <Sources sources={recall.sources} />}
+            </div>
+          )}
+
+          {[...recall.turns].reverse().map((turn, i) => (
+            <TurnBlock key={recall.turns.length - 1 - i} turn={turn} />
+          ))}
+
+          {!hasThread && recall.status === 'idle' && (
+            <LensIdle starters={RECALL_STARTERS} recent={recent} onPick={setQuery} />
           )}
         </div>
-      </div>
+      </PaneBody>
+    </div>
+  )
+}
 
-      <div className="flex-1 space-y-4 overflow-y-auto">
-        {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+/** Quick (Sonnet + concise, table-first) vs Deep (the Settings "Lore model" + full synthesis). Per-query. */
+function SpeedToggle({ speed, setSpeed }: { speed: Speed; setSpeed: (s: Speed) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
+      <button
+        type="button"
+        onClick={() => setSpeed('quick')}
+        title="Sonnet — faster, tighter answers"
+        className={cn(
+          'rounded px-2 py-1 transition-colors',
+          speed === 'quick'
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Quick
+      </button>
+      <button
+        type="button"
+        onClick={() => setSpeed('deep')}
+        title="Your Settings model — fuller synthesis"
+        className={cn(
+          'rounded px-2 py-1 transition-colors',
+          speed === 'deep'
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Deep
+      </button>
+    </div>
+  )
+}
 
-        {recall.status === 'idle' && recent.length === 0 && (
-          <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            The Keeper’s answer appears here, drawn from your annals.
-          </p>
-        )}
+/** One completed turn in the transcript: the question, the answer (+ per-turn Copy/Inscribe), its sources,
+ *  and — on the degraded paths — a note that it's showing the retrieved notes instead of an answer. */
+function TurnBlock({ turn }: { turn: RecallTurn }) {
+  const { copy, inscribe } = useLensSave()
+  const prose = recallProse(turn.question, turn.answer)
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium text-foreground/70">{turn.question}</p>
 
-        {recall.reason === 'offline' && (
-          <Banner icon={<WifiOff className="size-4" />}>
-            {reasonCopy('offline')} Showing the relevant notes instead.
-          </Banner>
-        )}
-        {recall.reason === 'no_key' && (
-          <Banner icon={<KeyRound className="size-4" />}>
-            {reasonCopy('no_key')} Showing the relevant notes instead.
-          </Banner>
-        )}
-        {recall.error && (
-          <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-            {['no_model', 'no_key', 'bad_key', 'offline'].includes(recall.error.kind)
-              ? reasonCopy(recall.error.kind)
-              : `Something went wrong: ${recall.error.message}`}
-          </Banner>
-        )}
+      {turn.reason === 'offline' && (
+        <Banner icon={<WifiOff className="size-4" />}>
+          {reasonCopy('offline')} Showing the relevant notes instead.
+        </Banner>
+      )}
+      {turn.reason === 'no_key' && (
+        <Banner icon={<KeyRound className="size-4" />}>
+          {reasonCopy('no_key')} Showing the relevant notes instead.
+        </Banner>
+      )}
 
-        {recall.answer && (
+      {turn.answer && (
+        <>
           <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
-            {recall.answer}
-            {streaming && <span className="ml-0.5 animate-pulse text-primary">▌</span>}
+            {turn.answer}
           </div>
-        )}
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => copy(prose)}
+            >
+              <Copy className="size-3.5" />
+              Copy
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => inscribe(prose)}
+            >
+              <BookPlus className="size-3.5" />
+              Inscribe
+            </Button>
+          </div>
+        </>
+      )}
 
-        {recall.sources.length > 0 && <Sources sources={recall.sources} />}
+      {turn.sources.length > 0 && <Sources sources={turn.sources} />}
 
-        {recall.status === 'done' && recall.cost && (
-          <p className="text-right font-mono text-[10px] text-muted-foreground">
-            {formatRunCost(recall.cost)}
-          </p>
-        )}
-      </div>
-    </PaneShell>
+      {turn.cost && (
+        <p className="text-right font-mono text-[10px] text-muted-foreground">
+          {formatRunCost(turn.cost)}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -212,8 +319,15 @@ function Sources({ sources }: { sources: RecallSource[] }) {
                 <span className="text-sm font-medium text-foreground">
                   {s.entityName ?? 'Campaign lore'}
                 </span>
+                {s.cited && (
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-primary/80">
+                    cited
+                  </span>
+                )}
                 {s.sessionLabel && (
-                  <span className="font-mono text-[10px] text-muted-foreground">{s.sessionLabel}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {s.sessionLabel}
+                  </span>
                 )}
               </span>
               {s.snippet && (
@@ -228,12 +342,20 @@ function Sources({ sources }: { sources: RecallSource[] }) {
               {eid ? (
                 <button
                   onClick={() => open(eid)}
-                  className="w-full rounded-md border border-border bg-card/40 px-3 py-2 text-left transition-colors hover:border-primary/50"
+                  className={cn(
+                    'w-full rounded-md border bg-card/40 px-3 py-2 text-left transition-colors hover:border-primary/50',
+                    s.cited ? 'border-primary/30' : 'border-border'
+                  )}
                 >
                   {body}
                 </button>
               ) : (
-                <div className="w-full rounded-md border border-border bg-card/40 px-3 py-2 text-left">
+                <div
+                  className={cn(
+                    'w-full rounded-md border bg-card/40 px-3 py-2 text-left',
+                    s.cited ? 'border-primary/30' : 'border-border'
+                  )}
+                >
                   {body}
                 </div>
               )}
@@ -244,4 +366,3 @@ function Sources({ sources }: { sources: RecallSource[] }) {
     </div>
   )
 }
-

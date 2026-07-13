@@ -5,6 +5,7 @@ import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entit
 import { cn } from '@renderer/lib/utils'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import type { HierarchyView } from '@shared/graph-types'
+import { ENTITY_TYPE_COLOR, ENTITY_TYPE_ICON } from '@renderer/lib/entity-visuals'
 import { ledger } from '@renderer/lib/ipc'
 import { useEntity, useNotes } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
@@ -37,7 +38,12 @@ interface EntityDetailProps {
 
 // The full record for a single entity: identity, hierarchy breadcrumb, traits/goals/attributes,
 // relationships, and its note stream (read-only here — notes are authored on the Notes page).
-export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted }: EntityDetailProps) {
+export function EntityDetail({
+  entityId,
+  allEntities,
+  onEntityChanged,
+  onDeleted
+}: EntityDetailProps) {
   const { entity, refresh: refreshEntity } = useEntity(entityId)
   const { notes, refresh: refreshNotes } = useNotes(entityId)
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
@@ -81,6 +87,7 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
 
   const fallen = entity.lifecycle === 'ended'
   const presumed = entity.lifecycle === 'presumed_ended'
+  const TypeIcon = ENTITY_TYPE_ICON[entity.type]
 
   return (
     <div className="flex h-full flex-col">
@@ -93,46 +100,53 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
             size="md"
           />
           <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
-              {ENTITY_TYPE_LABELS[entity.type]}
-            </span>
-            {entity.status && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {entity.status}
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+                style={{
+                  color: ENTITY_TYPE_COLOR[entity.type],
+                  borderColor: ENTITY_TYPE_COLOR[entity.type]
+                }}
+              >
+                <TypeIcon className="size-3" />
+                {ENTITY_TYPE_LABELS[entity.type]}
               </span>
-            )}
-          </div>
-          <h2
-            className={cn(
-              'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
-              fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
-              presumed && 'italic text-foreground/60'
-            )}
-          >
-            {entity.name}
-            {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
-            {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
-          </h2>
-          {(fallen || presumed) && (
-            <div className="inscribed mt-0.5 text-[11px] text-blood">
-              {LIFECYCLE_LABELS[entity.lifecycle]}
-            </div>
-          )}
-          {hierarchy && hierarchy.ancestors.length > 0 && (
-            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-              {hierarchy.ancestors.map((a) => (
-                <span
-                  key={a.id}
-                  className="after:mx-1 after:content-['›'] last:after:content-['']"
-                >
-                  <button className="hover:text-primary" onClick={() => setSelectedEntity(a.id)}>
-                    {a.name}
-                  </button>
+              {entity.status && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {entity.status}
                 </span>
-              ))}
+              )}
             </div>
-          )}
+            <h2
+              className={cn(
+                'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
+                fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
+                presumed && 'italic text-foreground/60'
+              )}
+            >
+              {entity.name}
+              {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
+              {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
+            </h2>
+            {(fallen || presumed) && (
+              <div className="inscribed mt-0.5 text-[11px] text-blood">
+                {LIFECYCLE_LABELS[entity.lifecycle]}
+              </div>
+            )}
+            {hierarchy && hierarchy.ancestors.length > 0 && (
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                {hierarchy.ancestors.map((a) => (
+                  <span
+                    key={a.id}
+                    className="after:mx-1 after:content-['›'] last:after:content-['']"
+                  >
+                    <button className="hover:text-primary" onClick={() => setSelectedEntity(a.id)}>
+                      {a.name}
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -230,8 +244,8 @@ export function EntityDetail({ entityId, allEntities, onEntityChanged, onDeleted
             <AlertDialogTitle className="font-display">Delete {entity.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes {entity.name}
-              {notes.length > 0 && `, its ${notes.length} note${notes.length === 1 ? '' : 's'}`}, and
-              all of its relationships. This can’t be undone.
+              {notes.length > 0 && `, its ${notes.length} note${notes.length === 1 ? '' : 's'}`},
+              and all of its relationships. This can’t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

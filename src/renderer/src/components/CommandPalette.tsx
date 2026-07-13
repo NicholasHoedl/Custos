@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { ENTITY_TYPE_LABELS, type Entity } from '@shared/entity-types'
+import { ENTITY_TYPE_COLOR, ENTITY_TYPE_ICON } from '@renderer/lib/entity-visuals'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
@@ -34,8 +35,7 @@ export function CommandPalette({
   const { campaigns } = useCampaigns()
   const [search, setSearch] = useState('')
 
-  const mainCharacterId =
-    campaigns.find((c) => c.id === activeCampaignId)?.mainCharacterId ?? null
+  const mainCharacterId = campaigns.find((c) => c.id === activeCampaignId)?.mainCharacterId ?? null
 
   function close(): void {
     setSearch('')
@@ -80,18 +80,22 @@ export function CommandPalette({
 
         {activeCampaignId && entities.length > 0 && (
           <CommandGroup heading="Entities">
-            {entities.map((e) => (
-              <CommandItem
-                key={e.id}
-                value={`${e.name} ${e.id}`}
-                onSelect={() => run(() => openEntity(e))}
-              >
-                <span className="truncate">{e.name}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {ENTITY_TYPE_LABELS[e.type]}
-                </span>
-              </CommandItem>
-            ))}
+            {entities.map((e) => {
+              const Icon = ENTITY_TYPE_ICON[e.type]
+              return (
+                <CommandItem
+                  key={e.id}
+                  value={`${e.name} ${e.id}`}
+                  onSelect={() => run(() => openEntity(e))}
+                >
+                  <span className="truncate">{e.name}</span>
+                  <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Icon className="size-3" style={{ color: ENTITY_TYPE_COLOR[e.type] }} />
+                    {ENTITY_TYPE_LABELS[e.type]}
+                  </span>
+                </CommandItem>
+              )
+            })}
           </CommandGroup>
         )}
 

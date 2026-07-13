@@ -45,6 +45,8 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { SceneControls } from '@renderer/components/scene/SceneControls'
 import { LensResultBar } from '@renderer/components/lens/LensResultBar'
+import { LensIdle } from '@renderer/components/lens/LensIdle'
+import { SUGGEST_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { directionsProse, momentsProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
@@ -135,15 +137,16 @@ export function SuggestView() {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col gap-4 p-6">
+    <div className="flex h-full flex-col">
       <PaneHeader
+        icon={Sparkles}
         title="Counsel"
-        size="lg"
-        description="In-character ideas for the table — how to react now, or where to take the story next."
         action={
           <div className="flex items-center gap-1">
             <CounselInfo />
-            {(situation.trim().length > 0 || goal.trim().length > 0 || suggest.status !== 'idle') && (
+            {(situation.trim().length > 0 ||
+              goal.trim().length > 0 ||
+              suggest.status !== 'idle') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -161,62 +164,81 @@ export function SuggestView() {
           </div>
         }
       />
-
-      {!onb.modelReady ? (
-        <SetupCard
-          icon={<Download className="size-4" />}
-          title={
-            setupError ? 'Model download failed' : 'Finish setup: download the local search model'
-          }
-          body={setupError ?? 'A one-time ~30 MB download lets Counsel find the relevant context.'}
-          action={
-            progress?.status === 'downloading' || downloading ? (
-              <ProgressBar progress={progress} />
-            ) : (
-              <Button size="sm" onClick={download}>
-                {setupError ? 'Retry' : 'Download model'}
+      <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col gap-4 p-6">
+        {!onb.modelReady ? (
+          <SetupCard
+            icon={<Download className="size-4" />}
+            title={
+              setupError ? 'Model download failed' : 'Finish setup: download the local search model'
+            }
+            body={
+              setupError ?? 'A one-time ~30 MB download lets Counsel find the relevant context.'
+            }
+            action={
+              progress?.status === 'downloading' || downloading ? (
+                <ProgressBar progress={progress} />
+              ) : (
+                <Button size="sm" onClick={download}>
+                  {setupError ? 'Retry' : 'Download model'}
+                </Button>
+              )
+            }
+          />
+        ) : !onb.keyReady ? (
+          <SetupCard
+            icon={<KeyRound className="size-4" />}
+            title="Add your API key to get counsel"
+            body="The Keeper reasons in your character’s voice — add a key in Settings to enable it."
+            action={
+              <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
+                Open Settings
               </Button>
-            )
-          }
-        />
-      ) : !onb.keyReady ? (
-        <SetupCard
-          icon={<KeyRound className="size-4" />}
-          title="Add your API key to get counsel"
-          body="The Keeper reasons in your character’s voice — add a key in Settings to enable it."
-          action={
-            <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
-              Open Settings
-            </Button>
-          }
-        />
-      ) : !hasPc ? (
-        <SetupCard
-          icon={<Users className="size-4" />}
-          title="Set your main character"
-          body="Counsel speaks as your main character — set one on the Character page."
-          action={
-            <Button size="sm" variant="outline" onClick={() => setActiveView('character')}>
-              Character page
-            </Button>
-          }
-        />
-      ) : null}
+            }
+          />
+        ) : !hasPc ? (
+          <SetupCard
+            icon={<Users className="size-4" />}
+            title="Set your main character"
+            body="Counsel speaks as your main character — set one on the Character page."
+            action={
+              <Button size="sm" variant="outline" onClick={() => setActiveView('character')}>
+                Character page
+              </Button>
+            }
+          />
+        ) : null}
 
-      {/* Controls on the left, the counsel on the right. Collapses to a single column below lg. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto lg:flex-row lg:gap-6 lg:overflow-visible">
-        {/* LEFT — the scene you're in and the moment you're asking about. */}
-        <div className="flex shrink-0 flex-col gap-4 lg:w-[360px] lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-          {/* The scene (where the party is, who's present, the mode) — pinned into Suggest's grounding. */}
-          <SceneControls campaignId={activeCampaignId} />
+        {/* Controls on the left, the counsel on the right. Collapses to a single column below lg. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto lg:flex-row lg:gap-6 lg:overflow-visible">
+          {/* LEFT — the scene you're in and the moment you're asking about. */}
+          <div className="flex shrink-0 flex-col gap-4 lg:w-[360px] lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+            {/* The scene (where the party is, who's present, the mode) — pinned into Suggest's grounding. */}
+            <SceneControls campaignId={activeCampaignId} />
 
-          <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-            {mode === 'attitudes' && (
-              <Input
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                placeholder="Optional goal — what are you trying to achieve? e.g. learn where Glasstaff is"
-                className="text-sm"
+            <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
+              {mode === 'attitudes' && (
+                <Input
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  placeholder="Optional goal — what are you trying to achieve? e.g. learn where Glasstaff is"
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault()
+                      submit()
+                    }
+                  }}
+                />
+              )}
+              <Textarea
+                value={situation}
+                onChange={(e) => setSituation(e.target.value)}
+                rows={3}
+                placeholder={
+                  mode === 'attitudes'
+                    ? "e.g. The mayor just admitted he's been paying off the Redbrands. The party turns to you."
+                    : 'Optional — where do things stand? e.g. We just got back to Phandalin after clearing the hideout.'
+                }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault()
@@ -224,111 +246,80 @@ export function SuggestView() {
                   }
                 }}
               />
-            )}
-            <Textarea
-              value={situation}
-              onChange={(e) => setSituation(e.target.value)}
-              rows={3}
-              placeholder={
-                mode === 'attitudes'
-                  ? "e.g. The mayor just admitted he's been paying off the Redbrands. The party turns to you."
-                  : 'Optional — where do things stand? e.g. We just got back to Phandalin after clearing the hideout.'
-              }
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault()
-                  submit()
-                }
-              }}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <ModeToggle mode={mode} setMode={changeMode} />
-                <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ModeToggle mode={mode} setMode={changeMode} />
+                  <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+                </div>
+                {thinking ? (
+                  <Button variant="outline" size="sm" onClick={suggest.cancel}>
+                    Stop
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={submit} disabled={!canSubmit}>
+                    Seek counsel
+                  </Button>
+                )}
               </div>
-              {thinking ? (
-                <Button variant="outline" size="sm" onClick={suggest.cancel}>
-                  Stop
-                </Button>
-              ) : (
-                <Button size="sm" onClick={submit} disabled={!canSubmit}>
-                  Seek counsel
-                </Button>
-              )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {mode === 'attitudes'
-                ? 'Six tagged ways to react to this moment, in your character’s voice.'
-                : 'Ways to move the story forward — grounded in your open quests and the party.'}
-            </p>
           </div>
-        </div>
 
-        {/* RIGHT — the counsel. Cards lay out by the pane's own width (container query), not the viewport. */}
-        <div className="@container space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-          {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+          {/* RIGHT — the counsel. Cards lay out by the pane's own width (container query), not the viewport. */}
+          <div className="@container space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+            {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
 
-          {suggest.status === 'idle' && recent.length === 0 && (
-            <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-              {mode === 'attitudes'
-                ? 'The Keeper’s counsel appears here — six ways your character might play the moment, drawn from who they are and what’s happened.'
-                : 'The Keeper’s counsel appears here — ways to carry the story onward, drawn from your open quests, the party, and where you are.'}
-            </p>
-          )}
+            {suggest.status === 'idle' && (
+              <LensIdle starters={SUGGEST_STARTERS} recent={recent} onPick={setSituation} />
+            )}
 
-          {thinking && (
-            <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
-              <Sparkles className="size-4 animate-pulse text-primary" />
-              {mode === 'attitudes'
-                ? 'Weighing how your character would react…'
-                : 'Looking for where your character would take things…'}
-            </div>
-          )}
-
-          {suggest.status === 'error' && (
-            <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-              Something went wrong: {suggest.error}
-            </Banner>
-          )}
-
-          {suggest.status === 'done' && suggest.result && !suggest.result.ok && (
-            <FailureBanner reason={suggest.result.reason} />
-          )}
-
-          {suggest.status === 'done' &&
-            suggest.result?.ok &&
-            suggest.result.mode === 'attitudes' && (
-              <div className="grid gap-3 @lg:grid-cols-2 @4xl:grid-cols-3">
-                {suggest.result.recommendations.map((r) => (
-                  <MomentCard key={r.primaryTag} rec={r} />
-                ))}
+            {thinking && (
+              <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
+                <Sparkles className="size-4 animate-pulse text-primary" />
+                {mode === 'attitudes'
+                  ? 'Weighing how your character would react…'
+                  : 'Looking for where your character would take things…'}
               </div>
             )}
 
-          {suggest.status === 'done' &&
-            suggest.result?.ok &&
-            suggest.result.mode === 'directions' && (
-              <DirectionsList suggestions={suggest.result.suggestions} />
+            {suggest.status === 'error' && (
+              <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+                Something went wrong: {suggest.error}
+              </Banner>
             )}
 
-          {suggest.status === 'done' && suggest.result?.ok && suggest.result.cost && (
-            <p className="text-right font-mono text-[10px] text-muted-foreground">
-              {formatRunCost(suggest.result.cost)}
-            </p>
-          )}
+            {suggest.status === 'done' && suggest.result && !suggest.result.ok && (
+              <FailureBanner reason={suggest.result.reason} />
+            )}
+
+            {suggest.status === 'done' &&
+              suggest.result?.ok &&
+              suggest.result.mode === 'attitudes' && (
+                <div className="grid gap-3 @lg:grid-cols-2 @4xl:grid-cols-3">
+                  {suggest.result.recommendations.map((r) => (
+                    <MomentCard key={r.primaryTag} rec={r} />
+                  ))}
+                </div>
+              )}
+
+            {suggest.status === 'done' &&
+              suggest.result?.ok &&
+              suggest.result.mode === 'directions' && (
+                <DirectionsList suggestions={suggest.result.suggestions} />
+              )}
+
+            {suggest.status === 'done' && suggest.result?.ok && suggest.result.cost && (
+              <p className="text-right font-mono text-[10px] text-muted-foreground">
+                {formatRunCost(suggest.result.cost)}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function ModeToggle({
-  mode,
-  setMode
-}: {
-  mode: SuggestMode
-  setMode: (m: SuggestMode) => void
-}) {
+function ModeToggle({ mode, setMode }: { mode: SuggestMode; setMode: (m: SuggestMode) => void }) {
   return (
     <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
       <button
@@ -441,9 +432,9 @@ function CounselInfo() {
     <InfoPopover label="About Counsel">
       <p className="text-sm font-medium text-foreground">What Counsel does</p>
       <p className="text-muted-foreground">
-        Reads your main character and the campaign and offers ideas in their voice — six tagged ways to
-        react to a moment, or story directions grounded in your open quests and the party. It reasons as
-        your character; it doesn&apos;t roll dice or decide outcomes.
+        Reads your main character and the campaign and offers ideas in their voice — six tagged ways
+        to react to a moment, or story directions grounded in your open quests and the party. It
+        reasons as your character; it doesn&apos;t roll dice or decide outcomes.
       </p>
       <p className="text-sm font-medium text-foreground">Get the best results</p>
       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
@@ -482,4 +473,3 @@ function FailureBanner({ reason }: { reason: SuggestFailureReason }) {
       )
   }
 }
-

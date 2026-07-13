@@ -25,7 +25,9 @@ test('Recall: a query streams an answer and lists real fuzzy-grounded sources', 
   await page.getByRole('button', { name: 'Codex' }).click()
   await page.getByRole('button', { name: 'Inscribe' }).click()
   await page.getByLabel('Name').fill('Aldric Vane')
-  await page.getByLabel('Description').fill('A wary tavern-keeper who trades in favors and secrets.')
+  await page
+    .getByLabel('Description')
+    .fill('A wary tavern-keeper who trades in favors and secrets.')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
 
@@ -38,5 +40,11 @@ test('Recall: a query streams an answer and lists real fuzzy-grounded sources', 
   // The canned answer streams in, and a Sources list renders — it only appears when retrieval returned
   // chunks, so its presence proves the real fuzzy grounding worked (the named entity was matched).
   await expect(page.getByText('From what the party has recorded')).toBeVisible()
-  await expect(page.getByText('Sources')).toBeVisible()
+  await expect(page.getByText('Sources').first()).toBeVisible()
+
+  // Follow-up loop (overhaul): a second question continues the SAME thread — the transcript keeps the
+  // first answer and adds a second (the submit button now reads "Follow up").
+  await page.getByPlaceholder('Ask a follow-up').fill('And who does he owe?')
+  await page.getByRole('button', { name: 'Follow up' }).click()
+  await expect(page.getByText('From what the party has recorded')).toHaveCount(2)
 })

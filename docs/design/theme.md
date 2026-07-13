@@ -95,6 +95,23 @@ utilities via `--color-metal` / `--color-blood` (`text-metal`, `text-blood`, `de
 --pewter         #9E9DA2   cool pewter — inscribed labels, wordmark
 ```
 
+**Web-graph entity-type hues (ADR-046).** The one data-viz surface that steps outside the single-accent
+rule: each entity type gets a muted "heraldry" outline color + a lucide icon on its node (with a legend),
+so type reads at a glance. Kept desaturated to hold the grim register — `--blood` is avoided (death) and
+plain ember / `--ember-bright` stay the main character's. Consumed via `ENTITY_TYPE_COLOR` /
+`ENTITY_TYPE_ICON` (`lib/entity-visuals.tsx`).
+
+```
+--type-npc        #C9A24B   amber
+--type-pc         → --ember   the player's side (MC keeps --ember-bright + a thicker ring)
+--type-location   #5F9A80   moss / teal-green
+--type-faction    #5E8C9C   slate-teal
+--type-quest      #CBB25E   straw-gold
+--type-item       → --pewter
+--type-event      #9A7BB0   plum
+--type-creature   #8A9A4F   bile-olive
+```
+
 Previously **Crypt & Verdigris** (green-black + verdigris-teal + tarnished bronze); switched to the
 warmer, torchlit Ash & Ember at the user's request. The accent (ember) and death (blood) share a warm
 family, so the death cues lean on the strike + skull + ghosting to separate — not hue.
@@ -130,8 +147,8 @@ two ember entries, and a third struck through in blood — the Fallen motif. Ras
 ## The Keeper's voice (as shipped — restrained)
 
 Targeted, not pervasive. Where it lands:
-- Empty / idle states, lightly — e.g. Lore idle: *"The Keeper's answer appears here, drawn from your
-  annals."*; empty Chronicle: *"No chronicle entries yet."*
+- Empty / idle states, lightly — e.g. empty Chronicle: *"No chronicle entries yet."* Idle prompts that
+  double as instructions stay plainer, e.g. Lore: *"Ask a question to get an answer from your annals."*
 - Key toasts: *"Chronicle entry recorded"*, *"Main character set"* / *"cleared"*, *"Saga created"*.
 - The Fallen footer (above).
 

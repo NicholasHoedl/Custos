@@ -4,6 +4,7 @@ import {
   MODEL_DOWNLOAD_PROGRESS_CHANNEL,
   QUICK_ADD_FOCUS_CHANNEL,
   RECALL_CHUNK_CHANNEL,
+  RECALL_SOURCES_CHANNEL,
   RECALL_DONE_CHANNEL,
   RECALL_ERROR_CHANNEL,
   RECAP_CHUNK_CHANNEL,
@@ -150,6 +151,7 @@ const api: LedgerApi = {
     return () => ipcRenderer.removeListener(QUICK_ADD_FOCUS_CHANNEL, listener)
   },
   onRecallChunk: (callback) => subscribe(RECALL_CHUNK_CHANNEL, callback),
+  onRecallSources: (callback) => subscribe(RECALL_SOURCES_CHANNEL, callback),
   onRecallDone: (callback) => subscribe(RECALL_DONE_CHANNEL, callback),
   onRecallError: (callback) => subscribe(RECALL_ERROR_CHANNEL, callback),
   onRecapChunk: (callback) => subscribe(RECAP_CHUNK_CHANNEL, callback),

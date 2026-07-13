@@ -7,6 +7,7 @@ import {
   type EntityType
 } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
+import { ENTITY_TYPE_COLOR, ENTITY_TYPE_ICON } from '@renderer/lib/entity-visuals'
 import { Input } from '@renderer/components/ui/input'
 import { Portrait } from './Portrait'
 
@@ -93,17 +94,20 @@ export function EntityBrowser({
               f === 'all' ? entities.length : entities.filter((e) => e.type === f).length
             if (f !== 'all' && count === 0 && filter !== f) return null
             const active = filter === f
+            const Icon = f !== 'all' ? ENTITY_TYPE_ICON[f] : null
+            const color = f !== 'all' ? ENTITY_TYPE_COLOR[f] : undefined
             return (
               <button
                 key={f}
                 onClick={() => onFilterChange(f)}
                 className={cn(
-                  'rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
                   active
                     ? 'bg-primary/15 text-primary'
                     : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                 )}
               >
+                {Icon && <Icon className="size-3" style={{ color }} />}
                 {f === 'all' ? 'All' : ENTITY_TYPE_LABELS[f]}
                 <span className="ml-1 opacity-60">{count}</span>
               </button>
@@ -160,6 +164,7 @@ function EntityCard({
 }) {
   const fallen = entity.lifecycle === 'ended'
   const presumed = entity.lifecycle === 'presumed_ended'
+  const TypeIcon = ENTITY_TYPE_ICON[entity.type]
   return (
     <button
       onClick={onClick}
@@ -172,27 +177,36 @@ function EntityCard({
     >
       <Portrait image={entity.image} name={entity.name} lifecycle={entity.lifecycle} size="sm" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <div className="flex w-full items-center gap-2">
-        <span
-          className={cn(
-            'truncate text-sm font-medium',
-            fallen ? 'text-foreground/60 line-through decoration-blood/70' : 'text-foreground'
+        <div className="flex w-full items-center gap-2">
+          <span
+            className={cn(
+              'truncate text-sm font-medium',
+              fallen ? 'text-foreground/60 line-through decoration-blood/70' : 'text-foreground'
+            )}
+          >
+            {entity.name}
+          </span>
+          {isMain && (
+            <Star
+              className="size-3 shrink-0 fill-primary text-primary"
+              aria-label="Main character"
+            />
           )}
-        >
-          {entity.name}
-        </span>
-        {isMain && (
-          <Star className="size-3 shrink-0 fill-primary text-primary" aria-label="Main character" />
+          {fallen && <Skull className="size-3 shrink-0 text-blood" aria-label="Fallen" />}
+          {presumed && (
+            <Skull className="size-3 shrink-0 text-blood/50" aria-label="Presumed lost" />
+          )}
+          <span
+            className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-wider"
+            style={{ color: ENTITY_TYPE_COLOR[entity.type] }}
+          >
+            <TypeIcon className="size-3" />
+            {ENTITY_TYPE_LABELS[entity.type]}
+          </span>
+        </div>
+        {entity.description && (
+          <span className="line-clamp-1 text-xs text-muted-foreground">{entity.description}</span>
         )}
-        {fallen && <Skull className="size-3 shrink-0 text-blood" aria-label="Fallen" />}
-        {presumed && <Skull className="size-3 shrink-0 text-blood/50" aria-label="Presumed lost" />}
-        <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-          {ENTITY_TYPE_LABELS[entity.type]}
-        </span>
-      </div>
-      {entity.description && (
-        <span className="line-clamp-1 text-xs text-muted-foreground">{entity.description}</span>
-      )}
       </div>
     </button>
   )

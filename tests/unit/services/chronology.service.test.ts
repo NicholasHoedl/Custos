@@ -9,6 +9,9 @@ import {
   stateAsOf
 } from '../../../src/main/services/chronology.service'
 import { makeTestDb } from '../../helpers/test-db'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { ENDED_KEYWORDS } from '../../../src/shared/lifecycle'
 
 describe('chronology.service', () => {
   describe('lifecycleHeuristic (must mirror migration 0005)', () => {
@@ -26,6 +29,20 @@ describe('chronology.service', () => {
     it('maps everything else to active', () => {
       expect(lifecycleHeuristic('Alive and well')).toBe('active')
       expect(lifecycleHeuristic('Occupied')).toBe('active')
+    })
+    // The real mirror: read migration 0005's SQL and assert its LIKE keywords ARE exactly ENDED_KEYWORDS.
+    // Editing the keyword list in lifecycle.ts (or the CASE in the migration) without the other fails here.
+    it('keeps ENDED_KEYWORDS in lockstep with migration 0005 SQL', () => {
+      const sql = readFileSync(
+        resolve(process.cwd(), 'drizzle', '0005_ambitious_freak.sql'),
+        'utf8'
+      )
+      // e.g. lower(`status`) LIKE '%dead%'  ->  captures "dead"
+      const sqlKeywords = [...sql.matchAll(/lower\(`status`\)\s+LIKE\s+'%([^%']+)%'/gi)].map(
+        (m) => m[1]
+      )
+      expect(sqlKeywords.length).toBeGreaterThan(0) // guard: the regex actually located the CASE arm
+      expect([...sqlKeywords].sort()).toEqual([...ENDED_KEYWORDS].sort())
     })
   })
 

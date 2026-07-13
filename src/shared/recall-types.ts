@@ -11,6 +11,12 @@ export interface RecallRequest {
   campaignId: string
   pcId: string | null
   mode: RecallMode
+  /** Per-query speed/depth (overhaul): 'quick' = Sonnet + concise; 'deep'/unset = the Settings model +
+   *  full synthesis. Resolved in recall.service; the Settings "Lore model" card is the Deep default. */
+  speed?: 'quick' | 'deep'
+  /** Follow-up loop (overhaul): prior turns (TEXT only) so the answer stays in context. Capped in the
+   *  service; the latest query still re-retrieves fresh grounding. */
+  history?: { question: string; answer: string }[]
   /**
    * Chronology (ADR-017): reconstruct the world "as of" this session NUMBER. Omitted = now (latest).
    * When set, retrieval AND state are clamped to ≤ N (no future-knowledge leak).
@@ -32,6 +38,9 @@ export interface RecallSource {
   noteId: string | null
   sessionLabel: string | null
   snippet?: string // shown in the offline / retrieval-only view
+  /** Set on the done event (overhaul): true if the streamed answer actually cited this note. Retrieved-
+   *  but-uncited sources still show — they're the grounding — just without the "cited" mark. */
+  cited?: boolean
 }
 
 export type RecallReason = 'ok' | 'offline' | 'no_key' | 'no_model'
@@ -43,6 +52,24 @@ export interface RecallDone {
   reason: RecallReason
   /** Per-run token/price readout (P0-4); absent on the no-op paths (offline/no_key/no_model). */
   cost?: AiRunCost
+}
+
+/** The early sources event (overhaul): retrieved grounding, emitted right after retrieval so it shows
+ *  before the answer finishes streaming. The `done` event later marks which were `cited`. */
+export interface RecallSourcesEvent {
+  requestId: string
+  sources: RecallSource[]
+}
+
+/** One completed turn in a Lore conversation (overhaul follow-up loop): the question, the answer, and the
+ *  sources that grounded it. Held by the renderer; prior turns' {question, answer} ride RecallRequest.history. */
+export interface RecallTurn {
+  question: string
+  answer: string
+  sources: RecallSource[]
+  /** The turn's outcome — offline/no_key show the retrieved notes with a note instead of an answer. */
+  reason?: RecallReason
+  cost?: AiRunCost | null
 }
 
 export type RecallErrorKind = 'offline' | 'no_key' | 'bad_key' | 'no_model' | 'api' | 'unknown'

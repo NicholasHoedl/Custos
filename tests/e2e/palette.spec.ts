@@ -26,13 +26,13 @@ test('command palette: Ctrl+K navigates to a view and finds an entity', async ()
   await page.getByLabel('Main character').fill('Vargas')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // Ctrl+K opens the palette; "Go to → Lore" navigates. The Lore header copy is unique to that view
-  // and renders regardless of model state (the SetupCard sits below it).
+  // Ctrl+K opens the palette; "Go to → Lore" navigates. The Lore heading is unique to that view and
+  // renders regardless of model state (the SetupCard sits below it).
   await page.keyboard.press('Control+k')
   await expect(page.getByPlaceholder(PALETTE_PLACEHOLDER)).toBeVisible()
   await page.getByPlaceholder(PALETTE_PLACEHOLDER).fill('Lore')
   await page.getByRole('option', { name: 'Lore' }).click()
-  await expect(page.getByText('Ask in plain language — answered from your annals.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Lore' })).toBeVisible()
   await expect(page.getByPlaceholder(PALETTE_PLACEHOLDER)).toHaveCount(0) // palette closed on select
 
   // Add an entity in Codex so the palette has something to find.

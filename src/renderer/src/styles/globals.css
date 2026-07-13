@@ -27,6 +27,19 @@
   --blood: #b23a2e; /* dried blood — death, enmity, destructive */
   --pewter: #9e9da2; /* cool pewter — labels, wordmark, inscriptions */
 
+  /* ---- Web-graph entity-type hues ---- */
+  /* Muted "heraldry" for the relationship graph — the one data-viz surface that steps outside the
+   * single-accent register (see docs/design/theme.md). pc reuses ember, item reuses pewter; none
+   * reuse blood (death). Consumed via ENTITY_TYPE_COLOR in lib/entity-visuals.tsx. */
+  --type-npc: #c9a24b; /* amber */
+  --type-pc: var(--ember); /* ember — the player's side */
+  --type-location: #5f9a80; /* moss / teal-green */
+  --type-faction: #5e8c9c; /* slate-teal */
+  --type-quest: #cbb25e; /* straw-gold */
+  --type-item: var(--pewter); /* pewter */
+  --type-event: #9a7bb0; /* plum */
+  --type-creature: #8a9a4f; /* bile-olive */
+
   /* ---- Semantic roles (dark-only) ---- */
   --background: var(--char);
   --foreground: var(--bone);

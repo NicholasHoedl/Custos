@@ -1,68 +1,58 @@
 import type { ComponentType, ReactNode } from 'react'
-import { Info, KeyRound } from 'lucide-react'
+import { Info, KeyRound, type LucideIcon } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
 import { Button } from '@renderer/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 
-// Shared view chrome — the banner/setup-card/progress/shell/header pieces every AI pane used to copy
-// locally (they had drifted apart; consolidated in the 2026-07-02 simplification pass). Pane WIDTH is
-// now deliberate: two named sizes instead of five accidental ones — 'reading' (max-w-3xl; the
-// top-level Recall/Suggest prose panes) and 'form' (max-w-2xl; the nested Capture panes + Settings).
+// Shared view chrome — the banner/setup-card/progress/header/body pieces every AI pane used to copy
+// locally (they had drifted apart; consolidated in the 2026-07-02 simplification pass). The unified
+// PaneHeader is a compact toolbar (icon + title + action); PaneBody is the centered scroll column
+// beneath it — 'reading' (max-w-3xl), 'form' (max-w-2xl), or 'wide' (max-w-[1600px]; Counsel).
 
-/** The standard pane container: centered column, one of two deliberate widths. */
-export function PaneShell({
+/** The unified page header: a compact toolbar — an optional leading (type) icon + the title + an
+ *  optional right-side action slot. Every top-level view uses this so the app chrome is consistent; the
+ *  large-Fraunces "display" moments live on CONTENT (entity / session / character names), not here. */
+export function PaneHeader({
+  icon: Icon,
+  title,
+  action
+}: {
+  icon?: LucideIcon
+  title: string
+  action?: ReactNode
+}) {
+  return (
+    <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3">
+      <div className="flex min-w-0 items-center gap-2">
+        {Icon && <Icon className="size-4 shrink-0 text-primary" />}
+        <h1 className="truncate font-display text-lg font-semibold text-foreground">{title}</h1>
+      </div>
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+    </header>
+  )
+}
+
+/** The scrolling body that pairs with PaneHeader: a centered column at one of three widths. Sits below
+ *  the full-width header inside a `flex h-full flex-col` view. Replaces PaneShell's centering role. */
+export function PaneBody({
   size = 'form',
-  scroll = false,
   className,
   children
 }: {
-  size?: 'reading' | 'form'
-  scroll?: boolean
+  size?: 'reading' | 'form' | 'wide'
   className?: string
   children: ReactNode
 }) {
   return (
     <div
       className={cn(
-        'mx-auto flex h-full flex-col gap-4 p-6',
-        size === 'reading' ? 'max-w-3xl' : 'max-w-2xl',
-        scroll && 'overflow-y-auto',
+        'mx-auto flex w-full flex-1 flex-col gap-4 overflow-y-auto p-6',
+        size === 'reading' ? 'max-w-3xl' : size === 'wide' ? 'max-w-[1600px]' : 'max-w-2xl',
         className
       )}
     >
       {children}
     </div>
-  )
-}
-
-/** Pane title + description, with an optional right-aligned action (e.g. a Reset button). */
-export function PaneHeader({
-  title,
-  description,
-  size = 'md',
-  action
-}: {
-  title: string
-  description?: ReactNode
-  /** 'lg' for top-level reading panes (Recall/Suggest/Settings); 'md' for nested Capture panes. */
-  size?: 'lg' | 'md'
-  action?: ReactNode
-}) {
-  return (
-    <header className="flex items-start justify-between gap-3">
-      <div>
-        <h1
-          className={cn(
-            'font-display font-semibold text-foreground',
-            size === 'lg' ? 'text-3xl' : 'text-2xl'
-          )}
-        >
-          {title}
-        </h1>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </header>
   )
 }
 
@@ -158,7 +148,12 @@ export function InfoPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label={label}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          aria-label={label}
+        >
           <Info className="size-4" />
         </Button>
       </PopoverTrigger>

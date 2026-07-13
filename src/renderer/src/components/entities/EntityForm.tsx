@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, ImageIcon, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, ImageIcon, Plus, ScrollText, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ENTITY_TYPES,
@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
-import { PaneHeader, PaneShell } from '@renderer/components/chrome'
+import { PaneBody, PaneHeader } from '@renderer/components/chrome'
 import { TagInput } from './TagInput'
 import { StatusCombobox } from './StatusCombobox'
 
@@ -116,8 +116,7 @@ export function EntityForm({
   }, [isPage, open, entity, defaultType])
 
   const prof = profileFor(type)
-  const setAttr = (key: string, val: unknown): void =>
-    setAttributes((a) => ({ ...a, [key]: val }))
+  const setAttr = (key: string, val: unknown): void => setAttributes((a) => ({ ...a, [key]: val }))
 
   // Create-only: switching type re-derives which attribute keys are "extra" and clears a status that
   // isn't valid for the new type. traits/goals are kept in state (gated at submit) so they survive
@@ -206,7 +205,9 @@ export function EntityForm({
             lifecycle
           })
       useUiStore.getState().bumpEntities() // refresh every entity list (e.g. scene selectors) now
-      toast.success(editing ? 'Saved' : `Added ${ENTITY_TYPE_LABELS[type]}`, { description: trimmed })
+      toast.success(editing ? 'Saved' : `Added ${ENTITY_TYPE_LABELS[type]}`, {
+        description: trimmed
+      })
       onSaved(saved) // dialog: caller closes; page: caller navigates (e.g. selects the new entity)
       onOpenChange?.(false)
     } catch (err) {
@@ -348,7 +349,11 @@ export function EntityForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ef-type">Type</Label>
-          <Select value={type} onValueChange={(v) => onTypeChange(v as EntityType)} disabled={editing}>
+          <Select
+            value={type}
+            onValueChange={(v) => onTypeChange(v as EntityType)}
+            disabled={editing}
+          >
             <SelectTrigger id="ef-type">
               <SelectValue />
             </SelectTrigger>
@@ -410,7 +415,6 @@ export function EntityForm({
         </div>
       )}
 
-
       {prof.status && (
         <div className="space-y-1.5">
           <Label htmlFor="ef-status">Status</Label>
@@ -465,7 +469,9 @@ export function EntityForm({
                 <Input
                   value={row.key}
                   onChange={(e) =>
-                    setExtraRows((rs) => rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)))
+                    setExtraRows((rs) =>
+                      rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r))
+                    )
                   }
                   placeholder="field"
                   className="w-1/3"
@@ -473,7 +479,9 @@ export function EntityForm({
                 <Input
                   value={row.value}
                   onChange={(e) =>
-                    setExtraRows((rs) => rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))
+                    setExtraRows((rs) =>
+                      rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
+                    )
                   }
                   placeholder="value"
                   className="flex-1"
@@ -506,23 +514,22 @@ export function EntityForm({
   // Page variant — an inline Capture pane (like Notes / Recap / Import).
   if (isPage) {
     return (
-      <PaneShell size="form">
-        <PaneHeader
-          title={editing ? 'Edit entity' : 'New entity'}
-          description="Create a person, place, faction, quest, item, or character — the whole profile."
-        />
-        <div className="flex-1 space-y-4 overflow-y-auto pr-1">{fields}</div>
-        <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
-          {onCancel && (
-            <Button variant="ghost" onClick={onCancel}>
-              Cancel
+      <div className="flex h-full flex-col">
+        <PaneHeader icon={ScrollText} title={editing ? 'Edit entity' : 'New entity'} />
+        <PaneBody size="form">
+          <div className="flex-1 space-y-4 overflow-y-auto pr-1">{fields}</div>
+          <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+            {onCancel && (
+              <Button variant="ghost" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+            <Button onClick={submit} disabled={!name.trim() || busy}>
+              {busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save' : 'Create'}
             </Button>
-          )}
-          <Button onClick={submit} disabled={!name.trim() || busy}>
-            {busy ? (editing ? 'Saving…' : 'Creating…') : editing ? 'Save' : 'Create'}
-          </Button>
-        </div>
-      </PaneShell>
+          </div>
+        </PaneBody>
+      </div>
     )
   }
 

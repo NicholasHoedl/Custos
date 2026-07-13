@@ -6,7 +6,8 @@ import type { AiRunCost } from '@shared/usage-types'
 import {
   RECALL_CHUNK_CHANNEL,
   RECALL_DONE_CHANNEL,
-  RECALL_ERROR_CHANNEL
+  RECALL_ERROR_CHANNEL,
+  RECALL_SOURCES_CHANNEL
 } from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
@@ -93,6 +94,10 @@ export async function ask(
     )
     const chunks = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
 
+    // Instant grounding (overhaul): push the retrieved sources NOW, before the LLM streams — the Sources
+    // list shows in ~1s. The done event later marks which of these the answer actually cited.
+    send(RECALL_SOURCES_CHANNEL, { requestId, sources: chunksToSources(chunks) })
+
     // In-character mode engages whenever there's a valid active PC — NOT only when a brief already
     // exists. The brief (which gives the character its voice and, crucially, tells the model WHO it is)
     // is resolved after the key/online gate below, since generating one needs Claude. Previously a PC
@@ -148,8 +153,12 @@ export async function ask(
     // treats resolved threads (a defeated NPC, a completed quest) as if they were still open.
     const seen = new Set<string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
-    const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
-      []
+    const stateItems: {
+      name: string
+      type: string
+      status: string | null
+      lifecycle: Lifecycle
+    }[] = []
     // One batched read for the retrieved entities (instead of a getEntity per chunk).
     const entitiesById = listEntitiesByIds(
       ctx,
@@ -200,7 +209,10 @@ export async function ask(
         state,
         mode: effectiveMode,
         context,
-        model: getSettings().recallModel,
+        // Overhaul: 'quick' → Sonnet + concise; 'deep'/unset → the Settings model + full synthesis.
+        model: req.speed === 'quick' ? 'claude-sonnet-4-6' : getSettings().recallModel,
+        concise: req.speed === 'quick',
+        history: req.history,
         onText,
         onCost: (c) => (cost = c), // per-run cost rides the done event (P0-4)
         signal

@@ -91,10 +91,17 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
   populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
   fields but is test-only; `getHierarchy` ignores them (structural).
-- **UI label ↔ code name (ADR-024/032/036/040/044):** the nav labels are Chronicle · Sessions · Character ·
-  Codex · **Web** · Lore · Counsel · Converse · Settings (9 views, Chronicle-first per ADR-044; **Web** is
-  P2-3/ADR-040, `'web'`, right after Codex); the code names stay `recall` (Lore), `suggest`
+- **UI label ↔ code name (ADR-024/032/036/040/044/047):** the nav labels are Chronicle · Sessions · Character ·
+  Codex · **Web** · Lore · Counsel · Converse · Settings (9 views, Chronicle-first per ADR-044, now GROUPED in
+  the Sidebar under **Capture / World / Ask** + Settings via `NavItem.group` + `.inscribed` headings, ADR-047;
+  **Web** is P2-3/ADR-040, `'web'`, right after Codex); the code names stay `recall` (Lore), `suggest`
   (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate).
+  **Every view's header is now the shared `PaneHeader` toolbar (leading icon + `text-lg` Fraunces title +
+  right `action` slot) over a `PaneBody` (`chrome.tsx`; `PaneShell` was deleted) — page chrome stays compact,
+  content identity (entity/session/character names) stays large Fraunces (ADR-047).** The three AI lenses fill
+  their idle state via `components/lens/LensIdle.tsx` (starter chips from `lib/lens-starters.ts` that fill the
+  input; + recent history), and Codex reuses the ADR-046 `ENTITY_TYPE_COLOR`/`ENTITY_TYPE_ICON` maps for its
+  filter chips + list badges (as do `EntityBadge`, `EntityDetail`, the command palette).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
   (`capture/TranscribeDialog.tsx`; `views/ImportView.tsx` is deleted, `'import'` left `ViewKey`). The
   Chronicle header hosts THREE controls: the **active-session selector** (`sessions/SessionControl.tsx`,
@@ -205,8 +212,10 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (first viz dep) over `buildCampaignGraph(ctx, campaignId)` (`link.service.ts`: nodes=`listEntities`,
   edges=`listLinksForCampaign` filtered to OPEN intervals with `RELATIONS[relation].forward` labels,
   dangling-endpoint edges dropped) → `graph:campaign` IPC → `useCampaignGraph` (refetches on
-  `entitiesVersion`). Rendered as themed SVG (hand-rolled pan/zoom/node-drag; ember ring reserved for the
-  MC, everyone else muted iron — the single-accent guardrail); the sim is **guarded on
+  `entitiesVersion`). Rendered as themed SVG (hand-rolled pan/zoom/node-drag; each entity type gets its own
+  muted outline color + lucide icon (`ENTITY_TYPE_COLOR`/`ENTITY_TYPE_ICON` in `lib/entity-visuals.tsx` →
+  `--type-*` tokens) with a corner legend, the MC keeping a brighter/thicker ember ring — the one data-viz
+  surface off the single-accent rule, ADR-046 revising ADR-040); the sim is **guarded on
   `activeView === 'web'`** (MainPanel keeps views mounted) — builds/reheats on activation, `stop()`s +
   cancels rAF when hidden, positions cached in a ref so a data change doesn't scramble. Click a node →
   `setSelectedEntity` + `setActiveView('capture')` (MC → `'character'`). No migration for the graph.

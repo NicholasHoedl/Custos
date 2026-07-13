@@ -127,7 +127,8 @@ export function CloseOutDialog({
   }, [open, step, enrich.phase])
 
   // Tier-1 failure: a thrown extract/apply ('error') or a non-empty failure reason on idle.
-  const tier1Reason = imp.status === 'idle' && imp.reason && imp.reason !== 'empty' ? imp.reason : null
+  const tier1Reason =
+    imp.status === 'idle' && imp.reason && imp.reason !== 'empty' ? imp.reason : null
   const tier1Failed = imp.status === 'error' || tier1Reason !== null
   const tier1Reviewing = imp.status === 'review' || imp.status === 'applying'
   const running = enrich.phase === 'running'
@@ -137,7 +138,13 @@ export function CloseOutDialog({
   // Both tiers' spend, for the summary (P0-4). addRunCost tolerates either being absent.
   const totalCost = enrich.cost
     ? addRunCost(imp.cost ?? undefined, enrich.cost)
-    : (imp.cost ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, usd: 0 })
+    : (imp.cost ?? {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        usd: 0
+      })
 
   return (
     <>
@@ -155,7 +162,7 @@ export function CloseOutDialog({
               {step === 'chronicle'
                 ? 'Step 1 of 2 — Chronicle. The Keeper reads this session’s log and proposes the entities, notes, and status changes it implies.'
                 : step === 'illuminate'
-                  ? 'Step 2 of 2 — Illuminate. The Keeper re-reads everything known about each entity this session touched and proposes the ties and profile details the notes support.'
+                  ? 'Step 2 of 2 — Illuminate. Re-reads each entity this session touched and proposes ties and profile details from the notes.'
                   : 'Session closed out — here’s what was recorded.'}
             </DialogDescription>
           </DialogHeader>
@@ -248,8 +255,8 @@ export function CloseOutDialog({
                   <>
                     {hasFresh && (
                       <p className="text-xs text-muted-foreground">
-                        Newly inscribed entities start unchecked — their profiles were just drawn from
-                        this log.
+                        Newly inscribed entities start unchecked — their profiles were just drawn
+                        from this log.
                       </p>
                     )}
                     <div className="max-h-[60vh] space-y-1.5 overflow-y-auto pr-1">
@@ -266,7 +273,10 @@ export function CloseOutDialog({
                       <Button variant="ghost" onClick={() => setStep('done')}>
                         Finish without illuminating
                       </Button>
-                      <Button onClick={() => void enrich.run()} disabled={enrich.checked.size === 0}>
+                      <Button
+                        onClick={() => void enrich.run()}
+                        disabled={enrich.checked.size === 0}
+                      >
                         <Sparkles className="size-3.5" />
                         Illuminate {enrich.checked.size}{' '}
                         {plural(enrich.checked.size, 'entity', 'entities')}

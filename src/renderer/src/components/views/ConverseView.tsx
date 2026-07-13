@@ -40,10 +40,12 @@ import {
 } from '@renderer/components/ui/command'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { LensResultBar } from '@renderer/components/lens/LensResultBar'
+import { LensIdle } from '@renderer/components/lens/LensIdle'
+import { CONVERSE_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { converseProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
-import { Banner, EmptyState, PaneHeader, PaneShell, SetupCard } from '@renderer/components/chrome'
+import { Banner, EmptyState, PaneBody, PaneHeader, SetupCard } from '@renderer/components/chrome'
 
 // You talk WITH a character (an NPC or a fellow PC), never a place/faction/item.
 const CHARACTER_TYPES = ['npc', 'pc'] as const
@@ -106,11 +108,10 @@ export function ConverseView() {
   }
 
   return (
-    <PaneShell size="reading">
+    <div className="flex h-full flex-col">
       <PaneHeader
+        icon={MessagesSquare}
         title="Converse"
-        size="lg"
-        description="Prepare to draw a character out — a spread of questions to ask them, in your character’s voice."
         action={
           (Boolean(targetId) || converse.status !== 'idle') && (
             <Button
@@ -129,97 +130,95 @@ export function ConverseView() {
           )
         }
       />
-
-      {!onb.keyReady ? (
-        <SetupCard
-          icon={<KeyRound className="size-4" />}
-          title="Add your API key to converse"
-          body="The Keeper reasons in your character’s voice — add a key in Settings to enable it."
-          action={
-            <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
-              Open Settings
-            </Button>
-          }
-        />
-      ) : !hasPc ? (
-        <SetupCard
-          icon={<Users className="size-4" />}
-          title="Set your main character"
-          body="Converse speaks as your main character — set one on the Character page."
-          action={
-            <Button size="sm" variant="outline" onClick={() => setActiveView('character')}>
-              Character page
-            </Button>
-          }
-        />
-      ) : null}
-
-      <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-        <TargetPicker targets={targets} value={targetId} onChange={setTargetId} />
-        <Textarea
-          value={thread}
-          onChange={(e) => setThread(e.target.value)}
-          rows={2}
-          placeholder="Optional — a thread to dig into: a person, a topic, a rumor. Leave blank to draw them out generally."
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault()
-              submit()
+      <PaneBody size="reading">
+        {!onb.keyReady ? (
+          <SetupCard
+            icon={<KeyRound className="size-4" />}
+            title="Add your API key to converse"
+            body="The Keeper reasons in your character’s voice — add a key in Settings to enable it."
+            action={
+              <Button size="sm" variant="outline" onClick={() => setActiveView('settings')}>
+                Open Settings
+              </Button>
             }
-          }}
-        />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
-          {thinking ? (
-            <Button variant="outline" size="sm" onClick={converse.cancel}>
-              Stop
-            </Button>
-          ) : (
-            <Button size="sm" onClick={submit} disabled={!canSubmit}>
-              Prepare questions
-            </Button>
+          />
+        ) : !hasPc ? (
+          <SetupCard
+            icon={<Users className="size-4" />}
+            title="Set your main character"
+            body="Converse speaks as your main character — set one on the Character page."
+            action={
+              <Button size="sm" variant="outline" onClick={() => setActiveView('character')}>
+                Character page
+              </Button>
+            }
+          />
+        ) : null}
+
+        <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
+          <TargetPicker targets={targets} value={targetId} onChange={setTargetId} />
+          <Textarea
+            value={thread}
+            onChange={(e) => setThread(e.target.value)}
+            rows={2}
+            placeholder="Optional — a thread to dig into: a person, a topic, a rumor. Leave blank to draw them out generally."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
+            {thinking ? (
+              <Button variant="outline" size="sm" onClick={converse.cancel}>
+                Stop
+              </Button>
+            ) : (
+              <Button size="sm" onClick={submit} disabled={!canSubmit}>
+                Prepare questions
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto">
+          {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+
+          {converse.status === 'idle' && (
+            <LensIdle starters={CONVERSE_STARTERS} recent={recent} onPick={setThread} />
+          )}
+
+          {thinking && (
+            <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
+              <MessagesSquare className="size-4 animate-pulse text-primary" />
+              Weighing what to ask {target?.name ?? 'them'}…
+            </div>
+          )}
+
+          {converse.status === 'error' && (
+            <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+              Something went wrong: {converse.error}
+            </Banner>
+          )}
+
+          {converse.status === 'done' && converse.result && !converse.result.ok && (
+            <FailureBanner reason={converse.result.reason} />
+          )}
+
+          {converse.status === 'done' && converse.result?.ok && (
+            <QuestionSpread questions={converse.result.questions} />
+          )}
+
+          {converse.status === 'done' && converse.result?.ok && converse.result.cost && (
+            <p className="text-right font-mono text-[10px] text-muted-foreground">
+              {formatRunCost(converse.result.cost)}
+            </p>
           )}
         </div>
-      </div>
-
-      <div className="flex-1 space-y-4 overflow-y-auto">
-        {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
-
-        {converse.status === 'idle' && recent.length === 0 && (
-          <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            Pick who your character wants to talk with. The Keeper readies a spread of questions to ask
-            — in your character&apos;s voice, from safe openers to pointed probes.
-          </p>
-        )}
-
-        {thinking && (
-          <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
-            <MessagesSquare className="size-4 animate-pulse text-primary" />
-            Weighing what to ask {target?.name ?? 'them'}…
-          </div>
-        )}
-
-        {converse.status === 'error' && (
-          <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-            Something went wrong: {converse.error}
-          </Banner>
-        )}
-
-        {converse.status === 'done' && converse.result && !converse.result.ok && (
-          <FailureBanner reason={converse.result.reason} />
-        )}
-
-        {converse.status === 'done' && converse.result?.ok && (
-          <QuestionSpread questions={converse.result.questions} />
-        )}
-
-        {converse.status === 'done' && converse.result?.ok && converse.result.cost && (
-          <p className="text-right font-mono text-[10px] text-muted-foreground">
-            {formatRunCost(converse.result.cost)}
-          </p>
-        )}
-      </div>
-    </PaneShell>
+      </PaneBody>
+    </div>
   )
 }
 

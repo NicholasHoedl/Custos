@@ -16,7 +16,7 @@ import { useAllNotes, useEntities, useSessions } from '@renderer/hooks/use-ledge
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
-import { EmptyState, PaneHeader, PaneShell } from '@renderer/components/chrome'
+import { EmptyState, PaneBody, PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Badge } from '@renderer/components/ui/badge'
@@ -122,116 +122,114 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
   const canSave = content.trim().length > 0 && !busy
 
   return (
-    <PaneShell size="reading">
-      <PaneHeader
-        title="Annals"
-        size="lg"
-        description="Write once, file it under everyone it touches."
-      />
+    <div className="flex h-full flex-col">
+      <PaneHeader icon={StickyNote} title="Annals" />
+      <PaneBody size="reading">
+        <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={3}
+            placeholder="What happened? Who said what?…  (Ctrl+Enter to save)"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault()
+                save()
+              }
+            }}
+          />
+          <EntityMultiSelect entities={entities} selectedIds={selectedIds} onToggle={toggle} />
+          {selectedEntities.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {selectedEntities.map((e) => (
+                <Badge key={e.id} variant="secondary" className="gap-1 pr-1">
+                  {e.name}
+                  <button
+                    type="button"
+                    onClick={() => toggle(e.id)}
+                    aria-label={`Remove ${e.name}`}
+                    className="rounded-sm text-muted-foreground transition-colors hover:text-destructive"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Confidence</span>
+            <Select value={confidence} onValueChange={(v) => setConfidence(v as NoteConfidence)}>
+              <SelectTrigger className="h-8 w-[140px] text-xs" aria-label="Note confidence">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NOTE_CONFIDENCES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {NOTE_CONFIDENCE_LABELS[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">
+              {editingId
+                ? 'Editing a note'
+                : `${activeSession ? `Filing under Session ${activeSession.number}` : 'Undated'}${
+                    selectedIds.length === 0 ? ' · no entities tagged — saves as campaign lore' : ''
+                  }`}
+            </span>
+            <div className="flex items-center gap-2">
+              {editingId && (
+                <Button variant="ghost" size="sm" onClick={resetComposer} disabled={busy}>
+                  Cancel
+                </Button>
+              )}
+              <Button size="sm" onClick={save} disabled={!canSave}>
+                {editingId ? 'Save changes' : 'Save note'}
+              </Button>
+            </div>
+          </div>
+          {entities.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No entities yet — notes save as campaign lore. Add people, places, and things in the
+              Codex to tag them.
+            </p>
+          )}
+        </div>
 
-      <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
-        <Textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={3}
-          placeholder="What happened? Who said what?…  (Ctrl+Enter to save)"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault()
-              save()
-            }
+        <div className="flex-1 space-y-2 overflow-y-auto">
+          {notes.length === 0 ? (
+            <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
+              No annals yet. Write one above and file it under the people, places, and things it
+              touches.
+            </p>
+          ) : (
+            notes.map((n) => (
+              <NoteCard
+                key={n.id}
+                note={n}
+                entityById={entityById}
+                editing={editingId === n.id}
+                onEdit={() => startEdit(n)}
+                onDelete={() => setConfirmingDelete(n)}
+              />
+            ))
+          )}
+        </div>
+
+        <DeleteNoteDialog
+          note={confirmingDelete}
+          onOpenChange={(o) => {
+            if (!o) setConfirmingDelete(null)
+          }}
+          onDeleted={(id) => {
+            if (editingId === id) resetComposer()
+            refresh()
           }}
         />
-        <EntityMultiSelect entities={entities} selectedIds={selectedIds} onToggle={toggle} />
-        {selectedEntities.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {selectedEntities.map((e) => (
-              <Badge key={e.id} variant="secondary" className="gap-1 pr-1">
-                {e.name}
-                <button
-                  type="button"
-                  onClick={() => toggle(e.id)}
-                  aria-label={`Remove ${e.name}`}
-                  className="rounded-sm text-muted-foreground transition-colors hover:text-destructive"
-                >
-                  <X className="size-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Confidence</span>
-          <Select value={confidence} onValueChange={(v) => setConfidence(v as NoteConfidence)}>
-            <SelectTrigger className="h-8 w-[140px] text-xs" aria-label="Note confidence">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {NOTE_CONFIDENCES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {NOTE_CONFIDENCE_LABELS[c]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-muted-foreground">
-            {editingId
-              ? 'Editing a note'
-              : `${activeSession ? `Filing under Session ${activeSession.number}` : 'Undated'}${
-                  selectedIds.length === 0 ? ' · no entities tagged — saves as campaign lore' : ''
-                }`}
-          </span>
-          <div className="flex items-center gap-2">
-            {editingId && (
-              <Button variant="ghost" size="sm" onClick={resetComposer} disabled={busy}>
-                Cancel
-              </Button>
-            )}
-            <Button size="sm" onClick={save} disabled={!canSave}>
-              {editingId ? 'Save changes' : 'Save note'}
-            </Button>
-          </div>
-        </div>
-        {entities.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            No entities yet — notes save as campaign lore. Add people, places, and things in the Codex to
-            tag them.
-          </p>
-        )}
-      </div>
-
-      <div className="flex-1 space-y-2 overflow-y-auto">
-        {notes.length === 0 ? (
-          <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-            No annals yet. Write one above and file it under the people, places, and things it touches.
-          </p>
-        ) : (
-          notes.map((n) => (
-            <NoteCard
-              key={n.id}
-              note={n}
-              entityById={entityById}
-              editing={editingId === n.id}
-              onEdit={() => startEdit(n)}
-              onDelete={() => setConfirmingDelete(n)}
-            />
-          ))
-        )}
-      </div>
-
-      <DeleteNoteDialog
-        note={confirmingDelete}
-        onOpenChange={(o) => {
-          if (!o) setConfirmingDelete(null)
-        }}
-        onDeleted={(id) => {
-          if (editingId === id) resetComposer()
-          refresh()
-        }}
-      />
-    </PaneShell>
+      </PaneBody>
+    </div>
   )
 }
 
@@ -351,7 +349,11 @@ function EntityMultiSelect({
             {groups.map((g) => (
               <CommandGroup key={g.type} heading={ENTITY_TYPE_LABELS[g.type]}>
                 {g.items.map((e) => (
-                  <CommandItem key={e.id} value={`${e.name} ${e.id}`} onSelect={() => onToggle(e.id)}>
+                  <CommandItem
+                    key={e.id}
+                    value={`${e.name} ${e.id}`}
+                    onSelect={() => onToggle(e.id)}
+                  >
                     <Check
                       className={cn('size-4', selected.has(e.id) ? 'opacity-100' : 'opacity-0')}
                     />

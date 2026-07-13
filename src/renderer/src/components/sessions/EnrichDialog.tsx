@@ -59,7 +59,7 @@ export function EnrichDialog({
           <DialogDescription>
             {enrich.phase === 'review'
               ? 'Review the ties and profile edits the Keeper found — applied to this session.'
-              : 'The Keeper re-reads everything known about each entity this session touched and proposes the ties and profile details the notes support.'}
+              : 'Re-reads each entity this session touched and proposes ties and profile details from the notes.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -186,7 +186,9 @@ export function EnrichDialog({
         ) : (
           <>
             <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-              {enrich.globalReason ? reasonCopy(enrich.globalReason) : `Something went wrong: ${enrich.error}`}
+              {enrich.globalReason
+                ? reasonCopy(enrich.globalReason)
+                : `Something went wrong: ${enrich.error}`}
             </Banner>
             <DialogFooter>
               <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>

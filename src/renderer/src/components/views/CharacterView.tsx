@@ -6,7 +6,7 @@ import { ledger } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
-import { EmptyState, PaneShell, PaneHeader } from '@renderer/components/chrome'
+import { EmptyState, PaneBody, PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import {
   Select,
@@ -41,43 +41,47 @@ export function CharacterView() {
   // Grandfathered / just-cleared: no main character yet → prompt to set one.
   if (!mainCharacterId) {
     return (
-      <PaneShell size="form">
-        <PaneHeader
-          title="Character"
-          description="Your main character is the hero you play and whose voice the Keeper speaks in."
-        />
-        <div className="space-y-3 rounded-lg border border-border bg-card/60 p-6 text-center">
-          <UserRound className="mx-auto size-8 text-primary/70" />
-          <p className="text-sm text-muted-foreground">
-            This campaign has no main character yet. Choose the hero you play.
-          </p>
-          <div className="flex justify-center">
-            <MainCharacterPicker campaignId={activeCampaignId} pcs={pcs} value={null} onChanged={refresh} />
-          </div>
-          {pcs.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No player characters yet — create one to begin.
+      <div className="flex h-full flex-col">
+        <PaneHeader icon={UserRound} title="Character" />
+        <PaneBody size="form">
+          <div className="space-y-3 rounded-lg border border-border bg-card/60 p-6 text-center">
+            <UserRound className="mx-auto size-8 text-primary/70" />
+            <p className="text-sm text-muted-foreground">
+              This campaign has no main character yet. Choose the hero you play.
             </p>
-          )}
-        </div>
-      </PaneShell>
+            <div className="flex justify-center">
+              <MainCharacterPicker
+                campaignId={activeCampaignId}
+                pcs={pcs}
+                value={null}
+                onChanged={refresh}
+              />
+            </div>
+            {pcs.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No player characters yet — create one to begin.
+              </p>
+            )}
+          </div>
+        </PaneBody>
+      </div>
     )
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-        <UserRound className="size-4 shrink-0 text-primary" />
-        <span className="text-xs text-muted-foreground">Main character</span>
-        <div className="ml-auto">
+      <PaneHeader
+        icon={UserRound}
+        title="Character"
+        action={
           <MainCharacterPicker
             campaignId={activeCampaignId}
             pcs={pcs}
             value={mainCharacterId}
             onChanged={refresh}
           />
-        </div>
-      </div>
+        }
+      />
       <div className="min-h-0 flex-1">
         <CharacterDashboard
           key={mainCharacterId}

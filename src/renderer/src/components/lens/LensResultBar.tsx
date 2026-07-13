@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui
 // durable answer to "AI answers are disposable in a memory tool." Copy/Inscribe act on the live result;
 // Recent lets you copy/inscribe any of the last few answers this session.
 
-/** Copy + Inscribe bound to the active campaign/session. Shared by the live bar and the Recent rows. */
-function useLensSave(): {
+/** Copy + Inscribe bound to the active campaign/session. Shared by the live bar and the Recent rows,
+ *  and by the Lore transcript's per-turn actions (overhaul). */
+export function useLensSave(): {
   copy: (prose: string) => void
   inscribe: (prose: string) => void
 } {

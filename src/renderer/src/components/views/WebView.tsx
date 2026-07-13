@@ -8,21 +8,37 @@ import {
   type Simulation
 } from 'd3-force'
 import { Waypoints } from 'lucide-react'
-import { ENTITY_TYPE_LABELS } from '@shared/entity-types'
+import { ENTITY_TYPE_LABELS, type EntityType } from '@shared/entity-types'
+import { ENTITY_TYPE_COLOR, ENTITY_TYPE_ICON } from '@renderer/lib/entity-visuals'
+import { PaneHeader } from '@renderer/components/chrome'
 import type { CampaignGraph, GraphNode } from '@shared/graph-types'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useCampaigns, useCampaignGraph } from '@renderer/hooks/use-ledger'
 
 // The "Web" view (P2-3): a read-only, force-directed map of the campaign's LIVE relationships. d3-force
-// computes the layout; we render it as hand-written SVG so it inherits the Ash & Ember theme (the ember
-// accent is reserved for the main character; everyone else stays in the muted iron register — the design
-// guardrail). Pan (background drag) · zoom (wheel) · drag a node to reposition (it pins) · click a node
-// to open it (MC → Character, else Codex). MainPanel keeps every view mounted, so the simulation only
-// runs while this view is active and stops when hidden.
+// computes the layout; we render it as hand-written SVG so it inherits the Ash & Ember theme. Each entity
+// type gets its own muted outline color + icon (ENTITY_TYPE_COLOR / ENTITY_TYPE_ICON → the --type-* tokens):
+// this is the one data-viz surface that leaves the single-accent register, but the main character still
+// stands apart with a brighter, thicker ember ring. Pan (background drag) · zoom (wheel) · drag a node to
+// reposition (it pins) · click a node to open it (MC → Character, else Codex). MainPanel keeps every view
+// mounted, so the simulation only runs while this view is active and stops when hidden.
 
 const NODE_R = 22 // node circle radius (world units)
 const LABEL_GAP = 30 // where the name sits below the node center
+
+// Legend order — the living (pc/npc/creature) before the structural (faction/location) and the inert
+// (item/quest/event). Every EntityType appears; the maps in entity-visuals keep this exhaustive.
+const LEGEND_ORDER: EntityType[] = [
+  'pc',
+  'npc',
+  'creature',
+  'faction',
+  'location',
+  'item',
+  'quest',
+  'event'
+]
 
 interface SimNode extends GraphNode {
   x?: number
@@ -241,26 +257,26 @@ export function WebView() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
-        <div className="flex items-center gap-2">
-          <Waypoints className="size-4 text-primary" />
-          <h1 className="font-display text-lg font-semibold text-foreground">Web</h1>
-          <span className="text-xs text-muted-foreground">The campaign’s living relationships</span>
-        </div>
-        {graph.nodes.length > 0 && (
-          <span className="font-mono text-[11px] text-muted-foreground">
-            {graph.nodes.length} {graph.nodes.length === 1 ? 'entity' : 'entities'} ·{' '}
-            {graph.edges.length} {graph.edges.length === 1 ? 'tie' : 'ties'}
-          </span>
-        )}
-      </header>
+      <PaneHeader
+        icon={Waypoints}
+        title="Web"
+        action={
+          graph.nodes.length > 0 ? (
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {graph.nodes.length} {graph.nodes.length === 1 ? 'entity' : 'entities'} ·{' '}
+              {graph.edges.length} {graph.edges.length === 1 ? 'tie' : 'ties'}
+            </span>
+          ) : undefined
+        }
+      />
 
       <div ref={containerRef} className="relative flex-1 overflow-hidden">
         {!hasCampaign ? (
           <CenterNote>Choose a campaign to see its web of relationships.</CenterNote>
         ) : empty ? (
           <CenterNote>
-            No entities yet. Inscribe a few in the Codex and tie them together — they’ll appear here.
+            No entities yet. Inscribe a few in the Codex and tie them together — they’ll appear
+            here.
           </CenterNote>
         ) : (
           <svg
@@ -320,6 +336,19 @@ export function WebView() {
         )}
 
         {!empty && hasCampaign && (
+          <div className="pointer-events-none absolute bottom-3 left-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-border/60 bg-card/70 px-2.5 py-2 backdrop-blur-sm">
+            {LEGEND_ORDER.map((t) => {
+              const Icon = ENTITY_TYPE_ICON[t]
+              return (
+                <div key={t} className="flex items-center gap-1.5">
+                  <Icon className="size-3 shrink-0" style={{ color: ENTITY_TYPE_COLOR[t] }} />
+                  <span className="text-[10px] text-muted-foreground">{ENTITY_TYPE_LABELS[t]}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {!empty && hasCampaign && (
           <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 font-mono text-[10px] text-muted-foreground/70">
             drag to pan · scroll to zoom · drag a node to move it · click to open
           </p>
@@ -339,7 +368,10 @@ function GraphNodeGlyph({
   onPointerDown: (e: React.PointerEvent) => void
 }) {
   const dim = node.lifecycle === 'ended' || node.lifecycle === 'presumed_ended'
-  const ring = isMain ? 'var(--ember)' : 'var(--iron)'
+  const typeColor = ENTITY_TYPE_COLOR[node.type]
+  // Per-type outline; the MC keeps a brighter, thicker ember ring so the protagonist still stands apart.
+  const ring = isMain ? 'var(--ember-bright)' : typeColor
+  const TypeIcon = ENTITY_TYPE_ICON[node.type]
   const clipId = `web-clip-${node.id}`
   return (
     <g
@@ -350,7 +382,7 @@ function GraphNodeGlyph({
       <title>
         {node.name} · {ENTITY_TYPE_LABELS[node.type]}
       </title>
-      <circle r={NODE_R} fill="var(--char-raised)" stroke={ring} strokeWidth={isMain ? 2.5 : 1.5} />
+      <circle r={NODE_R} fill="var(--char-raised)" stroke={ring} strokeWidth={isMain ? 3 : 1.75} />
       {node.image ? (
         <>
           <clipPath id={clipId}>
@@ -379,6 +411,11 @@ function GraphNodeGlyph({
           {initials(node.name)}
         </text>
       )}
+      {/* Type badge (color + glyph) at the node's lower-right — type reads without hovering. */}
+      <g transform={`translate(${NODE_R * 0.72},${NODE_R * 0.72})`}>
+        <circle r={8.5} fill="var(--char)" stroke={typeColor} strokeWidth={1.5} />
+        <TypeIcon x={-5.5} y={-5.5} width={11} height={11} color={typeColor} strokeWidth={2.25} />
+      </g>
       <text
         y={LABEL_GAP}
         textAnchor="middle"
