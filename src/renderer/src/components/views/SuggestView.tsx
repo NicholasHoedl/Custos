@@ -2,20 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   BookOpen,
-  ChevronDown,
-  Compass,
-  Dices,
   Download,
   Flag,
   Heart,
   KeyRound,
   MapPin,
-  MessagesSquare,
   Package,
   RotateCcw,
   ScrollText,
   Sparkles,
-  Swords,
   User,
   Users,
   WifiOff,
@@ -23,7 +18,6 @@ import {
 } from 'lucide-react'
 import {
   CATEGORY_LABELS,
-  PILLAR_LABELS,
   SUGGEST_CATEGORIES,
   tagLabel,
   type MomentSuggestion,
@@ -31,7 +25,6 @@ import {
   type SuggestCategory,
   type SuggestFailureReason,
   type SuggestMode,
-  type SuggestPillar,
   type SuggestResult
 } from '@shared/suggest-types'
 import { cn } from '@renderer/lib/utils'
@@ -145,7 +138,7 @@ export function SuggestView() {
   }
 
   // Re-roll the spread reshaped toward a nudge (attitudes only) — reuses the same moment, scene, and
-  // speed, passing the current six as `previous` so the model returns genuinely different options.
+  // speed, passing the current four as `previous` so the model returns genuinely different options.
   function refine(nudge: string) {
     const r = suggest.result
     if (thinking || !asked || !(r?.ok && r.mode === 'attitudes')) return
@@ -318,7 +311,7 @@ export function SuggestView() {
               suggest.result?.ok &&
               suggest.result.mode === 'attitudes' && (
                 <div className="space-y-4">
-                  <div className="grid gap-3 @lg:grid-cols-2 @4xl:grid-cols-3">
+                  <div className="grid gap-3 @lg:grid-cols-2">
                     {suggest.result.recommendations.map((r) => (
                       <MomentCard key={r.primaryTag} rec={r} />
                     ))}
@@ -424,22 +417,13 @@ function SpeedToggle({ speed, setSpeed }: { speed: Speed; setSpeed: (s: Speed) =
   )
 }
 
-const PILLAR_ICON: Record<SuggestPillar, LucideIcon> = {
-  combat: Swords,
-  social: MessagesSquare,
-  exploration: Compass
-}
-
-// Compact by default so six cards scan fast under table pressure: the front carries the tag(s), the
-// concrete action, and a prominent 5e-mechanic badge; pillar/teamwork/rationale tuck behind a per-card
-// expand (the house Button+Chevron idiom — no Collapsible primitive exists).
+// A narrative option (ADR-048): the category tags, then a bold action-verb TITLE, then a concise plain-
+// English EXPLANATION (what the move is + why it fits the character). No D&D mechanics, no expand.
 function MomentCard({ rec }: { rec: MomentSuggestion }) {
-  const [expanded, setExpanded] = useState(false)
-  const PillarIcon = PILLAR_ICON[rec.pillar]
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-card/60 p-4">
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card/60 p-4">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="rounded-md bg-primary/15 px-2 py-0.5 font-display text-sm font-medium text-primary">
+        <span className="rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-primary">
           {tagLabel(rec.primaryTag)}
         </span>
         {rec.secondaryTags.map((t) => (
@@ -450,36 +434,11 @@ function MomentCard({ rec }: { rec: MomentSuggestion }) {
             {tagLabel(t)}
           </span>
         ))}
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Hide details' : 'Show details'}
-          className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronDown className={cn('size-4 transition-transform', expanded && 'rotate-180')} />
-        </button>
       </div>
-      <p className="text-[15px] leading-relaxed text-foreground/90">{rec.action}</p>
-      <div className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary/90">
-        <Dices className="size-3.5 shrink-0" />
-        <span className="leading-snug">{rec.mechanic}</span>
-      </div>
-      {expanded && (
-        <div className="space-y-2 border-t border-border pt-2.5">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <PillarIcon className="size-3.5" />
-            {PILLAR_LABELS[rec.pillar]}
-          </div>
-          {rec.teamwork && (
-            <div className="rounded-md border border-primary/25 bg-primary/5 px-2.5 py-1.5">
-              <p className="inscribed mb-0.5 text-[10px]">With the party</p>
-              <p className="text-xs leading-relaxed text-foreground/80">{rec.teamwork}</p>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">{rec.rationale}</p>
-        </div>
-      )}
+      <h3 className="font-display text-[15px] font-medium leading-snug text-foreground">
+        {rec.title}
+      </h3>
+      <p className="text-[13px] leading-relaxed text-muted-foreground">{rec.explanation}</p>
     </div>
   )
 }
@@ -521,9 +480,9 @@ function CounselInfo() {
     <InfoPopover label="About Counsel">
       <p className="text-sm font-medium text-foreground">What Counsel does</p>
       <p className="text-muted-foreground">
-        Reads your main character and the campaign and offers ideas in their voice — six tagged ways
-        to react to a moment, or story directions grounded in your open quests and the party. It
-        reasons as your character; it doesn&apos;t roll dice or decide outcomes.
+        Reads your main character and the campaign and offers ideas that fit them — four tagged ways
+        to play a moment, or story directions grounded in your open quests and the party. It thinks
+        as your character; it doesn&apos;t roll dice or decide outcomes.
       </p>
       <p className="text-sm font-medium text-foreground">Get the best results</p>
       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">

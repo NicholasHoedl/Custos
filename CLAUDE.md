@@ -124,22 +124,25 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `listForEntity(asOf)` + persona), NOT retrieval, so it needs no embedding model — and `getEntityContext`/
   `listNotesForEntity` now take an **`asOf`** that clamps the target's notes to session ≤ N (null-session =
   pre-tracking baseline, always kept), closing an as-of leak. Add a structured lens by mirroring Suggest, not Recall.
-- **Counsel v2 (ADR-026):** each "in the moment" option carries a `pillar` / `mechanic` (5e check + ability,
-  no failure outcome — the DM's call) / `teamwork` field (all validated in `suggest.service` `validateMoment`);
-  an optional `goal` biases the spread. The **scene** (`SceneControls`) grounds **Counsel only** now
-  (ADR-027) — Recall is scene-free. **`flaws`** is a promoted entity field (like `traits`/`goals` — schema/serialize/entity.service)
-  that feeds the persona. **Entity embeddings now index `traits`/`goals`/`flaws` + salient attributes**
-  (`embedding-index.ts` `entityText`); editing that function re-embeds ALL entities on next launch.
-  **Counsel table-ergonomics overhaul:** mirrors Lore's per-query **speed** — `SuggestRequest.speed`
-  `'quick'` (Sonnet 4.6 + medium effort, the DEFAULT) vs `'deep'` (Settings model/effort), resolved once
-  in `suggest.service`. `SceneControls` now defaults **collapsed** (persisted to `localStorage`
-  `ledger.sceneOpen`) so the situation box leads. `MomentCard` is **compact** — tag + action + a `Dices`
-  mechanic badge up front, pillar/teamwork/rationale behind a per-card expand. A **Refine** row (nudge
-  chips: Bolder / More cautious / De-escalate / Fresh angle) re-rolls the SAME moment via
-  `SuggestRequest.refinement` + `previous` (prior spread folded into the user turn, `buildSuggestUserContent`)
-  — still single-shot, it REPLACES the spread (no transcript). `use-suggest.ask(situation, mode, opts)`
-  carries speed/refinement/previous; IPC/preload forward the request whole (no change). Still ADR-026's
-  exactly-6 `validateMoment`.
+- **Counsel "in the moment" (ADR-026 → reshaped by ADR-048):** the attitudes spread is now **FOUR**
+  narrative options, each `MomentSuggestion = { primaryTag, secondaryTags, title, explanation }` — a bold
+  action-verb **title** + a concise **plain-English explanation** (what + why) + category tags. **No D&D
+  mechanics** (the `pillar`/`mechanic`/`teamwork` fields + `SUGGEST_PILLARS`/`PILLAR_LABELS`/`SuggestPillar`
+  are GONE) and **no combat-turn tactics** — the rewritten `SUGGEST_INSTRUCTIONS` forbids dice/checks/rounds
+  ("even in a fight, stay in the fiction"), mandates plain modern English (no in-character register), and
+  **`suggestSystemBlocks` no longer appends the MC's voice examples** (they fight plain English; Recall still
+  uses them). `validateMoment` enforces **exactly four** distinct-primary options with non-empty
+  title+explanation; `MomentCard` is a FLAT card (tags → title → explanation, no expand), laid out 2-up. An
+  optional `goal` biases the spread. The **scene** (`SceneControls`) grounds **Counsel only** (ADR-027) —
+  Recall is scene-free. **`flaws`** is a promoted entity field (schema/serialize/entity.service) feeding the
+  persona; **entity embeddings index `traits`/`goals`/`flaws` + salient attributes** (`embedding-index.ts`
+  `entityText`; editing it re-embeds ALL entities on next launch). Per-query **speed** — `SuggestRequest.speed`
+  `'quick'` (Sonnet 4.6 + medium, the DEFAULT) vs `'deep'` (Settings model/effort), resolved once in
+  `suggest.service`. `SceneControls` defaults **collapsed** (persisted `localStorage ledger.sceneOpen`). A
+  **Refine** row (nudge chips: Bolder / More cautious / De-escalate / Fresh angle) re-rolls the SAME moment
+  via `SuggestRequest.refinement` + `previous` (prior spread serialized by tag+title, folded into the user
+  turn by `buildSuggestUserContent`) — still single-shot, it REPLACES the spread. `use-suggest.ask(situation,
+  mode, opts)` carries speed/refinement/previous; IPC/preload forward the request whole.
 - **Main character = the mandatory single lens (ADR-029).** Each campaign has ONE `pc` main character
   (`campaign.main_character_id`), created WITH the campaign (`createCampaign({mainCharacterName})`, atomic).
   There is **no active-PC switcher** — the store's `activePcId` is locked to the MC (the `MainCharacterBadge`

@@ -73,10 +73,11 @@ AI semantic search over the user's notes. Natural-language queries return synthe
 
 ### Pillar 3: Suggest
 
-> **As shipped (ADR-016, tuned to 6 in ADR-026-era; see §10):** Suggest returns **6 tagged options** from a ~62-tag vocabulary
-> (one primary disposition + ≤2 secondary tags), plus an open-ended "what's next" **directions** mode.
-> The 4-of-7-attitudes design described below is the original MVP model, kept here as the historical
-> record.
+> **As shipped (ADR-016 → ADR-048; see §10):** Suggest returns **4 narrative options** — each a short
+> action-verb **title** + a plain-English **explanation** + category tags (one primary disposition + ≤2
+> secondary, from a ~62-tag vocabulary) — plus an open-ended "what's next" **directions** mode. No D&D
+> mechanics. The 4-of-7-attitudes design described below is the original MVP model, kept here as the
+> historical record.
 
 In-character action options during live play. Rather than a single suggestion, Ledger surfaces a **spread of plausible in-character responses** so the player can choose. Given the active PC's traits, goals, and the campaign's current situation, Claude determines which **4 attitudes** the PC is *most likely* to adopt and writes a **unique in-character action for each**.
 
@@ -274,6 +275,12 @@ subsystem lives in the linked ADR (older additions are captured in git history).
 - **In-the-moment overhaul** — the 7 fixed attitudes were replaced by a ~62-tag vocabulary
   (disposition tags + the PC's own race/class); each option carries 1 primary + up to 2 secondary
   tags, and the mode now returns **6** options with distinct primary tags.
+
+**Counsel "in the moment" — current shape (ADR-048, supersedes ADR-026's mechanics layer):** the spread is
+now **four narrative options**, each a plain-English **title + explanation** + category tags — no `pillar`,
+`mechanic`, or `teamwork`, and no combat-turn tactics (the prompt writes plain English and stays in the
+fiction even in a fight). The ADR-026 mechanics paragraph that follows is kept as the historical record; its
+flaws / persona / embedding-surfacing parts still hold.
 
 **Counsel v2** (ADR-026) — the "in the moment" lens now speaks the *game*, not just the fiction: each of the
 six options carries a **pillar** (combat/social/exploration), a **mechanic** (the 5e check + ability + what

@@ -21,8 +21,8 @@ test('Counsel nav opens the real view (empty state without a campaign)', async (
   await expect(page.getByText('Choose a campaign in the sidebar to seek counsel.')).toBeVisible()
 })
 
-// The live "in the moment" path (ADR-026/043) driven through the fake-AI seam: 6 tagged option cards.
-test('Counsel: a charged moment returns six in-character option cards', async () => {
+// The live "in the moment" path (ADR-048/043) driven through the fake-AI seam: 4 narrative option cards.
+test('Counsel: a charged moment returns four narrative option cards', async () => {
   await createCampaign(page, 'Phandalin', 'Vargas')
   await plantKeyAndReload(page)
 
@@ -32,25 +32,14 @@ test('Counsel: a charged moment returns six in-character option cards', async ()
     .fill('The Redbrands surround the party in the town square.')
   await page.getByRole('button', { name: 'Seek counsel' }).click()
 
-  // A canned option's action + one of its tag labels prove the six-card spread rendered.
-  await expect(
-    page.getByText('Offer a calm compromise that gives them a way to save face.')
-  ).toBeVisible()
+  // Each card is a plain-English action-verb TITLE + a concise EXPLANATION + tag chips — no D&D
+  // mechanics, no expand (ADR-048). The canned title + explanation + a tag prove the spread rendered.
+  await expect(page.getByText('Offer them a way to walk away with their pride.')).toBeVisible()
+  await expect(page.getByText('Propose a compromise that lets both sides back down.')).toBeVisible()
   await expect(page.getByText('Protective')).toBeVisible()
 
-  // Compact cards (overhaul): the rationale is tucked behind a per-card expand — hidden until the
-  // chevron is clicked. The mechanic badge, by contrast, stays on the always-visible front.
-  await expect(page.getByText('Persuasion (CHA) vs. their Insight')).toBeVisible()
-  await expect(page.getByText('De-escalates without conceding anything real.')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Show details' }).first().click()
-  await expect(page.getByText('De-escalates without conceding anything real.')).toBeVisible()
-
-  // Refine (per-moment re-roll): a nudge chip re-asks the SAME moment and replaces the spread — the
-  // freshly mounted cards come back collapsed, so the detail we just expanded is hidden again. (The
-  // speed toggle is transparent to the fake seam, which returns the canned six regardless.)
+  // Refine (per-moment re-roll): a nudge chip re-asks the SAME moment and replaces the spread. The fake
+  // seam returns the canned four regardless, so a title is still on screen afterward (no crash/clear).
   await page.getByRole('button', { name: 'Bolder' }).click()
-  await expect(page.getByText('De-escalates without conceding anything real.')).toHaveCount(0)
-  await expect(
-    page.getByText('Offer a calm compromise that gives them a way to save face.')
-  ).toBeVisible()
+  await expect(page.getByText('Offer them a way to walk away with their pride.')).toBeVisible()
 })

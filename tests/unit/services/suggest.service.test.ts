@@ -66,18 +66,15 @@ import { suggest } from '../../../src/main/services/suggest.service'
 
 function rec(
   primaryTag: string,
-  action = 'do the thing',
-  rationale = 'fits them',
+  title = 'Do the thing.',
+  explanation = 'It fits them.',
   secondaryTags: string[] = []
 ): MomentSuggestion {
   return {
     primaryTag: primaryTag as MomentSuggestion['primaryTag'],
     secondaryTags: secondaryTags as MomentSuggestion['secondaryTags'],
-    pillar: 'social',
-    action,
-    mechanic: 'Persuasion (CHA)',
-    teamwork: null,
-    rationale
+    title,
+    explanation
   }
 }
 
@@ -108,38 +105,36 @@ beforeEach(() => {
 })
 
 describe('suggest.service — in-the-moment mode', () => {
-  // six valid, distinct primary tags — the happy-path response shape
-  const SIX = ['religious', 'hostile', 'cunning', 'friendly', 'protective', 'merciful']
+  // four valid, distinct primary tags — the happy-path response shape (ADR-048)
+  const FOUR = ['religious', 'hostile', 'cunning', 'friendly']
 
-  it('returns 6 distinct-primary suggestions on a valid response', async () => {
+  it('returns 4 distinct-primary suggestions on a valid response', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue(SIX.map((t) => rec(t)))
+    claudeSuggestFn.mockResolvedValue(FOUR.map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     if (res.ok && res.mode === 'attitudes')
-      expect(res.recommendations.map((r) => r.primaryTag)).toEqual(SIX)
+      expect(res.recommendations.map((r) => r.primaryTag)).toEqual(FOUR)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(1)
   })
 
-  it('trims a 7+ response down to the first 6 distinct primaries', async () => {
+  it('trims a 5+ response down to the first 4 distinct primaries', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue([...SIX, 'selfish'].map((t) => rec(t)))
+    claudeSuggestFn.mockResolvedValue([...FOUR, 'selfish'].map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(6)
+    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(4)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(1)
   })
 
-  it('retries once, then fails with reason "invalid" when distinct primaries < 6', async () => {
+  it('retries once, then fails with reason "invalid" when distinct primaries < 4', async () => {
     const { ctx, store, campaignId, pc } = setup()
-    // a duplicate and an invalid tag drop out, leaving only 5 distinct → short of 6
+    // a duplicate and an invalid tag drop out, leaving only 3 distinct → short of 4
     claudeSuggestFn.mockResolvedValue([
       rec('religious'),
       rec('religious'), // duplicate primary → dropped
       rec('hostile'),
       rec('cunning'),
-      rec('friendly'),
-      rec('protective'),
       rec('') // invalid primary → dropped
     ])
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
@@ -152,24 +147,23 @@ describe('suggest.service — in-the-moment mode', () => {
     const { ctx, store, campaignId, pc } = setup()
     claudeSuggestFn
       .mockResolvedValueOnce([rec('religious'), rec('hostile')])
-      .mockResolvedValueOnce(SIX.map((t) => rec(t)))
+      .mockResolvedValueOnce(FOUR.map((t) => rec(t)))
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
     expect(claudeSuggestFn).toHaveBeenCalledTimes(2)
   })
 
-  it('drops entries with a blank action or unknown primary tag', async () => {
+  it('drops entries with a blank title, blank explanation, or unknown primary tag', async () => {
     const { ctx, store, campaignId, pc } = setup()
     claudeSuggestFn.mockResolvedValue([
       rec('religious'),
-      rec('hostile', '   '), // blank action → dropped
+      rec('hostile', '   '), // blank title → dropped
+      rec('cunning', 'x', '   '), // blank explanation → dropped
       rec('bogus'), // not a tag → dropped
-      rec('cunning'),
       rec('friendly'),
-      rec('protective'),
-      rec('merciful')
+      rec('protective')
     ])
-    // five valid distinct survive (< 6) → invalid both attempts
+    // three valid distinct survive (religious, friendly, protective) < 4 → invalid both attempts
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toBe('invalid')
@@ -178,14 +172,19 @@ describe('suggest.service — in-the-moment mode', () => {
   it('cleans secondary tags: dedupes, drops invalid + primary-equal, caps at 2', async () => {
     const { ctx, store, campaignId, pc } = setup()
     claudeSuggestFn.mockResolvedValue([
-      rec('religious', 'a', 'r', ['merciful', 'merciful', 'bogus', 'religious', 'honorable', 'bold']),
+      rec('religious', 'a', 'r', [
+        'merciful',
+        'merciful',
+        'bogus',
+        'religious',
+        'honorable',
+        'bold'
+      ]),
       rec('hostile'),
       rec('cunning'),
       rec('friendly'),
       rec('protective'),
-      rec('merciful'),
-      rec('honorable'),
-      rec('bold')
+      rec('merciful')
     ])
     const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
     expect(res.ok).toBe(true)
@@ -194,30 +193,6 @@ describe('suggest.service — in-the-moment mode', () => {
       expect(first.primaryTag).toBe('religious')
       // deduped, 'bogus' dropped, primary ('religious') dropped, capped at 2
       expect(first.secondaryTags).toEqual(['merciful', 'honorable'])
-    }
-  })
-
-  it('validates the new fields: drops invalid pillar / blank mechanic, coerces empty teamwork to null', async () => {
-    const { ctx, store, campaignId, pc } = setup()
-    claudeSuggestFn.mockResolvedValue([
-      { ...rec('religious'), teamwork: '   ' }, // empty teamwork → coerced to null (kept)
-      { ...rec('hostile'), pillar: 'bogus' }, // invalid pillar → dropped
-      { ...rec('cunning'), mechanic: '   ' }, // blank mechanic → dropped
-      rec('friendly'),
-      rec('protective'),
-      rec('merciful'),
-      rec('honorable'),
-      rec('bold'),
-      rec('selfish'),
-      rec('diplomatic')
-    ])
-    const res = await suggest(ctx, store, { campaignId, pcId: pc.id, situation: 'x' }, sig())
-    expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') {
-      expect(res.recommendations).toHaveLength(6)
-      expect(res.recommendations.some((r) => r.primaryTag === 'hostile')).toBe(false)
-      expect(res.recommendations.some((r) => r.primaryTag === 'cunning')).toBe(false)
-      expect(res.recommendations.find((r) => r.primaryTag === 'religious')?.teamwork).toBeNull()
     }
   })
 })

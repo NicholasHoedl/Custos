@@ -1,6 +1,5 @@
 import {
   CATEGORY_LABELS,
-  PILLAR_LABELS,
   tagLabel,
   type MomentSuggestion,
   type StorySuggestion,
@@ -22,17 +21,11 @@ export function recallProse(query: string, answer: string): string {
   return `Lore — ${query.trim()}\n\n${answer.trim()}`
 }
 
-/** Counsel "in the moment": each option's action + check + teamwork + rationale. */
+/** Counsel "in the moment": each option's tag, its action-verb title, and a plain-English explanation. */
 export function momentsProse(situation: string, recs: MomentSuggestion[]): string {
   const head = `Counsel — in the moment${situation.trim() ? `: ${situation.trim()}` : ''}`
   const body = recs
-    .map((r) => {
-      const lines = [`• [${tagLabel(r.primaryTag)} · ${PILLAR_LABELS[r.pillar]}] ${r.action}`]
-      lines.push(`  Check: ${r.mechanic}`)
-      if (r.teamwork) lines.push(`  With the party: ${r.teamwork}`)
-      lines.push(`  Why: ${r.rationale}`)
-      return lines.join('\n')
-    })
+    .map((r) => `• [${tagLabel(r.primaryTag)}] ${r.title}\n  ${r.explanation}`)
     .join('\n\n')
   return `${head}\n\n${body}`
 }

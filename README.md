@@ -13,7 +13,7 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
   campaign and session. An OS-global hotkey (`Ctrl+Alt+L`) opens the add-entity form from anywhere.
 - **Lore** — ask a natural-language question; get a cited, streamed answer synthesized from the
   relevant notes (semantic search over local embeddings).
-- **Counsel** — in-character ideas for the moment (six tagged options in your main character's voice) or
+- **Counsel** — narrative ideas for the moment (four plain-English options that fit your main character) or
   open-ended directions for where to take the story next.
 
 Built on top of these: the **Character page** (every campaign has one **main character** — the hero you

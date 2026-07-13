@@ -52,15 +52,12 @@ function unit(i: number): Float32Array {
   return v
 }
 
-// A full MomentSuggestion the validator accepts (pillar + mechanic required; empty teamwork -> null).
+// A full MomentSuggestion the validator accepts (title + explanation required; ADR-048).
 const m = (primaryTag: string, secondaryTags: string[] = []): Record<string, unknown> => ({
   primaryTag,
   secondaryTags,
-  pillar: 'social',
-  action: 'a',
-  mechanic: 'Insight (WIS)',
-  teamwork: '',
-  rationale: 'r'
+  title: 'Do the thing.',
+  explanation: 'It fits them.'
 })
 
 describe('suggest RAG pipeline (mocked AI)', () => {
@@ -101,9 +98,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
       m('religious', ['merciful']),
       m('hostile'),
       m('cunning'),
-      m('friendly'),
-      m('protective'),
-      m('merciful')
+      m('friendly')
     ])
 
     const res = await suggest(
@@ -114,7 +109,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     )
 
     expect(res.ok).toBe(true)
-    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(6)
+    if (res.ok && res.mode === 'attitudes') expect(res.recommendations).toHaveLength(4)
 
     expect(claudeSuggest).toHaveBeenCalledTimes(1)
     const call = claudeSuggest.mock.calls[0][0] as {
@@ -207,14 +202,7 @@ describe('suggest RAG pipeline (mocked AI)', () => {
       status: 'Safe'
     })
     embedFn.mockResolvedValue(unit(0))
-    claudeSuggest.mockResolvedValue([
-      m('religious'),
-      m('hostile'),
-      m('cunning'),
-      m('friendly'),
-      m('protective'),
-      m('merciful')
-    ])
+    claudeSuggest.mockResolvedValue([m('religious'), m('hostile'), m('cunning'), m('friendly')])
 
     const res = await suggest(
       ctx,
@@ -235,7 +223,10 @@ describe('suggest RAG pipeline (mocked AI)', () => {
     )
 
     expect(res.ok).toBe(true)
-    const call = claudeSuggest.mock.calls.at(-1)![0] as { scene: string | null; state: string | null }
+    const call = claudeSuggest.mock.calls.at(-1)![0] as {
+      scene: string | null
+      state: string | null
+    }
     expect(call.scene).toContain('Stonehill Inn')
     expect(call.scene).toContain("What's happening: Combat")
     expect(call.state).toContain('Stonehill Inn (location): Safe')

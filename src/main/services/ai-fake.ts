@@ -77,25 +77,59 @@ export function fakePersona(): string {
   return 'A steady, plain-spoken adventurer who leads with curiosity and keeps their word — watches before acting, speaks briefly, and trusts earned loyalty over charm.'
 }
 
-/** Counsel "in the moment": EXACTLY 6 options with DISTINCT primary tags spanning the three pillars —
- *  the minimum `validateMoment` accepts. */
+/** Counsel "in the moment": EXACTLY 4 narrative options with DISTINCT primary tags — the count
+ *  `validateMoment` accepts. Plain English, no D&D mechanics (ADR-048). */
 export function fakeSuggest(): MomentSuggestion[] {
   return [
-    { primaryTag: 'diplomatic', secondaryTags: [], pillar: 'social', action: 'Offer a calm compromise that gives them a way to save face.', mechanic: 'Persuasion (CHA) vs. their Insight', teamwork: null, rationale: 'De-escalates without conceding anything real.' },
-    { primaryTag: 'cautious', secondaryTags: [], pillar: 'exploration', action: 'Hang back and read the room before committing to anything.', mechanic: 'Insight (WIS) to gauge the threat', teamwork: null, rationale: 'Buys information before the situation hardens.' },
-    { primaryTag: 'bold', secondaryTags: [], pillar: 'combat', action: 'Step between the threat and your ally, weapon ready.', mechanic: 'Athletics (STR) to hold the line', teamwork: null, rationale: 'Seizes the initiative and shields the group.' },
-    { primaryTag: 'deceptive', secondaryTags: [], pillar: 'social', action: 'Feign agreement to draw out what they really want.', mechanic: 'Deception (CHA) vs. their Insight', teamwork: null, rationale: 'Turns the exchange into a source of intel.' },
-    { primaryTag: 'investigative', secondaryTags: [], pillar: 'exploration', action: 'Search the scene for the detail everyone else missed.', mechanic: 'Investigation (INT) of the surroundings', teamwork: null, rationale: 'A concrete clue reframes the whole choice.' },
-    { primaryTag: 'protective', secondaryTags: [], pillar: 'combat', action: 'Ready an action to shield whoever is most exposed.', mechanic: 'Perception (WIS) to watch for the first move', teamwork: 'Signal an ally to fall back to cover.', rationale: 'Keeps the most fragile member of the party alive.' }
+    {
+      primaryTag: 'diplomatic',
+      secondaryTags: ['patient'],
+      title: 'Offer them a way to walk away with their pride.',
+      explanation:
+        'Propose a compromise that lets both sides back down. You would rather defuse this than win it outright.'
+    },
+    {
+      primaryTag: 'cautious',
+      secondaryTags: [],
+      title: 'Hold back and watch before you commit to anything.',
+      explanation:
+        'Read the room first. You trust hard facts over first impressions, and a moment of patience keeps your options open.'
+    },
+    {
+      primaryTag: 'deceptive',
+      secondaryTags: ['cunning'],
+      title: 'Play along to draw out what they really want.',
+      explanation:
+        'Feign agreement so they tip their hand. You would rather learn their angle than reveal your own.'
+    },
+    {
+      primaryTag: 'protective',
+      secondaryTags: [],
+      title: 'Put yourself between the danger and whoever is most exposed.',
+      explanation:
+        'Shield the person least able to defend themselves, even at a cost to you. Protecting the party comes first.'
+    }
   ]
 }
 
 /** Counsel "what's next": ≥3 grouped story directions (survives `validateDirections`). */
 export function fakeDirections(): StorySuggestion[] {
   return [
-    { category: 'quest', suggestion: 'Follow the unpaid debt back to whoever is really collecting it.', rationale: 'Ties the open thread to a face the party can confront.' },
-    { category: 'npc', suggestion: 'Pay the tavern-keeper a second visit — they hinted at more.', rationale: 'A warm contact is the cheapest lead available.' },
-    { category: 'location', suggestion: 'Scout the road out of town before the next nightfall.', rationale: 'Sets up the journey and surfaces an ambush or an ally.' }
+    {
+      category: 'quest',
+      suggestion: 'Follow the unpaid debt back to whoever is really collecting it.',
+      rationale: 'Ties the open thread to a face the party can confront.'
+    },
+    {
+      category: 'npc',
+      suggestion: 'Pay the tavern-keeper a second visit — they hinted at more.',
+      rationale: 'A warm contact is the cheapest lead available.'
+    },
+    {
+      category: 'location',
+      suggestion: 'Scout the road out of town before the next nightfall.',
+      rationale: 'Sets up the journey and surfaces an ambush or an ally.'
+    }
   ]
 }
 
@@ -103,17 +137,34 @@ export function fakeDirections(): StorySuggestion[] {
  *  `validateConverse`, floor 4). */
 export function fakeConverse(): ConverseQuestion[] {
   return [
-    { question: 'It has been a long road for you — how are you holding up, truly?', tag: 'rapport', read: 'Opens warmly to earn a little trust before pressing.' },
-    { question: 'What first brought you to this place?', tag: 'open-probe', read: 'A low-cost prompt that lets them choose what to reveal.' },
-    { question: 'When all of this is over, what are you actually after?', tag: 'motivation', read: 'Tests whether their stated aims match their real ones.' },
-    { question: 'What is the one thing you are hoping no one here finds out?', tag: 'secret-seeking', read: 'A high-cost probe — worth the risk only after some rapport.' }
+    {
+      question: 'It has been a long road for you — how are you holding up, truly?',
+      tag: 'rapport',
+      read: 'Opens warmly to earn a little trust before pressing.'
+    },
+    {
+      question: 'What first brought you to this place?',
+      tag: 'open-probe',
+      read: 'A low-cost prompt that lets them choose what to reveal.'
+    },
+    {
+      question: 'When all of this is over, what are you actually after?',
+      tag: 'motivation',
+      read: 'Tests whether their stated aims match their real ones.'
+    },
+    {
+      question: 'What is the one thing you are hoping no one here finds out?',
+      tag: 'secret-seeking',
+      read: 'A high-cost probe — worth the risk only after some rapport.'
+    }
   ]
 }
 
 /** Draft step 1: a non-empty derived profile (survives `validateDerived`). */
 export function fakeDerive(): DerivedProfile {
   return {
-    description: 'A wandering problem-solver shaped by a hard childhood and a stubborn sense of fairness.',
+    description:
+      'A wandering problem-solver shaped by a hard childhood and a stubborn sense of fairness.',
     traits: ['resourceful', 'guarded'],
     goals: ['find out who burned the old district'],
     flaws: ['trusts too slowly to ask for help'],

@@ -3,7 +3,6 @@ import type { RecallMode, RecallSource } from '@shared/recall-types'
 import {
   SUGGEST_TAGS,
   SUGGEST_CATEGORIES,
-  SUGGEST_PILLARS,
   type MomentSuggestion,
   type StorySuggestion
 } from '@shared/suggest-types'
@@ -531,15 +530,18 @@ export async function recap(params: RecapParams): Promise<void> {
 
 // ---- Suggest prompt (Phase 3) ----
 
-const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide how THEIR character would act in a charged moment. You'll be given a brief on how this player character (PC) thinks, values, and FAILS (their flaws), the character's race and class, retrieved campaign notes, a snapshot of the current state, the known relationships, the present scene (including which party members are present), maybe a GOAL the player is chasing, and the situation facing the party right now.
+const SUGGEST_INSTRUCTIONS = `You help a tabletop RPG player decide what THEIR character would do in a charged story moment. You'll be given a brief on how this player character (PC) thinks, values, and FAILS (their flaws), the character's race and class, retrieved campaign notes, a snapshot of the current state, the known relationships, the present scene (including which party members are present), maybe a GOAL the player is chasing, and the situation facing the party right now.
 
-Your job: give SIX different ways THIS character might play THIS moment. The six must feel genuinely distinct — not six shades of the same move. Each option carries:
-- ONE primary tag (its dominant flavor) + up to TWO secondary tags (nuance). The six PRIMARY tags must all differ.
-- A PILLAR — which of D&D's three pillars it engages: "combat", "social", or "exploration".
-- The ACTION — one concrete thing the player could do or say at the table this turn.
-- The MECHANIC — how it resolves at the table (below).
-- TEAMWORK — a coordination play naming a PRESENT ally, or "" (empty) when the move is solo.
-- A one-line RATIONALE.
+Your job: give FOUR genuinely different ways THIS character might play THIS moment. The four must feel distinct — not four shades of the same move. Each option carries:
+- A TITLE — one short sentence that STARTS WITH AN ACTION VERB and names the move in plain terms. E.g. "Question the bandit about who sent them.", "Offer them a way to walk away.", "Search the room while they argue.", "Walk out and let them stew."
+- An EXPLANATION — one or two sentences, in plain English: what the character actually does, and WHY it fits THEM (point to a value, fear, flaw, want, or relationship from the brief).
+- ONE primary tag (its dominant flavor) + up to TWO secondary tags (nuance). The four PRIMARY tags must all differ.
+
+WRITE IN PLAIN, CLEAR, MODERN ENGLISH. Do NOT write in the character's "voice", accent, or period register, and do NOT use ornate, grim, or theatrical prose. You are advising the player in normal words — the character's personality decides WHAT they'd do; you still describe it plainly. If a sentence is hard to parse on one read, rewrite it simpler.
+
+NARRATIVE, NOT RULES. This is a roleplay aid, not a combat calculator. NEVER mention dice, ability checks, skills, saving throws, attacks, combat actions (Help, Dodge, Ready…), advantage or disadvantage, DCs, rounds, or turns. Suggest the CHOICE — what the character says or does in the fiction — never how it resolves at the table. Resolving it is the DM's job.
+
+EVEN IN A FIGHT, STAY IN THE FICTION. If the moment is dangerous or violent, still offer in-story choices — talk them down, threaten, bluff, create a distraction, shield someone, break away, improvise with the surroundings — not turn-by-turn tactics. Describe what the character does, not the mechanics of an attack.
 
 TAGS NAME THE KIND OF MOVE. Choose from this vocabulary:
 - Social stance: friendly, hostile, diplomatic, defiant, intimidating, suspicious, forthright, inspiring
@@ -552,28 +554,22 @@ TAGS NAME THE KIND OF MOVE. Choose from this vocabulary:
 - Other: playful, survival
 You MAY also tag a move with the character's OWN race or class when it leans into who they are (a cleric calling on faith → "cleric"; a dwarf's stonecraft → "dwarf"). Use ONLY this character's race and class — never another. Secondary tags: include 0, 1, or 2 only when they genuinely apply, and never repeat the primary tag.
 
-MECHANIC — SPEAK D&D 5e. Name the ability check the action calls for and its governing ability, and — when it's contested — what it's rolled against. Use the real skills (Athletics, Acrobatics, Sleight of Hand, Stealth, Arcana, History, Investigation, Nature, Religion, Animal Handling, Insight, Medicine, Perception, Survival, Deception, Intimidation, Performance, Persuasion) — or an attack / a saving throw when it's a fight. Do NOT invent DCs or numbers, and do NOT state what happens on a failure — a failed roll's consequences are the DM's to adjudicate, never yours. E.g. "Deception (CHA), opposed by their Insight" or "Athletics (STR) to vault the bar." A move that needs no roll (just talking, just moving) should say so.
+COVER A REAL SPREAD — DON'T CLUSTER. Across the four, give BOTH cooperative and adversarial approaches — not four variations on "watch them warily" or "get ready to fight." Calibrate to the scene's ACTUAL stakes: a friendly tavern dice game is not a combat scene; don't treat every moment as violence about to break out. Include lower-key options — build rapport, satisfy curiosity, show restraint, even walk away — when they fit.
 
-SPAN THE PILLARS — DON'T CLUSTER. Across the six, cover more than one pillar and BOTH cooperative and adversarial approaches — not six variations on "watch them warily" or "get ready to fight." Calibrate to the scene's ACTUAL stakes: a friendly tavern dice game is not a combat scene; don't treat every moment as violence about to break out. Include lower-key options — build rapport, satisfy curiosity, show restraint, even walk away — when they fit.
+PLAY THE WHOLE CHARACTER. Let the brief's values, fears, wants, flaws, and stakes drive the four — a blunt zealot and a greedy rogue facing the same scene should not get the same four. AT LEAST ONE option should follow the character's FLAW, fear, or a bond even when it's not the smart play — the move they'd make because of who they are, not despite it. And favor moves this character could actually pull off — don't hand a delicate lie to someone with no gift for it, or a feat of strength to the frail. Not every option needs a race or class tag.
 
-TEAMWORK — THIS IS A PARTY GAME. When party members are present in the scene, AT LEAST ONE option must coordinate with a NAMED one of them: the Help action (grant them advantage), setting up their strength, or splitting roles ("while Balasar keeps the table talking, I…"). Name only party members the scene says are present. For solo moves, leave TEAMWORK empty.
-
-PLAY THE WHOLE CHARACTER. Let the brief's values, fears, wants, flaws, and stakes drive the six — a blunt zealot and a greedy rogue facing the same scene should not get the same six. AT LEAST ONE option should follow the character's FLAW, fear, or a bond even when it's not the smart play — the move they'd make because of who they are, not despite it. And favor moves this character could actually pull off: lean on their class and level; don't hand a delicate con to someone with no gift for it, or a feat of strength to the frail. Not every option needs a race or class tag.
-
-GOAL. If the player states a goal, bias the six toward achieving it — but keep them distinct (different pillars, tags, and risk levels), not six ways to do the one thing.
-
-WRITE A REAL ACTION, NOT A LABEL. Each action is concrete and specific to THIS situation and THIS character, in their register (honor the brief's diction and attitude). "Buy the table a round and ask which of them rode with Glasstaff" — not "be friendly." The action embodies the tags; don't just restate them.
+GOAL. If the player states a goal, bias the four toward achieving it — but keep them distinct (different tags and risk levels), not four ways to do the one thing.
 
 GROUND IT. Everything you treat as a world-fact — who's who, who holds or controls what, what's resolved, what's still open — must come from the notes, the current state, or the relationships. Don't invent events, possessions, alliances, or outcomes. The character may suspect, hope, or intend (that's theirs), but never assert an arrangement the notes don't establish. Read the current state as the present: don't propose acting on a quest already completed or confronting someone already dead or defeated.
 
-RATIONALE. One short line per option: why THIS move fits THIS character here — point to a value, fear, flaw, want, or relationship from the brief, or a fact from the notes. It is not a summary of the action.
+TITLE + EXPLANATION, NOT A LABEL. The title is a concrete move specific to THIS situation and THIS character ("Buy the table a round and ask who rode with Glasstaff." — not "Be friendly."). The explanation says plainly what that looks like in play and why THIS character would choose it — point to a value, fear, flaw, want, or relationship from the brief, or a fact from the notes. Don't just restate the tags.
 
-PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them (party) and who they're facing (NPCs/factions), the quest in progress, and the scene's MODE. Let the mode steer the kind of action — Combat: immediate, physical, tactical; Social: persuasion, leverage, reading people; Stealth: avoid notice, scout, misdirect; Exploration: investigate, search, press deeper; Downtime: rest, personal threads, prepare; Travel: on the road, plan ahead — and aim the options at whoever the character is facing.`
+PRESENT SCENE. A "present scene" block may set where the character is, the time, who's with them (party) and who they're facing (NPCs/factions), the quest in progress, and the scene's MODE. Let the mode steer the kind of choice — Combat: what the character does in the fiction of the fight, never the mechanics of the turn; Social: persuasion, leverage, reading people; Stealth: avoid notice, scout, misdirect; Exploration: investigate, search, press deeper; Downtime: rest, personal threads, prepare; Travel: on the road, plan ahead — and aim the options at whoever the character is facing.`
 
 /**
  * The structured-output schema for Suggest's "in the moment" mode. JSON Schema cannot enforce array
  * length or tag uniqueness (minItems/maxItems/uniqueItems are unsupported) — `suggest.service`
- * validates "exactly 6 with distinct primary tags" and cleans the secondary tags in code. The tag
+ * validates "exactly 4 with distinct primary tags" and cleans the secondary tags in code. The tag
  * enums and required fields ARE enforced here. Every object needs additionalProperties:false.
  */
 const SUGGEST_SCHEMA = {
@@ -588,21 +584,10 @@ const SUGGEST_SCHEMA = {
         properties: {
           primaryTag: { type: 'string', enum: [...SUGGEST_TAGS] },
           secondaryTags: { type: 'array', items: { type: 'string', enum: [...SUGGEST_TAGS] } },
-          pillar: { type: 'string', enum: [...SUGGEST_PILLARS] },
-          action: { type: 'string' },
-          mechanic: { type: 'string' },
-          teamwork: { type: 'string' },
-          rationale: { type: 'string' }
+          title: { type: 'string' },
+          explanation: { type: 'string' }
         },
-        required: [
-          'primaryTag',
-          'secondaryTags',
-          'pillar',
-          'action',
-          'mechanic',
-          'teamwork',
-          'rationale'
-        ]
+        required: ['primaryTag', 'secondaryTags', 'title', 'explanation']
       }
     }
   },
@@ -623,6 +608,8 @@ export interface SuggestContext {
  * Shared system prefix for both Suggest modes: instructions + campaign + (race/class) + persona brief.
  * The race/class line is a bare fact so the "in the moment" prompt knows which race/class tags are
  * legal; it's harmless context for directions mode. The persona stays last (the cached prefix boundary).
+ * NOTE: unlike Recall, Counsel does NOT append the MC's voice examples — they push in-character diction
+ * that fights Counsel's plain-English output (ADR-048). The persona brief alone grounds who the PC is.
  */
 function suggestSystemBlocks(
   ctx: SuggestContext,
@@ -644,8 +631,6 @@ function suggestSystemBlocks(
     text: `Character brief for ${ctx.pcName ?? 'the character'}:\n\n${ctx.persona ?? ''}`,
     cache_control: { type: 'ephemeral' }
   })
-  const voice = voiceExamplesBlock(ctx.voiceExamples, ctx.pcName)
-  if (voice) blocks.push(voice)
   return blocks
 }
 
@@ -708,10 +693,10 @@ export function buildSuggestUserContent(
     })
   }
   if (refinement?.trim() && previous?.length) {
-    const prior = previous.map((p) => `- ${p.primaryTag}: ${p.action}`).join('\n')
+    const prior = previous.map((p) => `- ${p.primaryTag}: ${p.title}`).join('\n')
     content.push({
       type: 'text',
-      text: `You already offered these six options for THIS exact moment:\n${prior}\n\nThe player wants a different take: ${refinement.trim()}. Give a FRESH spread of six — reshaped toward that, with new actions and (mostly) new primary tags. Don't repeat the options above.`
+      text: `You already offered these four options for THIS exact moment:\n${prior}\n\nThe player wants a different take: ${refinement.trim()}. Give a FRESH spread of four — reshaped toward that, with new titles and (mostly) new primary tags. Don't repeat the options above.`
     })
   }
   content.push({ type: 'text', text: `The situation right now:\n${situation}` })
@@ -1295,7 +1280,7 @@ export async function enrichChangeset(params: EnrichCallParams): Promise<RawEnri
   })
 }
 
-/** "In the moment" call. Returns raw suggestions (caller enforces the 8-distinct-primary rule). */
+/** "In the moment" call. Returns raw suggestions (caller enforces the 4-distinct-primary rule). */
 export async function suggest(params: SuggestParams): Promise<MomentSuggestion[]> {
   return structuredArrayCall<MomentSuggestion>({
     feature: 'counsel',

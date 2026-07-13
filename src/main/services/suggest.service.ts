@@ -2,12 +2,10 @@ import { eq } from 'drizzle-orm'
 import {
   SUGGEST_TAGS,
   SUGGEST_CATEGORIES,
-  SUGGEST_PILLARS,
   type MomentSuggestion,
   type StorySuggestion,
   type SuggestCategory,
   type SuggestFailureReason,
-  type SuggestPillar,
   type SuggestRequest,
   type SuggestResult,
   type SuggestTag
@@ -40,16 +38,15 @@ import { fakeAiEnabled, fakeDirections, fakeSuggest } from './ai-fake'
 
 const TOP_K = 8
 const TAG_SET = new Set<string>(SUGGEST_TAGS)
-const PILLAR_SET = new Set<string>(SUGGEST_PILLARS)
 
 function fail(reason: SuggestFailureReason): SuggestResult {
   return { ok: false, reason }
 }
 
 /**
- * Enforce the rules the JSON schema can't: exactly 6 suggestions with DISTINCT primary tags and
- * non-empty action + rationale. Secondary tags are cleaned (valid enum, deduped, ≤2, never equal to the
- * primary). Drops malformed/duplicate-primary entries and trims extras; returns null if fewer than 6
+ * Enforce the rules the JSON schema can't: exactly 4 suggestions with DISTINCT primary tags and a
+ * non-empty title + explanation. Secondary tags are cleaned (valid enum, deduped, ≤2, never equal to the
+ * primary). Drops malformed/duplicate-primary entries and trims extras; returns null if fewer than 4
  * valid distinct-primary suggestions survive (caller then retries / fails).
  */
 function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
@@ -57,10 +54,8 @@ function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
   const clean: MomentSuggestion[] = []
   for (const r of recs) {
     if (!r || typeof r.primaryTag !== 'string' || !TAG_SET.has(r.primaryTag)) continue
-    if (typeof r.pillar !== 'string' || !PILLAR_SET.has(r.pillar)) continue
-    if (typeof r.action !== 'string' || !r.action.trim()) continue
-    if (typeof r.mechanic !== 'string' || !r.mechanic.trim()) continue
-    if (typeof r.rationale !== 'string' || !r.rationale.trim()) continue
+    if (typeof r.title !== 'string' || !r.title.trim()) continue
+    if (typeof r.explanation !== 'string' || !r.explanation.trim()) continue
     if (seen.has(r.primaryTag)) continue
     const primary = r.primaryTag as SuggestTag
     const secondary: SuggestTag[] = []
@@ -76,15 +71,12 @@ function validateMoment(recs: MomentSuggestion[]): MomentSuggestion[] | null {
     clean.push({
       primaryTag: primary,
       secondaryTags: secondary,
-      pillar: r.pillar as SuggestPillar,
-      action: r.action.trim(),
-      mechanic: r.mechanic.trim(),
-      teamwork: typeof r.teamwork === 'string' && r.teamwork.trim() ? r.teamwork.trim() : null,
-      rationale: r.rationale.trim()
+      title: r.title.trim(),
+      explanation: r.explanation.trim()
     })
-    if (clean.length === 6) break
+    if (clean.length === 4) break
   }
-  return clean.length === 6 ? clean : null
+  return clean.length === 4 ? clean : null
 }
 
 const CATEGORY_SET = new Set<string>(SUGGEST_CATEGORIES)
@@ -123,7 +115,7 @@ function validateDirections(suggestions: StorySuggestion[]): StorySuggestion[] |
 /**
  * Run a Suggest query: resolve the PC + persona (regenerating a stale brief) → embed the situation →
  * vector search + fuzzy name match → gather relationships/state → ask Claude (structured, single-shot)
- * for 6 tagged actions → validate (retry once). Returns a discriminated SuggestResult so the
+ * for 4 tagged narrative options → validate (retry once). Returns a discriminated SuggestResult so the
  * renderer can show offline / no-key / no-PC states without try/catch (ADR-008, ADR-009).
  */
 export async function suggest(
@@ -301,7 +293,7 @@ export async function suggest(
         onUsage: (c) => (cost = addRunCost(cost, c)),
         signal
       })
-    // One retry: the model occasionally returns fewer than 6 or a duplicate primary tag.
+    // One retry: the model occasionally returns fewer than 4 or a duplicate primary tag.
     let recs = validateMoment(fakeAiEnabled() ? fakeSuggest() : await callOnce())
     if (!recs) recs = validateMoment(await callOnce())
     if (!recs) return fail('invalid')

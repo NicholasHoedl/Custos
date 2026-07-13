@@ -256,9 +256,9 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 **Goal:** In-character action recommendations during live play. The developer describes the current situation and receives **4 distinct attitude-based recommendations** — the model selects the 4 attitudes the active PC is most likely to adopt and writes a unique in-character action for each — via a Claude Opus 4.8 structured-output call (adaptive thinking), grounded in the PC's traits and campaign history.
 
 > **As shipped:** the 4-of-7 fixed-attitude model below was later superseded by **ADR-016** — Counsel
-> (formerly Suggest) now returns **6 options** (trimmed from 8 in ADR-026) from a multi-tag vocabulary
-> (1 primary + ≤2 secondary tags), plus an open-ended "what's next" directions mode. The text below is
-> the historical plan.
+> (formerly Suggest) now returns **4 narrative options** (title + plain-English explanation, no mechanics —
+> ADR-048; was 6 in ADR-026, 8 originally) tagged from a multi-tag vocabulary (1 primary + ≤2 secondary
+> tags), plus an open-ended "what's next" directions mode. The text below is the historical plan.
 
 ### Key Tasks
 

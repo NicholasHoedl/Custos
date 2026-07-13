@@ -45,23 +45,27 @@ describe('suggest prompt assembly (in the moment)', () => {
     const text = sys.map((b) => b.text).join('\n')
     expect(text).toContain('Phandelver')
     expect(text).toContain('THE-CHARACTER-BRIEF')
-    // the moment-tag vocabulary + six-options framing live in the instructions
-    expect(text).toContain('SIX')
+    // the moment-tag vocabulary + four-options framing live in the instructions
+    expect(text).toContain('FOUR')
     expect(text).toContain('religious')
     expect(text).toContain('investigative')
     expect(text).toContain('forceful') // an expansion tag is present in the vocabulary
-    // the v2 dimensions the overhaul added (ADR-026)
-    expect(text).toContain('MECHANIC')
-    expect(text).toContain('PILLAR')
-    expect(text).toContain('TEAMWORK')
+    // the narrative card shape (ADR-048): a title + a plain-English explanation
+    expect(text).toContain('TITLE')
+    expect(text).toContain('EXPLANATION')
+    expect(text).toContain('PLAIN')
     expect(text).toContain('FLAW')
+    // the D&D-mechanics framing (ADR-026) is gone — Counsel suggests the choice, not the roll
+    expect(text).not.toContain('MECHANIC')
+    expect(text).not.toContain('PILLAR')
+    expect(text).not.toContain('TEAMWORK')
     // the PC's race/class are stated so the model knows which race/class tags are legal
     expect(text).toContain('elf wizard')
     // the cacheable breakpoint is on the last (persona) block
     expect(sys[sys.length - 1].cache_control).toEqual({ type: 'ephemeral' })
   })
 
-  it('appends a cached voice-examples block only when the MC has them (ADR-029)', () => {
+  it('never appends the MC voice-examples block — Counsel wants plain English (ADR-048)', () => {
     const base = {
       campaignName: 'Phandelver',
       campaignDescription: null,
@@ -70,15 +74,16 @@ describe('suggest prompt assembly (in the moment)', () => {
       pcClass: null,
       persona: 'BRIEF'
     }
-    const withVoice = buildSuggestSystem({ ...base, voiceExamples: ['Coin first, questions later.'] })
-    const text = withVoice.map((b) => b.text).join('\n')
-    expect(text).toMatch(/Voice examples/)
-    expect(text).toContain('Coin first, questions later.')
-    expect(withVoice[withVoice.length - 1].cache_control).toEqual({ type: 'ephemeral' }) // cached last
-    const without = buildSuggestSystem(base)
+    // The MC's stylized sample lines would fight Counsel's plain-English mandate, so — unlike Recall —
+    // the suggest system prompt omits them even when they're available.
+    const withVoice = buildSuggestSystem({
+      ...base,
+      voiceExamples: ['Coin first, questions later.']
+    })
       .map((b) => b.text)
       .join('\n')
-    expect(without).not.toMatch(/Voice examples/)
+    expect(withVoice).not.toMatch(/Voice examples/)
+    expect(withVoice).not.toContain('Coin first, questions later.')
   })
 
   it('user content uses PLAIN TEXT blocks (never document/citations) and ends with the situation', () => {
@@ -114,6 +119,25 @@ describe('suggest prompt assembly (in the moment)', () => {
     const texts = content.map((b) => ('text' in b ? b.text : ''))
     expect(texts.some((t) => t.includes('find Glasstaff'))).toBe(true)
     expect(texts[texts.length - 1]).toContain('The situation right now:')
+  })
+
+  it('folds the prior spread (by tag + title) and the nudge into a refine block (ADR-048)', () => {
+    const content = buildSuggestUserContent('Do it?', [], null, null, null, undefined, 'bolder', [
+      {
+        primaryTag: 'cautious',
+        secondaryTags: [],
+        title: 'Hold back and watch.',
+        explanation: 'x'
+      },
+      { primaryTag: 'diplomatic', secondaryTags: [], title: 'Offer a way out.', explanation: 'y' }
+    ])
+    const texts = content.map((b) => ('text' in b ? b.text : ''))
+    const refine = texts.find((t) => t.includes('already offered'))
+    expect(refine).toBeTruthy()
+    expect(refine).toContain('cautious: Hold back and watch.') // prior spread rendered by tag + title
+    expect(refine).toContain('bolder') // the player's nudge
+    expect(refine).toContain('four') // asks for a fresh four
+    expect(texts[texts.length - 1]).toContain('The situation right now:') // situation still last
   })
 })
 

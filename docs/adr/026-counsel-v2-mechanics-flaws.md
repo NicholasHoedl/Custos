@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted — but its **mechanics layer is superseded by [ADR-048](048-counsel-narrative-cards.md)**. Counsel's
+"in the moment" mode is now narrative-only: four plain-English title + explanation cards (+ category tags),
+with the `pillar` / `mechanic` / `teamwork` fields removed. The flaws/persona/entity-surfacing decisions of
+this ADR still stand.
 
 **Date:** 2026-07-07
 **Deciders:** Solo developer

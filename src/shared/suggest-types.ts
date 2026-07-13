@@ -95,36 +95,23 @@ export function tagLabel(tag: string): string {
     .join('-')
 }
 
-/** The three pillars of D&D play. Every "in the moment" option is tagged with the pillar it engages, so
- *  the six span combat / social / exploration instead of clustering in one (ADR-026). */
-export const SUGGEST_PILLARS = ['combat', 'social', 'exploration'] as const
-export type SuggestPillar = (typeof SUGGEST_PILLARS)[number]
-
-export const PILLAR_LABELS: Record<SuggestPillar, string> = {
-  combat: 'Combat',
-  social: 'Social',
-  exploration: 'Exploration'
-}
-
 /**
- * One "in the moment" suggestion: a concrete in-character action, its dominant PRIMARY tag, up to two
- * SECONDARY tags for nuance, the PILLAR it engages, how it resolves at the table (MECHANIC: the 5e check +
- * ability + stakes), an optional TEAMWORK play with a present ally, and a one-line rationale.
+ * One "in the moment" suggestion: a plain-English, in-character NARRATIVE option — a short action-verb
+ * TITLE, a concise EXPLANATION (what the character does + why it fits them), and its category tags (one
+ * dominant PRIMARY + up to two SECONDARY for nuance). No D&D mechanics: Counsel suggests the CHOICE, never
+ * how it resolves at the table (ADR-048, superseding ADR-026's pillar/mechanic/teamwork layer).
  */
 export interface MomentSuggestion {
   primaryTag: SuggestTag
   secondaryTags: SuggestTag[]
-  pillar: SuggestPillar
-  action: string
-  /** The 5e check + governing ability (+ what it's opposed by), no DCs or failure outcomes — e.g. "Deception (CHA) vs. their Insight". */
-  mechanic: string
-  /** A coordination play naming a PRESENT ally, or null when the move is solo. */
-  teamwork: string | null
-  rationale: string
+  /** A short sentence starting with an action verb — e.g. "Question the bandit about who sent them." */
+  title: string
+  /** Concise, plain English: what the move is and why it fits this character. */
+  explanation: string
 }
 
 /**
- * Suggest has two modes: 'attitudes' (the "in the moment" mode — 6 tagged ways to react to a charged
+ * Suggest has two modes: 'attitudes' (the "in the moment" mode — 4 tagged narrative ways to play a charged
  * moment) and 'directions' (open-ended — story-progression moves to keep things going).
  */
 export type SuggestMode = 'attitudes' | 'directions'
@@ -181,7 +168,7 @@ export interface SuggestRequest {
    *  Counsel model + effort. Mirrors Recall's speed toggle. */
   speed?: 'quick' | 'deep'
   /** Refine (attitudes only): a short nudge to reshape the spread — "Bolder", "De-escalate", … When set
-   *  with `previous`, the model re-rolls a fresh six adjusted toward it instead of a first pass. */
+   *  with `previous`, the model re-rolls a fresh four adjusted toward it instead of a first pass. */
   refinement?: string
   /** The spread being refined, so the re-roll produces genuinely different options (not a repeat). */
   previous?: MomentSuggestion[]
@@ -199,7 +186,7 @@ export type SuggestFailureReason =
 
 /**
  * The result of a Suggest query, discriminated by `mode`. Attitudes ("in the moment") mode returns
- * exactly SIX multi-tagged suggestions; directions mode returns a grouped set of story suggestions. On
+ * exactly FOUR multi-tagged suggestions; directions mode returns a grouped set of story suggestions. On
  * failure, a reason the renderer can render without try/catch (mirrors RecallDone.reason).
  */
 export type SuggestResult =

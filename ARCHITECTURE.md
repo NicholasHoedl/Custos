@@ -4,8 +4,9 @@
 **Date:** 2026-06-25 · **Last currency review:** 2026-07-12 (through ADR-045)
 **Status:** Implemented — this is the original MVP architecture plan. Several subsystems have since
 evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
-store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest uses a **multi-tag, 6-option**
-model, not 4-of-7 fixed attitudes (ADR-016); **notes are many-to-many** via `note_entity` (SPEC §10);
+store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest's "in the moment" mode is a
+**multi-tag, 4-option narrative** model (title + plain-English explanation, no D&D mechanics — ADR-048,
+superseding ADR-026), not 4-of-7 fixed attitudes; **notes are many-to-many** via `note_entity` (SPEC §10);
 retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); post-MVP features (current
 scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10; a
 **chronology** model (session-stamped history + "as of session N" reconstruction) shipped in
@@ -426,7 +427,7 @@ Anthropic's `ephemeral` cache defaults to a **5-minute** TTL; pass `cache_contro
 | Feature | Default Model | Notes |
 |---|---|---|
 | Recall synthesis | `claude-sonnet-4-6` | Lower latency/cost; configurable to Opus |
-| Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 6-option "in the moment" + open-ended "directions" — ADR-016) |
+| Suggest | `claude-opus-4-8` | Marquee reasoning feature; adaptive thinking + structured output (multi-tag 4-option narrative "in the moment" — ADR-048 — + open-ended "directions" — ADR-016) |
 | Converse | `claude-opus-4-8` | Third AI lens; **reuses the Suggest model + effort setting**; single-shot structured, direct-fetch grounding (ADR-025) |
 | Auto-tagging (future) | `claude-haiku-4-5` | Background task, latency-insensitive |
 
@@ -483,8 +484,9 @@ interface SuggestResult {
 
 > **⚠️ Superseded by ADR-016 (`docs/adr/016-suggest-multitag-overhaul.md`).** The 4-of-7 fixed-attitude
 > model in this section — and the `Attitude` / `AttitudeRecommendation` / `count: 4` types above — was
-> the MVP design. Current Suggest returns **6 options** from a **62-tag** vocabulary (1 primary + ≤2
-> secondary tags, distinct primaries), plus an open-ended **"directions"** mode. The structured-output
+> the MVP design. Current Suggest returns **4 narrative options** (title + plain-English explanation, no
+> mechanics — ADR-048) tagged from a **62-tag** vocabulary (1 primary + ≤2 secondary tags, distinct
+> primaries), plus an open-ended **"directions"** mode. The structured-output
 > + code-side-validation *mechanism* described below still holds; the output *shape* does not.
 
 Suggest does **not** return one recommendation. Given the situation, the active PC's traits/goals, and retrieved campaign history, Opus 4.8 (with adaptive thinking) must:
@@ -557,7 +559,7 @@ All communication between renderer and main process goes through typed IPC chann
 
 // AI channels
 'recall:query'       → streamed tokens + final citations (streaming)
-'suggest:query'      → SuggestResult (single structured response; multi-tag 6-option + directions — ADR-016)
+'suggest:query'      → SuggestResult (single structured response; multi-tag 4-option narrative + directions — ADR-048/016)
 'converse:query'     → ConverseResult (single structured response: briefing + in-character questions — ADR-025)
 
 // Settings channels
