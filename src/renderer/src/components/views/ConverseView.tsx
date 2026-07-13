@@ -70,6 +70,8 @@ export function ConverseView() {
   const [thread, setThread] = useState('')
   const [speed, setSpeed] = useState<Speed>('quick')
   const [asOf, setAsOf] = useState<number | null>(null)
+  // The suggested question the player picked to build a follow-up on (required before following up).
+  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null)
   const [asked, setAsked] = useState<{ name: string; focus: string }>({ name: '', focus: '' })
   const { entries: recent, remember } = useLensHistory()
   const rememberedRef = useRef(0)
@@ -110,6 +112,7 @@ export function ConverseView() {
   function submit() {
     if (!canSubmit || !targetId) return
     setAsked({ name: target?.name ?? 'them', focus: thread.trim() })
+    setSelectedQuestion(null)
     converse.ask(targetId, thread, { asOfSession: asOf ?? undefined, speed })
   }
 
@@ -128,6 +131,7 @@ export function ConverseView() {
                 converse.reset()
                 setTargetId(null)
                 setThread('')
+                setSelectedQuestion(null)
               }}
             >
               <RotateCcw className="size-3.5" />
@@ -136,7 +140,7 @@ export function ConverseView() {
           )
         }
       />
-      <PaneBody size="reading">
+      <PaneBody size="reading" className="max-w-4xl">
         {!onb.keyReady ? (
           <SetupCard
             icon={<KeyRound className="size-4" />}
@@ -194,7 +198,15 @@ export function ConverseView() {
           )}
 
           {converse.turns.map((turn, i) => (
-            <TurnBlock key={i} targetName={asked.name || 'them'} focus={asked.focus} turn={turn} />
+            <TurnBlock
+              key={i}
+              targetName={asked.name || 'them'}
+              focus={asked.focus}
+              turn={turn}
+              onPick={
+                i === converse.turns.length - 1 && !thinking ? setSelectedQuestion : undefined
+              }
+            />
           ))}
 
           {thinking && (
@@ -219,7 +231,22 @@ export function ConverseView() {
 
           {converse.failure && <FailureBanner reason={converse.failure} />}
 
-          {active && !thinking && <FollowUpBox onSend={converse.followUp} />}
+          {active &&
+            !thinking &&
+            (selectedQuestion ? (
+              <FollowUpBox
+                question={selectedQuestion}
+                onSend={(answer) => {
+                  converse.followUp(selectedQuestion, answer)
+                  setSelectedQuestion(null)
+                }}
+                onChange={() => setSelectedQuestion(null)}
+              />
+            ) : (
+              <p className="text-center text-sm text-muted-foreground">
+                Pick the question you asked above to follow up.
+              </p>
+            ))}
         </div>
       </PaneBody>
     </div>
@@ -260,8 +287,17 @@ function SpeedToggle({ speed, setSpeed }: { speed: Speed; setSpeed: (s: Speed) =
   )
 }
 
-/** The "continue the conversation" composer: paraphrase what the target said → follow-up questions. */
-function FollowUpBox({ onSend }: { onSend: (answer: string) => void }) {
+/** The "continue the conversation" composer: shows the question you PICKED, you paraphrase their answer,
+ *  and the next spread builds on that exchange. */
+function FollowUpBox({
+  question,
+  onSend,
+  onChange
+}: {
+  question: string
+  onSend: (answer: string) => void
+  onChange: () => void
+}) {
   const [answer, setAnswer] = useState('')
   function send() {
     const a = answer.trim()
@@ -270,13 +306,26 @@ function FollowUpBox({ onSend }: { onSend: (answer: string) => void }) {
     setAnswer('')
   }
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-      <p className="inscribed text-[10px]">Continue — what did they say?</p>
+    <div className="space-y-2 rounded-lg border border-primary/30 bg-card/60 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm leading-relaxed text-foreground/80">
+          <span className="inscribed mr-1.5 text-[10px]">You asked</span>
+          {`"${question}"`}
+        </p>
+        <button
+          type="button"
+          onClick={onChange}
+          className="shrink-0 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          change
+        </button>
+      </div>
       <Textarea
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
         rows={2}
-        placeholder="Paraphrase their answer — the next questions build on it. e.g. He admits he owes the Zhentarim, but swears he's done with them."
+        autoFocus
+        placeholder="What did they say back? Paraphrase it — the follow-ups build on it. e.g. He admits he owes the Zhentarim, but swears he's done with them."
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault()
@@ -293,28 +342,36 @@ function FollowUpBox({ onSend }: { onSend: (answer: string) => void }) {
   )
 }
 
-/** One turn in the thread: the target's answer that prompted it (for follow-ups), the funnel-ordered
- *  spread, and per-turn Copy/Inscribe. */
+/** One turn in the thread: for a follow-up, the exchange that prompted it (you asked X → they said Y), then
+ *  the funnel-ordered spread and per-turn Copy/Inscribe. `onPick` (latest turn only) enables the follow-up. */
 function TurnBlock({
   targetName,
   focus,
-  turn
+  turn,
+  onPick
 }: {
   targetName: string
   focus: string
   turn: ConverseTurn
+  onPick?: (question: string) => void
 }) {
   const { copy, inscribe } = useLensSave()
   const prose = converseProse(targetName, focus || undefined, turn.questions)
   return (
     <div className="space-y-3">
-      {turn.answer && (
-        <div className="rounded-md border-l-2 border-primary/40 bg-muted/20 py-1.5 pl-3 pr-2 text-sm leading-relaxed text-foreground/80">
-          <span className="inscribed mr-1.5 text-[10px]">They said</span>
-          {turn.answer}
+      {turn.asked && (
+        <div className="space-y-1 rounded-md border-l-2 border-primary/40 bg-muted/20 py-1.5 pl-3 pr-2 text-sm leading-relaxed">
+          <p className="text-foreground/70">
+            <span className="inscribed mr-1.5 text-[10px]">You asked</span>
+            {`"${turn.asked.question}"`}
+          </p>
+          <p className="text-foreground/80">
+            <span className="inscribed mr-1.5 text-[10px]">They said</span>
+            {turn.asked.answer}
+          </p>
         </div>
       )}
-      <QuestionSpread questions={turn.questions} />
+      <QuestionSpread questions={turn.questions} onPick={onPick} />
       <div className="flex items-center justify-end gap-1">
         <Button
           variant="ghost"
@@ -406,25 +463,30 @@ function TargetPicker({
   )
 }
 
-// The question spread, funnel-ordered by trust cost (rapport-builders first, sensitive probes last).
-function QuestionSpread({ questions }: { questions: ConverseQuestion[] }) {
+// The question spread, funnel-ordered by trust cost (rapport-builders first, sensitive probes last),
+// stacked in a single wide column (follow-up v2). `onPick` (latest turn only) shows the per-card follow-up.
+function QuestionSpread({
+  questions,
+  onPick
+}: {
+  questions: ConverseQuestion[]
+  onPick?: (question: string) => void
+}) {
   const ordered = [...questions].sort(
     (a, b) =>
       CONVERSE_COST_ORDER[CONVERSE_TAG_META[a.tag].cost] -
       CONVERSE_COST_ORDER[CONVERSE_TAG_META[b.tag].cost]
   )
   return (
-    <div className="@container">
-      <div className="grid gap-3 @lg:grid-cols-2">
-        {ordered.map((q) => (
-          <QuestionCard key={q.tag} q={q} />
-        ))}
-      </div>
+    <div className="space-y-3">
+      {ordered.map((q) => (
+        <QuestionCard key={q.tag} q={q} onPick={onPick} />
+      ))}
     </div>
   )
 }
 
-function QuestionCard({ q }: { q: ConverseQuestion }) {
+function QuestionCard({ q, onPick }: { q: ConverseQuestion; onPick?: (question: string) => void }) {
   const meta = CONVERSE_TAG_META[q.tag]
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-card/60 p-4">
@@ -440,7 +502,16 @@ function QuestionCard({ q }: { q: ConverseQuestion }) {
         </span>
       </div>
       <p className="text-[15px] leading-relaxed text-foreground/90">{`"${q.question}"`}</p>
-      <p className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">{q.read}</p>
+      <p className="border-t border-border pt-2 text-xs text-muted-foreground">{q.read}</p>
+      {onPick && (
+        <button
+          type="button"
+          onClick={() => onPick(q.question)}
+          className="self-start text-xs font-medium text-primary/80 transition-colors hover:text-primary"
+        >
+          Follow up on this →
+        </button>
+      )}
     </div>
   )
 }

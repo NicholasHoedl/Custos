@@ -23,9 +23,10 @@ export interface ConverseRequest {
   /** Per-query speed: 'quick' = Sonnet + medium effort (table-fast); 'deep'/unset = the Settings model +
    *  effort. Mirrors Recall/Counsel's speed toggle. */
   speed?: 'quick' | 'deep'
-  /** Follow-up loop (ADR-049): what the TARGET has said so far this conversation, oldest-first (newest
-   *  last). Present → the model returns follow-up questions that build on those answers. */
-  history?: string[]
+  /** Follow-up loop (ADR-049): the conversation so far — the question the PC ASKED and what the target
+   *  said back, each turn, oldest-first (newest last). Present → the model returns follow-up questions that
+   *  build on those specific exchanges. The `question` is the suggestion the player actually used. */
+  history?: { question: string; answer: string }[]
 }
 
 // The question-type taxonomy (ADR-034). Each suggestion gets ONE tag naming the KIND of question. The
@@ -142,12 +143,12 @@ export type ConverseResult =
   | { ok: false; reason: ConverseFailureReason; message?: string }
 
 /**
- * One turn in a Converse thread (ADR-049, the follow-up loop). `answer` is what the target said that
- * prompted this spread — null for the opening spread. Renderer-facing state (mirrors RecallTurn); never
- * crosses IPC.
+ * One turn in a Converse thread (ADR-049, the follow-up loop). `asked` is the exchange that prompted this
+ * spread — the question the PC used and the target's answer — or null for the opening spread. Renderer-
+ * facing state (mirrors RecallTurn); never crosses IPC.
  */
 export interface ConverseTurn {
-  answer: string | null
+  asked: { question: string; answer: string } | null
   questions: ConverseQuestion[]
   cost?: AiRunCost
 }

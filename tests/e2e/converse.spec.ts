@@ -40,13 +40,19 @@ test('Converse: preparing questions for a target returns a tagged spread', async
   await expect(page.getByText('What first brought you to this place?')).toBeVisible()
   await expect(page.getByText('Rapport', { exact: true })).toBeVisible()
 
-  // Follow-up loop (ADR-049): paraphrase what they "said" → a fresh spread of follow-ups (the fake seam
-  // returns the canned four regardless; speed is transparent). The answer shows in the thread, and the
-  // canned question now appears twice — once per turn — proving the follow-up spread rendered.
+  // Follow-up v2 (ADR-049): you must PICK the suggestion you used, THEN paraphrase the answer. Pick the
+  // open-probe card, feed an answer, follow up (the fake seam returns the canned four regardless).
+  const card = page.locator('div.rounded-lg', { hasText: 'What first brought you to this place?' })
+  await card.getByRole('button', { name: /Follow up on this/ }).click()
   await page
-    .getByPlaceholder(/Paraphrase their answer/)
+    .getByPlaceholder(/What did they say back/)
     .fill('She admits she is worried about a missing friend.')
-  await page.getByRole('button', { name: 'Follow up' }).click()
+  // exact — the card "Follow up on this →" buttons also contain "Follow up".
+  await page.getByRole('button', { name: 'Follow up', exact: true }).click()
+  // The exchange breadcrumb (their answer) proves the picked question + answer were captured…
   await expect(page.getByText('She admits she is worried about a missing friend.')).toBeVisible()
-  await expect(page.getByText('What first brought you to this place?')).toHaveCount(2)
+  // …and a fresh spread renders — a different canned question now shows in both turns' spreads.
+  await expect(
+    page.getByText('When all of this is over, what are you actually after?')
+  ).toHaveCount(2)
 })

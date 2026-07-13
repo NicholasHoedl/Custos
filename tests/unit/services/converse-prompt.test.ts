@@ -39,6 +39,10 @@ describe('converse prompt assembly', () => {
     expect(text).toContain('secret-seeking') // a tag from the question vocabulary
     expect(text).toContain('FUNNEL') // the funnel/trust-cost spread rule
     expect(text).toContain('elf wizard') // race/class stated for prompt parity
+    // Dialogue-quality guardrails (natural-speech rework): the "sound like a real person" rule + the
+    // few-shot example block that anchor short, spoken, in-character lines.
+    expect(text).toContain('SOUND LIKE A REAL PERSON')
+    expect(text).toContain('EXAMPLES')
     // Unlike Counsel, Converse RESTORES the MC voice examples — its questions are dialogue in the PC's
     // voice (ADR-049).
     expect(text).toContain('Voice examples')
@@ -134,20 +138,25 @@ describe('converse prompt assembly', () => {
     expect(all).toContain('vain')
   })
 
-  it('folds the conversation-so-far into a follow-up block when history is given (ADR-049)', () => {
+  it('folds the conversation-so-far exchanges into a follow-up block when history is given (ADR-049)', () => {
     const content = buildConverseUserContent({
       target: TARGET,
       notes: [],
       connections: null,
       tie: null,
-      history: ['He admitted he owes the Zhentarim.', 'He swears he is done with them.'],
+      history: [
+        { question: 'Who do you answer to?', answer: 'He admitted he owes the Zhentarim.' },
+        { question: 'And now?', answer: 'He swears he is done with them.' }
+      ],
       anchorLabel: 'Session 3',
       asOf: false,
       pcName: 'Vargas'
     })
     const all = content.map((b) => ('text' in b ? b.text : '')).join('\n')
     expect(all).toContain('conversation so far') // the follow-up grounding block
-    expect(all).toContain('He admitted he owes the Zhentarim.')
+    // Each turn renders the question ASKED + the answer, so the model can build on the real exchange.
+    expect(all).toContain('You asked: "Who do you answer to?"')
+    expect(all).toContain('They said: "He admitted he owes the Zhentarim."')
     expect(all).toContain('He swears he is done with them.')
     // With history, the closing ask ships FOLLOW-UP questions.
     expect((content[content.length - 1] as { text: string }).text).toContain('follow-up questions')

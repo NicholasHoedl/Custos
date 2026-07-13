@@ -29,7 +29,7 @@ export interface ConverseAskOpts {
  */
 export function useConverse(): ConverseState & {
   ask: (targetId: string, thread: string, opts?: ConverseAskOpts) => void
-  followUp: (answer: string) => void
+  followUp: (question: string, answer: string) => void
   cancel: () => void
   reset: () => void
 } {
@@ -40,19 +40,19 @@ export function useConverse(): ConverseState & {
   const reqRef = useRef(0)
   const requestIdRef = useRef<string | null>(null)
   // The active conversation's params (so followUp reuses the same target/thread/as-of/speed) + the
-  // target's answers fed so far (each follow-up grounds on them).
+  // exchanges (the question asked + the answer) fed so far (each follow-up grounds on them).
   const convoRef = useRef<({ targetId: string; thread: string } & ConverseAskOpts) | null>(null)
-  const answersRef = useRef<string[]>([])
+  const exchangesRef = useRef<{ question: string; answer: string }[]>([])
 
-  // One request → append a turn on success. `answer` is what the target said that prompted this spread
-  // (null for the opening spread); `history` is the answers that ground it (empty for the opening spread).
+  // One request → append a turn on success. `asked` is the exchange (question + answer) that prompted this
+  // spread (null for the opening spread); `history` is the exchanges that ground it (empty on the opening).
   const send = useCallback(
     (
       targetId: string,
       thread: string,
       opts: ConverseAskOpts,
-      history: string[],
-      answer: string | null
+      history: { question: string; answer: string }[],
+      asked: { question: string; answer: string } | null
     ) => {
       if (!activeCampaignId || !activePcId || !targetId) return
       const token = ++reqRef.current
@@ -73,12 +73,12 @@ export function useConverse(): ConverseState & {
         .then((result) => {
           if (reqRef.current !== token) return
           if (result.ok) {
-            answersRef.current = history
+            exchangesRef.current = history
             setState((s) => ({
               ...s,
               status: 'done',
               failure: null,
-              turns: [...s.turns, { answer, questions: result.questions, cost: result.cost }]
+              turns: [...s.turns, { asked, questions: result.questions, cost: result.cost }]
             }))
           } else {
             setState((s) => ({ ...s, status: 'done', failure: result.reason }))
@@ -98,25 +98,27 @@ export function useConverse(): ConverseState & {
       if (!targetId) return
       const o = opts ?? {}
       convoRef.current = { targetId, thread, ...o }
-      answersRef.current = []
+      exchangesRef.current = []
       setState((s) => ({ ...s, turns: [], failure: null, error: null }))
       send(targetId, thread, o, [], null)
     },
     [send]
   )
 
-  // Feed what the target just said → a spread of follow-up questions grounded in the answers so far.
+  // Feed the question you asked + what the target said → follow-up questions grounded in the exchange.
   const followUp = useCallback(
-    (answer: string) => {
+    (question: string, answer: string) => {
       const convo = convoRef.current
+      const q = question.trim()
       const a = answer.trim()
-      if (!convo || !a) return
+      if (!convo || !q || !a) return
+      const exchange = { question: q, answer: a }
       send(
         convo.targetId,
         convo.thread,
         { asOfSession: convo.asOfSession, speed: convo.speed },
-        [...answersRef.current, a],
-        a
+        [...exchangesRef.current, exchange],
+        exchange
       )
     },
     [send]
@@ -136,7 +138,7 @@ export function useConverse(): ConverseState & {
     if (requestIdRef.current) ledger.converse.cancel(requestIdRef.current)
     requestIdRef.current = null
     convoRef.current = null
-    answersRef.current = []
+    exchangesRef.current = []
     setState(IDLE)
   }, [])
 

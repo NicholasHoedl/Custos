@@ -1485,26 +1485,41 @@ const CONVERSE_INSTRUCTIONS = `You help a tabletop RPG player prepare to TALK to
 
 Your job: write a spread of FOUR in-character QUESTIONS the PC could actually SAY to this character to open them up. Output ONLY questions — no briefing, no summary, no preamble. Each question carries ONE type TAG and a short READ.
 
-ASK THE GAP, NOT THE KNOWN. Reason silently over what the party has: what is CONFIRMED, what is only (rumored)/(suspected), and what is conspicuously MISSING (unknown backstory, motives, loyalties, feelings). Then aim every question at a gap or an uncertain lead — never at something already confirmed (you would be asking what you already know). Turn a confirmed fact into a CALLBACK that cracks open the next layer; put a rumor or hunch to them to confirm, deny, or complicate; open the blank spaces with a broad probe.
+SOUND LIKE A REAL PERSON TALKING. These are lines the PC says OUT LOUD, so write them the way people actually speak — not the way a novelist writes.
+- SHORT. Usually one sentence; two at most. A question you could say in a single breath, not a speech. If a line stacks clauses behind a dash or piles on qualifications, cut it back to the plain ask.
+- PLAIN AND SPOKEN. Contractions, everyday words, the rhythm of talk. No writerly flourishes, no rhetorical curlicues, no clever asides, no "and I mean…" hedges. Just ask the thing.
+- STILL THIS CHARACTER. The voice comes through in WORD CHOICE and directness, not in length or ornament — a blunt soldier and a sly merchant ask the same question differently, but both ask plainly. Honor the brief's diction and attitude, and how the PC feels about this person (warm, wary, sly, cold), but never let "in character" tip into over-written.
 
 EACH QUESTION HAS:
-- question — one thing the PC could say, in THIS character's voice (honor the brief's diction and attitude, and how the PC feels about them: a question can be warm, blunt, guarded, sly, or cold depending on who is asking and their standing).
+- question — ONLY the words the PC says out loud. Nothing else: no explanation, no "why," no stage direction. Keep the strategy OUT of the line.
 - tag — ONE type from the vocabulary below.
-- read — a short "read": what the PC suspects, why ask it now, or what gap it means to open. This is the INTENT behind the line (a beat of insight) — NOT a restatement of the question.
+- read — the private intent behind the line: what the PC suspects, why ask it now, or what gap it opens. This is where ALL the strategy goes — exactly the reasoning you'd otherwise be tempted to cram into the question. It's a note to the player, never spoken, and never just a restatement of the question.
 
-THE TAG VOCABULARY — grouped by how much social capital the question spends:
-- Builds trust: rapport (safe, personal small-talk that warms the room), empathetic-disclosure (share a matching wound or truth first, so honesty is reciprocated).
-- Low cost: open-probe (a broad, un-leading opener that just gets them talking), lore (history, customs, places, factions — the setting itself), rumor-test (put a known rumor to them to confirm or deny), backstory-dig (excavate their past and how they got here), callback (anchor to something already known to open its next layer), flatter (elevate them so they WANT to reveal).
-- Medium cost: feelings (name or ask their emotional state — needs a read of them first), motivation (what they truly want or fear), opinion (their read on a THIRD party — trust, grudges, alliances).
-- High cost: secret-seeking (go after hidden information or test a suspected lie's seams), leading (presume the answer to pressure a confession), challenge (force or threat to compel an answer).
+EXAMPLES — the LENGTH and PLAINNESS to hit (a different character and campaign; borrow none of these facts). Short, spoken, in character — and the strategy stays in the read, never the line:
+- question: "You've run this place a long time, haven't you? What's it really like here?" | tag: open-probe | read: An easy way in; how they sum the town up tells me what they actually care about.
+- question: "People keep saying the Ashen Hand runs the docks. That true?" | tag: rumor-test | read: Put the rumor to them flat and watch — do they confirm it, or get careful?
+- question: "Straight answer: are you still taking their coin?" | tag: challenge | read: A hard push, only worth it because we're past pretending. I want the flinch as much as the words.
+Not this: "You've been here long enough to know how this place actually works. What's the first thing a stranger ought to understand — and I mean what's true, not what's on the welcome sign." That's a writer performing. A real person just asks: "What should a newcomer know about this place?"
 
-FUNNEL THE SPREAD. Range across the costs — open with at least one builds/low question, and reserve the high-cost probes for when they are earned. Do NOT hand a stranger a secret-seeking or challenge line: gauge STANDING from the PC's tie and how each side feels (a sworn friend or a bitter enemy can push where an acquaintance cannot). Mix the aims too — some questions chase the world and its lore, others the character's inner life. Keep every tag distinct across the spread.
+ASK THE GAP, NOT THE KNOWN. Work out silently what the party already has: what's CONFIRMED, what's only (rumored)/(suspected), and what's missing (backstory, motives, loyalties, feelings you don't know). Aim every question at a gap or an unsure lead — never at something already confirmed, or you're asking what you already know. Use a confirmed fact as a CALLBACK to get at what came next; put a rumor or a hunch to them to confirm or deny; open the blank spaces with a broad question.
+
+THE TAG VOCABULARY — grouped by how much trust the question spends:
+- Builds trust: rapport (safe, personal small-talk that puts them at ease), empathetic-disclosure (offer a matching truth or wound of your own first, so they open up in return).
+- Low cost: open-probe (a broad, un-leading opener that just gets them talking), lore (history, customs, places, factions — the setting itself), rumor-test (put a known rumor to them to confirm or deny), backstory-dig (their past and how they got here), callback (pick up something already known and ask what came next), flatter (praise them so they want to say more).
+- Medium cost: feelings (ask their emotional state — needs a read of them first), motivation (what they really want or fear), opinion (their take on a THIRD party — trust, grudges, alliances).
+- High cost: secret-seeking (go after hidden information, or push on a lie you suspect), leading (assume the answer to pressure a confession), challenge (use force or a threat to make them answer).
+
+FUNNEL THE SPREAD. On the OPENING round, range across the costs — start with at least one builds/low question and save the high-cost probes for when they're earned. (On follow-ups you've moved past openers — see FOLLOW UP.) Don't hand a stranger a secret-seeking or challenge line: judge STANDING from the PC's tie and how each side feels (a sworn friend or a bitter enemy can push where an acquaintance can't). Mix the aims too — some questions chase the world and its lore, others the character's inner life. Keep every tag distinct across the spread.
 
 FOLLOW THE THREAD. When a thread is given, point most questions at it — their ties to it, what they know of it, how they feel about it — while still varying the type and cost. With no thread, spread across their backstory, motives, feelings, connections, and any open rumors.
 
-FOLLOW UP. If a "conversation so far" is given — things the target has already said — your questions are FOLLOW-UPS: dig into what they just revealed, pull the loose thread in their answer, or open the next gap it exposed. Don't re-ask what they've already answered, and let the most recent thing they said steer the spread.
+FOLLOW UP. When a "conversation so far" is given (the questions already asked and what the target said back), you're mid-conversation — your four questions are FOLLOW-UPS, not a fresh start:
+- PROGRESS, DON'T RESTART. You've already spent your openers, so don't lead with more rapport or broad open-probes. Take the specific thread the last answer opened and push it — go deeper, or into the gap it just exposed. Reach for the medium- and high-cost probes the conversation has now earned.
+- READ HOW THEY ANSWERED, not just what. Did they answer straight, dodge, hedge, over-share, or clearly lie? Press a dodge, deepen an opening, corner a lie, ease off if they bristled — the way they answered is half the information.
+- Don't re-ask what they've already answered, and don't just repeat the tags you offered last turn — move to new angles.
+- Let the MOST RECENT thing they said steer the spread.
 
-GROUND IT. Everything you treat as fact — who they are tied to, what is resolved, what is only suspected — comes from the notes, connections, tie, and state you are given; invent nothing. Respect the current state: if they are marked [ended]/[presumed ended], or you are reconstructing an earlier session, ask only what the PC could know then, and phrase accordingly.`
+GROUND IT. Everything you treat as fact — who they're tied to, what's resolved, what's only suspected — comes from the notes, connections, tie, and state you're given; invent nothing. Respect the current state: if they're marked [ended]/[presumed ended], or you're reconstructing an earlier session, ask only what the PC could know then, and phrase accordingly.`
 
 /**
  * The structured-output schema for Converse (ADR-034): a spread of tagged questions, nothing else. JSON
@@ -1558,8 +1573,8 @@ export function buildConverseUserContent(p: {
   connections: string | null
   tie: string | null
   focus?: string
-  /** Follow-up loop (ADR-049): the target's prior answers this conversation, oldest-first. */
-  history?: string[]
+  /** Follow-up loop (ADR-049): the conversation so far — question asked + answer, per turn, oldest-first. */
+  history?: { question: string; answer: string }[]
   anchorLabel: string | null
   asOf: boolean
   pcName: string
@@ -1618,10 +1633,12 @@ export function buildConverseUserContent(p: {
     })
   }
   if (p.history?.length) {
-    const said = p.history.map((a, i) => `${i + 1}. ${a}`).join('\n')
+    const said = p.history
+      .map((h, i) => `${i + 1}. You asked: "${h.question}" — They said: "${h.answer}"`)
+      .join('\n')
     content.push({
       type: 'text',
-      text: `The conversation so far — what ${p.target.name} has already said to ${p.pcName}, in order (most recent last):\n${said}\n\nThese are FOLLOW-UPS: build on what they've revealed (especially the latest), and don't re-ask what they've already answered.`
+      text: `The conversation so far — the questions ${p.pcName} asked and what ${p.target.name} said back, in order (most recent last):\n${said}\n\nThese are FOLLOW-UPS (see the FOLLOW UP rule): build on the thread the latest answer opened, and don't re-ask what they've already answered.`
     })
   }
   content.push({
@@ -1645,8 +1662,8 @@ export interface ConverseParams {
   connections: string | null
   tie: string | null
   focus?: string
-  /** Follow-up loop (ADR-049): the target's prior answers this conversation, oldest-first. */
-  history?: string[]
+  /** Follow-up loop (ADR-049): the conversation so far — question asked + answer, per turn, oldest-first. */
+  history?: { question: string; answer: string }[]
   anchorLabel: string | null
   asOf: boolean
   context: SuggestContext

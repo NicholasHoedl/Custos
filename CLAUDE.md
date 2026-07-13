@@ -121,13 +121,22 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `CONVERSE_TAGS` taxonomy; a static `CONVERSE_TAG_META` (aim + trust-cost) drives the renderer's funnel
   ordering + badges (the model emits only the tag). `validateConverse` mirrors Counsel's `validateMoment`
   (distinct tags, **exactly 4** — cap 4/floor 4, ADR-049 — retry-once). The card renders the `question`
-  line in double quotes (it's spoken dialogue); the `read` is the muted strategic note. **Converse follow-up
-  loop + speed (ADR-049):**
-  `ConverseRequest.history?: string[]` (the target's prior answers, oldest-first) → the model returns
-  FOLLOW-UP questions (`buildConverseUserContent` folds a "conversation so far" block; a new
-  `CONVERSE_INSTRUCTIONS` paragraph); `use-converse` holds a `ConverseTurn[]` thread + a `followUp(answer)`,
-  and `ConverseView` renders the thread (a "They said…" breadcrumb + the funnel spread per turn) with a
-  "what did they say?" composer. Per-query **speed** (`speed?: 'quick'|'deep'`, quick=Sonnet+medium, resolved
+  line in double quotes (it's spoken dialogue); the `read` is the muted strategic note. **Dialogue quality:**
+  `CONVERSE_INSTRUCTIONS` keeps questions in-character but SHORT + spoken + flourish-free (a "SOUND LIKE A
+  REAL PERSON" section mirroring Recall's RESTRAINT/RIGHT-SIZE, a **few-shot** of tight example questions,
+  and a firm boundary that the `question` is ONLY what's said out loud — all strategy stays in the `read`);
+  this is prompt tuning, NOT a plain-English pivot like Counsel (Converse stays in-voice). **Converse
+  follow-up loop + speed (ADR-049):**
+  `ConverseRequest.history?: { question, answer }[]` (the EXCHANGES so far — the question the player used +
+  the target's answer, oldest-first; mirrors Recall) → the model returns FOLLOW-UP questions that build on
+  the specific exchange (`buildConverseUserContent` renders each as `You asked "Q" — They said "A"`; the
+  `CONVERSE_INSTRUCTIONS` FOLLOW UP rule says PROGRESS not restart — skip openers, react to how they
+  answered, don't repeat last turn's tags; FUNNEL's "open with a low-cost question" is scoped to the OPENING
+  round). To follow up you MUST **pick one of the four cards** (a "Follow up on this →" button on the latest
+  spread sets `selectedQuestion`; the answer composer only appears after a pick), then paraphrase the answer.
+  `use-converse` holds a `ConverseTurn[]` thread (each turn's `asked: {question,answer}|null`) + `followUp
+  (question, answer)`; `ConverseView` renders the thread (a **"You asked / They said"** breadcrumb + the
+  funnel spread per turn) in a **single wide column** (`PaneBody className="max-w-4xl"`, cards stacked). Per-query **speed** (`speed?: 'quick'|'deep'`, quick=Sonnet+medium, resolved
   once in `converse.service`). **Voice restored for Converse** (its questions are dialogue in the PC's voice)
   via `suggestSystemBlocks(ctx, instructions, includeVoice)` — `buildConverseSystem` passes `true`; Counsel/
   Directions stay voice-free (ADR-048). Converse grounds by **direct fetch** (`getEntityContext` +
