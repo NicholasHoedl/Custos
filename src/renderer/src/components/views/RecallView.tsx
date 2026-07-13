@@ -23,6 +23,7 @@ import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { PromptStarters } from '@renderer/components/recall/PromptStarters'
 import { useLensSave } from '@renderer/components/lens/LensResultBar'
 import { LensIdle } from '@renderer/components/lens/LensIdle'
+import { LensPromptInfo } from '@renderer/components/lens/LensPromptInfo'
 import { RECALL_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { recallProse } from '@renderer/lib/lens-prose'
@@ -88,20 +89,23 @@ export function RecallView() {
         icon={Search}
         title="Lore"
         action={
-          (query.trim().length > 0 || hasThread || recall.status !== 'idle') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => {
-                recall.reset()
-                setQuery('')
-              }}
-            >
-              <RotateCcw className="size-3.5" />
-              Reset
-            </Button>
-          )
+          <div className="flex items-center gap-1">
+            <LensPromptInfo lens="recall" />
+            {(query.trim().length > 0 || hasThread || recall.status !== 'idle') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => {
+                  recall.reset()
+                  setQuery('')
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+                Reset
+              </Button>
+            )}
+          </div>
         }
       />
       <PaneBody size="reading">

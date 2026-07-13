@@ -26,6 +26,48 @@ export const TOOL_BLURBS: Record<string, string> = {
     'About to talk to someone? Get a spread of in-character questions to draw them out, from safe openers to pointed probes.'
 }
 
+/** The three AI lenses, the ones whose output is only as good as the prompt. */
+export type LensKey = 'recall' | 'suggest' | 'converse'
+
+/**
+ * "How to prompt this tool well" copy for each AI lens's header info popover
+ * (`components/lens/LensPromptInfo.tsx`). `name` names the tool ("What Lore does" / "About Lore"), `does`
+ * is a one-line what-it-does, and `tips` are the prompt best-practices. Kept here beside `TOOL_BLURBS` so
+ * all lens help copy shares one home and the three popovers can't drift.
+ */
+export const LENS_PROMPT_TIPS: Record<LensKey, { name: string; does: string; tips: string[] }> = {
+  recall: {
+    name: 'Lore',
+    does: 'Searches your notes and writes a cited answer in plain language.',
+    tips: [
+      'Name the person, place, or event you’re asking about — retrieval matches on names.',
+      'Ask one clear question at a time.',
+      'Follow-ups stay in context — build on the last answer instead of restating it.',
+      'Use “as of” to ask about an earlier session without spoiling what came later.'
+    ]
+  },
+  suggest: {
+    name: 'Counsel',
+    does: 'Reads your character and the campaign and offers ideas that fit them — four tagged ways to play a moment, or story directions grounded in your open quests and the party.',
+    tips: [
+      'Set the scene — where you are and who’s present sharpens the read.',
+      'Describe a concrete moment, not a vague situation.',
+      'Name a goal to bias the options toward it.',
+      'Use “as of” to ask without spoiling what your character doesn’t know yet.'
+    ]
+  },
+  converse: {
+    name: 'Converse',
+    does: 'Gives a spread of in-character questions to ask someone — from safe openers to pointed probes.',
+    tips: [
+      'Pick who you’re talking WITH — an NPC or another player’s character.',
+      'Name a thread to steer them (a person, topic, or rumor), or leave it blank to draw them out generally.',
+      'To follow up, pick the question you actually asked, then paraphrase their answer — the next questions build on it.',
+      'Use “as of” to ask only what your character could know at that point.'
+    ]
+  }
+}
+
 /** The tools, grouped into the three teaching screens (nav order within each). */
 export const TOUR_GROUPS: Record<
   'tour-capture' | 'tour-world' | 'tour-ask',
@@ -45,7 +87,11 @@ export interface LoopStep {
 // The core ritual. Icons match the real buttons: BookCheck = the "Close out session" button; the rest
 // read as their step. Rendered by LoopExplainer (Chronicle card) and the Quickstart guide.
 export const LOOP_STEPS: LoopStep[] = [
-  { icon: NotebookPen, label: 'Chronicle', gloss: 'Jot what happens at the table, in plain lines.' },
+  {
+    icon: NotebookPen,
+    label: 'Chronicle',
+    gloss: 'Jot what happens at the table, in plain lines.'
+  },
   { icon: BookCheck, label: 'Close out', gloss: 'Turn the session’s log into entities & notes.' },
   { icon: Wand2, label: 'Illuminate', gloss: 'Fill in ties & profiles from those notes.' },
   { icon: Library, label: 'Ask', gloss: 'Lore, Counsel & Converse draw on it all.' }

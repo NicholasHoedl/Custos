@@ -100,7 +100,10 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   right `action` slot) over a `PaneBody` (`chrome.tsx`; `PaneShell` was deleted) — page chrome stays compact,
   content identity (entity/session/character names) stays large Fraunces (ADR-047).** The three AI lenses fill
   their idle state via `components/lens/LensIdle.tsx` (starter chips from `lib/lens-starters.ts` that fill the
-  input; + recent history), and Codex reuses the ADR-046 `ENTITY_TYPE_COLOR`/`ENTITY_TYPE_ICON` maps for its
+  input; + recent history), and each lens's `PaneHeader` carries a shared **`LensPromptInfo`**
+  (`components/lens/LensPromptInfo.tsx`) info popover of prompt best-practices — copy in `lib/guide-content.tsx`
+  `LENS_PROMPT_TIPS` (it generalized the old inline `CounselInfo`, so all three popovers share one shape). Codex
+  reuses the ADR-046 `ENTITY_TYPE_COLOR`/`ENTITY_TYPE_ICON` maps for its
   filter chips + list badges (as do `EntityBadge`, `EntityDetail`, the command palette).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
   (`capture/TranscribeDialog.tsx`; `views/ImportView.tsx` is deleted, `'import'` left `ViewKey`). The

@@ -43,6 +43,7 @@ import {
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { useLensSave } from '@renderer/components/lens/LensResultBar'
 import { LensIdle } from '@renderer/components/lens/LensIdle'
+import { LensPromptInfo } from '@renderer/components/lens/LensPromptInfo'
 import { CONVERSE_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { converseProse } from '@renderer/lib/lens-prose'
@@ -122,22 +123,25 @@ export function ConverseView() {
         icon={MessagesSquare}
         title="Converse"
         action={
-          (Boolean(targetId) || converse.status !== 'idle') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => {
-                converse.reset()
-                setTargetId(null)
-                setThread('')
-                setSelectedQuestion(null)
-              }}
-            >
-              <RotateCcw className="size-3.5" />
-              Reset
-            </Button>
-          )
+          <div className="flex items-center gap-1">
+            <LensPromptInfo lens="converse" />
+            {(Boolean(targetId) || converse.status !== 'idle') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => {
+                  converse.reset()
+                  setTargetId(null)
+                  setThread('')
+                  setSelectedQuestion(null)
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+                Reset
+              </Button>
+            )}
+          </div>
         }
       />
       <PaneBody size="reading" className="max-w-4xl">

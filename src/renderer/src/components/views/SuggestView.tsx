@@ -41,18 +41,12 @@ import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { SceneControls } from '@renderer/components/scene/SceneControls'
 import { LensResultBar } from '@renderer/components/lens/LensResultBar'
 import { LensIdle } from '@renderer/components/lens/LensIdle'
+import { LensPromptInfo } from '@renderer/components/lens/LensPromptInfo'
 import { SUGGEST_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { directionsProse, momentsProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
-import {
-  Banner,
-  EmptyState,
-  InfoPopover,
-  PaneHeader,
-  ProgressBar,
-  SetupCard
-} from '@renderer/components/chrome'
+import { Banner, EmptyState, PaneHeader, ProgressBar, SetupCard } from '@renderer/components/chrome'
 
 type Speed = 'quick' | 'deep'
 
@@ -158,7 +152,7 @@ export function SuggestView() {
         title="Counsel"
         action={
           <div className="flex items-center gap-1">
-            <CounselInfo />
+            <LensPromptInfo lens="suggest" />
             {(situation.trim().length > 0 ||
               goal.trim().length > 0 ||
               suggest.status !== 'idle') && (
@@ -472,26 +466,6 @@ function DirectionsList({ suggestions }: { suggestions: StorySuggestion[] }) {
         )
       })}
     </div>
-  )
-}
-
-function CounselInfo() {
-  return (
-    <InfoPopover label="About Counsel">
-      <p className="text-sm font-medium text-foreground">What Counsel does</p>
-      <p className="text-muted-foreground">
-        Reads your main character and the campaign and offers ideas that fit them — four tagged ways
-        to play a moment, or story directions grounded in your open quests and the party. It thinks
-        as your character; it doesn&apos;t roll dice or decide outcomes.
-      </p>
-      <p className="text-sm font-medium text-foreground">Get the best results</p>
-      <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
-        <li>Set the scene — where you are and who&apos;s present sharpens the read.</li>
-        <li>Describe a concrete moment, not a vague situation.</li>
-        <li>Name a goal to bias the options toward it.</li>
-        <li>Use “as of” to ask without spoiling what your character doesn&apos;t know yet.</li>
-      </ul>
-    </InfoPopover>
   )
 }
 
