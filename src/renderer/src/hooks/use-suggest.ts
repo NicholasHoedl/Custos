@@ -1,9 +1,19 @@
 import { useCallback, useRef, useState } from 'react'
-import type { SuggestMode, SuggestResult } from '@shared/suggest-types'
+import type { MomentSuggestion, SuggestMode, SuggestResult } from '@shared/suggest-types'
 import { ledger } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/app-store'
 
 export type SuggestStatus = 'idle' | 'thinking' | 'done' | 'error'
+
+/** Everything past the situation + mode: as-of clamp, goal bias, speed tier, and the refine re-roll. */
+export interface AskOptions {
+  asOfSession?: number
+  goal?: string
+  speed?: 'quick' | 'deep'
+  /** Refine (attitudes only): a nudge + the spread being reshaped — re-rolls a fresh six. */
+  refinement?: string
+  previous?: MomentSuggestion[]
+}
 
 interface SuggestState {
   status: SuggestStatus
@@ -19,7 +29,7 @@ const IDLE: SuggestState = { status: 'idle', result: null, error: null }
  * the campaign's open threads).
  */
 export function useSuggest(): SuggestState & {
-  ask: (situation: string, mode: SuggestMode, asOfSession?: number, goal?: string) => void
+  ask: (situation: string, mode: SuggestMode, opts?: AskOptions) => void
   cancel: () => void
   reset: () => void
 } {
@@ -33,7 +43,7 @@ export function useSuggest(): SuggestState & {
   const requestIdRef = useRef<string | null>(null)
 
   const ask = useCallback(
-    (situation: string, mode: SuggestMode, asOfSession?: number, goal?: string) => {
+    (situation: string, mode: SuggestMode, opts?: AskOptions) => {
       if (!activeCampaignId || !activePcId) return
       if (mode === 'attitudes' && !situation.trim()) return
       const token = ++reqRef.current
@@ -46,10 +56,13 @@ export function useSuggest(): SuggestState & {
           campaignId: activeCampaignId,
           pcId: activePcId,
           situation: situation.trim(),
-          goal: goal?.trim() || undefined,
+          goal: opts?.goal?.trim() || undefined,
           mode,
           scene,
-          asOfSession
+          asOfSession: opts?.asOfSession,
+          speed: opts?.speed,
+          refinement: opts?.refinement,
+          previous: opts?.previous
         })
         .then((result) => {
           if (reqRef.current === token) setState({ status: 'done', result, error: null })

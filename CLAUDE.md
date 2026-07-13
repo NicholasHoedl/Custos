@@ -130,6 +130,16 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (ADR-027) — Recall is scene-free. **`flaws`** is a promoted entity field (like `traits`/`goals` — schema/serialize/entity.service)
   that feeds the persona. **Entity embeddings now index `traits`/`goals`/`flaws` + salient attributes**
   (`embedding-index.ts` `entityText`); editing that function re-embeds ALL entities on next launch.
+  **Counsel table-ergonomics overhaul:** mirrors Lore's per-query **speed** — `SuggestRequest.speed`
+  `'quick'` (Sonnet 4.6 + medium effort, the DEFAULT) vs `'deep'` (Settings model/effort), resolved once
+  in `suggest.service`. `SceneControls` now defaults **collapsed** (persisted to `localStorage`
+  `ledger.sceneOpen`) so the situation box leads. `MomentCard` is **compact** — tag + action + a `Dices`
+  mechanic badge up front, pillar/teamwork/rationale behind a per-card expand. A **Refine** row (nudge
+  chips: Bolder / More cautious / De-escalate / Fresh angle) re-rolls the SAME moment via
+  `SuggestRequest.refinement` + `previous` (prior spread folded into the user turn, `buildSuggestUserContent`)
+  — still single-shot, it REPLACES the spread (no transcript). `use-suggest.ask(situation, mode, opts)`
+  carries speed/refinement/previous; IPC/preload forward the request whole (no change). Still ADR-026's
+  exactly-6 `validateMoment`.
 - **Main character = the mandatory single lens (ADR-029).** Each campaign has ONE `pc` main character
   (`campaign.main_character_id`), created WITH the campaign (`createCampaign({mainCharacterName})`, atomic).
   There is **no active-PC switcher** — the store's `activePcId` is locked to the MC (the `MainCharacterBadge`

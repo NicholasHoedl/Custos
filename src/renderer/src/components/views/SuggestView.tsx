@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   BookOpen,
+  ChevronDown,
   Compass,
+  Dices,
   Download,
   Flag,
   Heart,
@@ -59,6 +61,11 @@ import {
   SetupCard
 } from '@renderer/components/chrome'
 
+type Speed = 'quick' | 'deep'
+
+/** Preset nudges for the per-moment re-roll — each re-asks the same moment reshaped toward it. */
+const REFINE_NUDGES = ['Bolder', 'More cautious', 'De-escalate', 'Fresh angle'] as const
+
 const CATEGORY_ICONS: Record<SuggestCategory, LucideIcon> = {
   quest: ScrollText,
   npc: User,
@@ -78,6 +85,7 @@ export function SuggestView() {
   const suggest = useSuggest()
   const [situation, setSituation] = useState('')
   const [mode, setMode] = useState<SuggestMode>('attitudes')
+  const [speed, setSpeed] = useState<Speed>('quick')
   const { sessions } = useSessions(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
   const [goal, setGoal] = useState('')
@@ -133,7 +141,21 @@ export function SuggestView() {
   function submit() {
     if (!canSubmit) return
     setAsked(situation.trim())
-    suggest.ask(situation, mode, asOf ?? undefined, goal)
+    suggest.ask(situation, mode, { asOfSession: asOf ?? undefined, goal, speed })
+  }
+
+  // Re-roll the spread reshaped toward a nudge (attitudes only) — reuses the same moment, scene, and
+  // speed, passing the current six as `previous` so the model returns genuinely different options.
+  function refine(nudge: string) {
+    const r = suggest.result
+    if (thinking || !asked || !(r?.ok && r.mode === 'attitudes')) return
+    suggest.ask(asked, 'attitudes', {
+      asOfSession: asOf ?? undefined,
+      goal,
+      speed,
+      refinement: nudge,
+      previous: r.recommendations
+    })
   }
 
   return (
@@ -247,8 +269,9 @@ export function SuggestView() {
                 }}
               />
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <ModeToggle mode={mode} setMode={changeMode} />
+                  <SpeedToggle speed={speed} setSpeed={setSpeed} />
                   <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
                 </div>
                 {thinking ? (
@@ -294,10 +317,27 @@ export function SuggestView() {
             {suggest.status === 'done' &&
               suggest.result?.ok &&
               suggest.result.mode === 'attitudes' && (
-                <div className="grid gap-3 @lg:grid-cols-2 @4xl:grid-cols-3">
-                  {suggest.result.recommendations.map((r) => (
-                    <MomentCard key={r.primaryTag} rec={r} />
-                  ))}
+                <div className="space-y-4">
+                  <div className="grid gap-3 @lg:grid-cols-2 @4xl:grid-cols-3">
+                    {suggest.result.recommendations.map((r) => (
+                      <MomentCard key={r.primaryTag} rec={r} />
+                    ))}
+                  </div>
+                  {/* Re-roll the same moment, nudged — replaces the spread rather than stacking a transcript. */}
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                    <span className="inscribed text-[10px]">Refine</span>
+                    {REFINE_NUDGES.map((n) => (
+                      <Button
+                        key={n}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-full text-xs font-normal"
+                        onClick={() => refine(n)}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -350,13 +390,51 @@ function ModeToggle({ mode, setMode }: { mode: SuggestMode; setMode: (m: Suggest
   )
 }
 
+/** Quick (Sonnet — table-fast) vs Deep (the Settings "Counsel model" — fuller reasoning). Per-query. */
+function SpeedToggle({ speed, setSpeed }: { speed: Speed; setSpeed: (s: Speed) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
+      <button
+        type="button"
+        onClick={() => setSpeed('quick')}
+        title="Sonnet — faster options at the table"
+        className={cn(
+          'rounded px-2 py-1 transition-colors',
+          speed === 'quick'
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Quick
+      </button>
+      <button
+        type="button"
+        onClick={() => setSpeed('deep')}
+        title="Your Settings model — fuller reasoning"
+        className={cn(
+          'rounded px-2 py-1 transition-colors',
+          speed === 'deep'
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Deep
+      </button>
+    </div>
+  )
+}
+
 const PILLAR_ICON: Record<SuggestPillar, LucideIcon> = {
   combat: Swords,
   social: MessagesSquare,
   exploration: Compass
 }
 
+// Compact by default so six cards scan fast under table pressure: the front carries the tag(s), the
+// concrete action, and a prominent 5e-mechanic badge; pillar/teamwork/rationale tuck behind a per-card
+// expand (the house Button+Chevron idiom — no Collapsible primitive exists).
 function MomentCard({ rec }: { rec: MomentSuggestion }) {
+  const [expanded, setExpanded] = useState(false)
   const PillarIcon = PILLAR_ICON[rec.pillar]
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-card/60 p-4">
@@ -372,25 +450,36 @@ function MomentCard({ rec }: { rec: MomentSuggestion }) {
             {tagLabel(t)}
           </span>
         ))}
-        <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-          <PillarIcon className="size-3.5" />
-          {PILLAR_LABELS[rec.pillar]}
-        </span>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Hide details' : 'Show details'}
+          className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronDown className={cn('size-4 transition-transform', expanded && 'rotate-180')} />
+        </button>
       </div>
       <p className="text-[15px] leading-relaxed text-foreground/90">{rec.action}</p>
-      <div className="rounded-md border border-border/70 bg-muted/20 px-2.5 py-1.5">
-        <p className="inscribed mb-0.5 text-[10px]">Check</p>
-        <p className="text-xs leading-relaxed text-foreground/80">{rec.mechanic}</p>
+      <div className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary/90">
+        <Dices className="size-3.5 shrink-0" />
+        <span className="leading-snug">{rec.mechanic}</span>
       </div>
-      {rec.teamwork && (
-        <div className="rounded-md border border-primary/25 bg-primary/5 px-2.5 py-1.5">
-          <p className="inscribed mb-0.5 text-[10px]">With the party</p>
-          <p className="text-xs leading-relaxed text-foreground/80">{rec.teamwork}</p>
+      {expanded && (
+        <div className="space-y-2 border-t border-border pt-2.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <PillarIcon className="size-3.5" />
+            {PILLAR_LABELS[rec.pillar]}
+          </div>
+          {rec.teamwork && (
+            <div className="rounded-md border border-primary/25 bg-primary/5 px-2.5 py-1.5">
+              <p className="inscribed mb-0.5 text-[10px]">With the party</p>
+              <p className="text-xs leading-relaxed text-foreground/80">{rec.teamwork}</p>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">{rec.rationale}</p>
         </div>
       )}
-      <p className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">
-        {rec.rationale}
-      </p>
     </div>
   )
 }

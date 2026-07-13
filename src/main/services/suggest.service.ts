@@ -193,8 +193,12 @@ export async function suggest(
     const scene = resolveScene(ctx, req.scene, pcId, asOf)
     const seen = new Set<string>()
     const relItems: { name: string; views: RelationshipView[] }[] = []
-    const stateItems: { name: string; type: string; status: string | null; lifecycle: Lifecycle }[] =
-      []
+    const stateItems: {
+      name: string
+      type: string
+      status: string | null
+      lifecycle: Lifecycle
+    }[] = []
     // Pin the current-scene entities into grounding first so they're always present, even off-vector.
     gatherPinned(ctx, scene.pinned, seen, relItems, stateItems, asOf)
     // One batched read for the retrieved entities (instead of a getEntity per chunk).
@@ -230,7 +234,12 @@ export async function suggest(
           })()
     const state = formatState(anchorLabel, stateItems, asOf !== undefined)
 
-    const { suggestModel, suggestEffort } = getSettings()
+    // Per-query speed (Counsel overhaul): 'quick' runs Sonnet + medium effort for a table-fast spread;
+    // 'deep' (or unset) uses the Settings Counsel model/effort. Both modes read these shared locals.
+    const settings = getSettings()
+    const quick = req.speed === 'quick'
+    const suggestModel = quick ? 'claude-sonnet-4-6' : settings.suggestModel
+    const suggestEffort: 'medium' | 'high' = quick ? 'medium' : settings.suggestEffort
 
     if (mode === 'directions') {
       // Open-ended: ground in the campaign's unfinished business + the rest of the party.
@@ -284,6 +293,8 @@ export async function suggest(
         state,
         scene: scene.block,
         goal: req.goal,
+        refinement: req.refinement,
+        previous: req.previous,
         context,
         model: suggestModel,
         effort: suggestEffort,

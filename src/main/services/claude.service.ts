@@ -558,7 +558,7 @@ SPAN THE PILLARS — DON'T CLUSTER. Across the six, cover more than one pillar a
 
 TEAMWORK — THIS IS A PARTY GAME. When party members are present in the scene, AT LEAST ONE option must coordinate with a NAMED one of them: the Help action (grant them advantage), setting up their strength, or splitting roles ("while Balasar keeps the table talking, I…"). Name only party members the scene says are present. For solo moves, leave TEAMWORK empty.
 
-PLAY THE WHOLE CHARACTER. Let the brief's values, fears, wants, flaws, and stakes drive the eight — a blunt zealot and a greedy rogue facing the same scene should not get the same eight. AT LEAST ONE option should follow the character's FLAW, fear, or a bond even when it's not the smart play — the move they'd make because of who they are, not despite it. And favor moves this character could actually pull off: lean on their class and level; don't hand a delicate con to someone with no gift for it, or a feat of strength to the frail. Not every option needs a race or class tag.
+PLAY THE WHOLE CHARACTER. Let the brief's values, fears, wants, flaws, and stakes drive the six — a blunt zealot and a greedy rogue facing the same scene should not get the same six. AT LEAST ONE option should follow the character's FLAW, fear, or a bond even when it's not the smart play — the move they'd make because of who they are, not despite it. And favor moves this character could actually pull off: lean on their class and level; don't hand a delicate con to someone with no gift for it, or a feat of strength to the frail. Not every option needs a race or class tag.
 
 GOAL. If the player states a goal, bias the six toward achieving it — but keep them distinct (different pillars, tags, and risk levels), not six ways to do the one thing.
 
@@ -573,7 +573,7 @@ PRESENT SCENE. A "present scene" block may set where the character is, the time,
 /**
  * The structured-output schema for Suggest's "in the moment" mode. JSON Schema cannot enforce array
  * length or tag uniqueness (minItems/maxItems/uniqueItems are unsupported) — `suggest.service`
- * validates "exactly 5 with distinct primary tags" and cleans the secondary tags in code. The tag
+ * validates "exactly 6 with distinct primary tags" and cleans the secondary tags in code. The tag
  * enums and required fields ARE enforced here. Every object needs additionalProperties:false.
  */
 const SUGGEST_SCHEMA = {
@@ -670,7 +670,9 @@ export function buildSuggestUserContent(
   relationships?: string | null,
   state?: string | null,
   scene?: string | null,
-  goal?: string | null
+  goal?: string | null,
+  refinement?: string | null,
+  previous?: MomentSuggestion[] | null
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (chunks.length) {
@@ -705,6 +707,13 @@ export function buildSuggestUserContent(
       text: `What the player is trying to achieve — bias the options toward this goal (without collapsing their variety):\n${goal.trim()}`
     })
   }
+  if (refinement?.trim() && previous?.length) {
+    const prior = previous.map((p) => `- ${p.primaryTag}: ${p.action}`).join('\n')
+    content.push({
+      type: 'text',
+      text: `You already offered these six options for THIS exact moment:\n${prior}\n\nThe player wants a different take: ${refinement.trim()}. Give a FRESH spread of six — reshaped toward that, with new actions and (mostly) new primary tags. Don't repeat the options above.`
+    })
+  }
   content.push({ type: 'text', text: `The situation right now:\n${situation}` })
   return content
 }
@@ -716,6 +725,10 @@ export interface SuggestParams {
   state?: string | null
   scene?: string | null
   goal?: string | null
+  /** Refine (attitudes re-roll): a nudge + the prior spread — folds a "give a fresh six that's X" block
+   *  into the user turn. Both empty on a first pass. */
+  refinement?: string | null
+  previous?: MomentSuggestion[] | null
   context: SuggestContext
   model: string
   effort: 'medium' | 'high'
@@ -1297,7 +1310,9 @@ export async function suggest(params: SuggestParams): Promise<MomentSuggestion[]
       params.relationships,
       params.state,
       params.scene,
-      params.goal
+      params.goal,
+      params.refinement,
+      params.previous
     ),
     arrayKey: 'recommendations',
     signal: params.signal

@@ -25,6 +25,7 @@ import {
 } from '@renderer/components/ui/command'
 
 const SCENE_NONE = '__none__'
+const SCENE_OPEN_KEY = 'ledger.sceneOpen'
 
 function isOpenQuestStatus(status: string | null): boolean {
   return !status || !['completed', 'failed'].includes(status.toLowerCase())
@@ -36,7 +37,26 @@ function isOpenQuestStatus(status: string | null): boolean {
 // entity-backed selector hides when its list is empty. Collapsing only hides the controls — the selected
 // scene (in app-store) stays active.
 export function SceneControls({ campaignId }: { campaignId: string }) {
-  const [open, setOpen] = useState(true)
+  // Collapsed by default so the situation box is the focus; the collapsed dot flags a set scene. The
+  // open/closed choice sticks across restarts (localStorage), mirroring how the scene VALUES persist.
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SCENE_OPEN_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  function toggleOpen() {
+    setOpen((v) => {
+      const next = !v
+      try {
+        localStorage.setItem(SCENE_OPEN_KEY, next ? '1' : '0')
+      } catch {
+        // ignore storage failures — the toggle still works for this session
+      }
+      return next
+    })
+  }
   const scene = useAppStore((s) => s.scene)
   const sceneActive =
     Boolean(scene.locationId) ||
@@ -48,7 +68,7 @@ export function SceneControls({ campaignId }: { campaignId: string }) {
     <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-2">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-2"
       >
@@ -294,7 +314,11 @@ function PresentEntitiesSelector({ campaignId }: { campaignId: string }) {
               {groups.map((g) => (
                 <CommandGroup key={g.type} heading={ENTITY_TYPE_LABELS[g.type]}>
                   {g.items.map((e) => (
-                    <CommandItem key={e.id} value={`${e.name} ${e.id}`} onSelect={() => toggle(e.id)}>
+                    <CommandItem
+                      key={e.id}
+                      value={`${e.name} ${e.id}`}
+                      onSelect={() => toggle(e.id)}
+                    >
                       <Check
                         className={cn('size-4', selected.has(e.id) ? 'opacity-100' : 'opacity-0')}
                       />

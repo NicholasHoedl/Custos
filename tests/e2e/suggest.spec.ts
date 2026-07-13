@@ -37,4 +37,20 @@ test('Counsel: a charged moment returns six in-character option cards', async ()
     page.getByText('Offer a calm compromise that gives them a way to save face.')
   ).toBeVisible()
   await expect(page.getByText('Protective')).toBeVisible()
+
+  // Compact cards (overhaul): the rationale is tucked behind a per-card expand — hidden until the
+  // chevron is clicked. The mechanic badge, by contrast, stays on the always-visible front.
+  await expect(page.getByText('Persuasion (CHA) vs. their Insight')).toBeVisible()
+  await expect(page.getByText('De-escalates without conceding anything real.')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show details' }).first().click()
+  await expect(page.getByText('De-escalates without conceding anything real.')).toBeVisible()
+
+  // Refine (per-moment re-roll): a nudge chip re-asks the SAME moment and replaces the spread — the
+  // freshly mounted cards come back collapsed, so the detail we just expanded is hidden again. (The
+  // speed toggle is transparent to the fake seam, which returns the canned six regardless.)
+  await page.getByRole('button', { name: 'Bolder' }).click()
+  await expect(page.getByText('De-escalates without conceding anything real.')).toHaveCount(0)
+  await expect(
+    page.getByText('Offer a calm compromise that gives them a way to save face.')
+  ).toBeVisible()
 })

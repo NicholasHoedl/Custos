@@ -177,6 +177,14 @@ export interface SuggestRequest {
   scene?: SceneContext
   /** Chronology (ADR-017): reconstruct "as of" this session NUMBER (retrieval + state clamped ≤ N). */
   asOfSession?: number
+  /** Per-query speed: 'quick' = Sonnet + medium effort (table-fast); 'deep'/unset = the Settings
+   *  Counsel model + effort. Mirrors Recall's speed toggle. */
+  speed?: 'quick' | 'deep'
+  /** Refine (attitudes only): a short nudge to reshape the spread — "Bolder", "De-escalate", … When set
+   *  with `previous`, the model re-rolls a fresh six adjusted toward it instead of a first pass. */
+  refinement?: string
+  /** The spread being refined, so the re-roll produces genuinely different options (not a repeat). */
+  previous?: MomentSuggestion[]
 }
 
 export type SuggestFailureReason =
