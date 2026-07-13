@@ -157,7 +157,10 @@ export function InfoPopover({
           <Info className="size-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align={align} className="w-80 space-y-2 text-xs leading-relaxed">
+      <PopoverContent
+        align={align}
+        className="max-h-[75vh] w-96 space-y-2 overflow-y-auto text-xs leading-relaxed"
+      >
         {children}
       </PopoverContent>
     </Popover>

@@ -30,40 +30,56 @@ export const TOOL_BLURBS: Record<string, string> = {
 export type LensKey = 'recall' | 'suggest' | 'converse'
 
 /**
- * "How to prompt this tool well" copy for each AI lens's header info popover
- * (`components/lens/LensPromptInfo.tsx`). `name` names the tool ("What Lore does" / "About Lore"), `does`
- * is a one-line what-it-does, and `tips` are the prompt best-practices. Kept here beside `TOOL_BLURBS` so
- * all lens help copy shares one home and the three popovers can't drift.
+ * Copy for each AI lens's header info popover (`components/lens/LensPromptInfo.tsx`). `name` names the tool
+ * ("What Lore does"), `does` is the one-line what-it-does, `using` is the mechanical how-to, and `query` is
+ * the prompt best-practices — what a query should actually CONTAIN to get the best result. The `query` copy
+ * is validated by a live weak-vs-strong A/B against each lens (grounding held constant): a specific, detailed
+ * query beats a vague one every time — Counsel most starkly (a vague situation makes it guess). Kept beside
+ * `TOOL_BLURBS` so lens help copy shares one home and the three popovers can't drift.
  */
-export const LENS_PROMPT_TIPS: Record<LensKey, { name: string; does: string; tips: string[] }> = {
+export const LENS_PROMPT_TIPS: Record<
+  LensKey,
+  { name: string; does: string; using: string[]; query: string[] }
+> = {
   recall: {
     name: 'Lore',
-    does: 'Searches your notes and writes a cited answer in plain language.',
-    tips: [
-      'Name the person, place, or event you’re asking about — retrieval matches on names.',
-      'Ask one clear question at a time.',
-      'Follow-ups stay in context — build on the last answer instead of restating it.',
-      'Use “as of” to ask about an earlier session without spoiling what came later.'
+    does: "Searches your notes and answers in your character's voice, citing what it drew on.",
+    using: [
+      'One question at a time — follow-ups remember the thread, so build on the last answer.',
+      'Use “as of” to answer as of an earlier session, without spoilers from later ones.'
+    ],
+    query: [
+      'Name the person, place, or thing — it matches your words against note text and entity names, so “Glasstaff” finds far more than “the wizard,” and a bare “him” finds nothing.',
+      'Ask about what you’ve actually recorded — it answers only from your notes, and keeps a rumor a rumor rather than inventing.',
+      'Ask one concrete thing, not a broad “what’s going on?” — a pointed question gets a pointed, right-sized answer instead of a shallow tour.'
     ]
   },
   suggest: {
     name: 'Counsel',
-    does: 'Reads your character and the campaign and offers ideas that fit them — four tagged ways to play a moment, or story directions grounded in your open quests and the party.',
-    tips: [
-      'Set the scene — where you are and who’s present sharpens the read.',
-      'Describe a concrete moment, not a vague situation.',
-      'Name a goal to bias the options toward it.',
-      'Use “as of” to ask without spoiling what your character doesn’t know yet.'
+    does: 'Reads your character and the campaign and offers four ways to play the moment — or, with no situation, story directions from your open threads.',
+    using: [
+      'Set the scene — especially the mode (Combat / Social / Stealth / Downtime…) — so the moves fit the kind of moment.',
+      'Add a goal to point all four options toward it; leave it off for a wider spread.',
+      'Not quite right? Refine re-rolls the same moment bolder or calmer.'
+    ],
+    query: [
+      'Describe the exact moment — who just did or said what, and the choice you’re now facing. “The mayor just admitted he pays the Redbrands, and he’s waiting on our answer” beats “we’re in trouble.”',
+      'Name who’s involved and what’s at stake — the four options anchor to those characters’ real ties to you.',
+      'Vague in, generic out: given only “we’re in trouble,” it guesses at what you mean and hands back safe, middle-of-the-road moves.'
     ]
   },
   converse: {
     name: 'Converse',
-    does: 'Gives a spread of in-character questions to ask someone — from safe openers to pointed probes.',
-    tips: [
+    does: 'Gives four in-character questions to ask someone — from safe openers to pointed probes.',
+    using: [
       'Pick who you’re talking WITH — an NPC or another player’s character.',
-      'Name a thread to steer them (a person, topic, or rumor), or leave it blank to draw them out generally.',
-      'To follow up, pick the question you actually asked, then paraphrase their answer — the next questions build on it.',
-      'Use “as of” to ask only what your character could know at that point.'
+      'To follow up, pick the question you actually asked, then paraphrase their answer — the next four build on it.',
+      'Use “as of” to ask only what your character knew at an earlier session.'
+    ],
+    query: [
+      'Name the specific thing you want to crack — “Does he know who hired the bandits?” aims most of the four questions there, and reaches specifics a blank thread won’t.',
+      'It only knows what you’ve recorded about them — their goals, flaws, and how you two stand. Flesh a thin character out first, or the questions stay thin.',
+      'In a follow-up, include HOW they answered — a dodge, a flinch, a boast — so the next questions push on the tell, not just the words.'
     ]
   }
 }

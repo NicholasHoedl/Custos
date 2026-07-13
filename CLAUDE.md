@@ -101,8 +101,10 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   content identity (entity/session/character names) stays large Fraunces (ADR-047).** The three AI lenses fill
   their idle state via `components/lens/LensIdle.tsx` (starter chips from `lib/lens-starters.ts` that fill the
   input; + recent history), and each lens's `PaneHeader` carries a shared **`LensPromptInfo`**
-  (`components/lens/LensPromptInfo.tsx`) info popover of prompt best-practices — copy in `lib/guide-content.tsx`
-  `LENS_PROMPT_TIPS` (it generalized the old inline `CounselInfo`, so all three popovers share one shape). Codex
+  (`components/lens/LensPromptInfo.tsx`) info popover with a **Using it** how-to + a **Writing a good query**
+  best-practices section — copy in `lib/guide-content.tsx` `LENS_PROMPT_TIPS` (`{name,does,using,query}`; it
+  generalized the old inline `CounselInfo`, so all three popovers share one shape, and the `query` bullets are
+  live weak-vs-strong A/B-validated per lens). Codex
   reuses the ADR-046 `ENTITY_TYPE_COLOR`/`ENTITY_TYPE_ICON` maps for its
   filter chips + list badges (as do `EntityBadge`, `EntityDetail`, the command palette).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
