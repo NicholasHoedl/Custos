@@ -156,7 +156,9 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   ("even in a fight, stay in the fiction"), mandates plain modern English (no in-character register), and
   **`suggestSystemBlocks` no longer appends the MC's voice examples** (they fight plain English; Recall still
   uses them). `validateMoment` enforces **exactly four** distinct-primary options with non-empty
-  title+explanation; `MomentCard` is a FLAT card (tags → title → explanation, no expand), laid out 2-up. An
+  title+explanation; `MomentCard` is a FLAT card (tags → title → explanation, no expand), stacked in a
+  single wide column — `SuggestView` is now `PaneBody size="reading"` + `max-w-4xl` with the composer on top
+  and cards stacked, matching Converse (was a two-column controls|results split with a 2-up card grid). An
   optional `goal` biases the spread. The **scene** (`SceneControls`) grounds **Counsel only** (ADR-027) —
   Recall is scene-free. **`flaws`** is a promoted entity field (schema/serialize/entity.service) feeding the
   persona; **entity embeddings index `traits`/`goals`/`flaws` + salient attributes** (`embedding-index.ts`

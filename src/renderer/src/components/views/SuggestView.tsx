@@ -46,7 +46,14 @@ import { SUGGEST_STARTERS } from '@renderer/lib/lens-starters'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { directionsProse, momentsProse } from '@renderer/lib/lens-prose'
 import { formatRunCost } from '@renderer/lib/format'
-import { Banner, EmptyState, PaneHeader, ProgressBar, SetupCard } from '@renderer/components/chrome'
+import {
+  Banner,
+  EmptyState,
+  PaneBody,
+  PaneHeader,
+  ProgressBar,
+  SetupCard
+} from '@renderer/components/chrome'
 
 type Speed = 'quick' | 'deep'
 
@@ -173,7 +180,7 @@ export function SuggestView() {
           </div>
         }
       />
-      <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col gap-4 p-6">
+      <PaneBody size="reading" className="max-w-4xl">
         {!onb.modelReady ? (
           <SetupCard
             icon={<Download className="size-4" />}
@@ -217,131 +224,126 @@ export function SuggestView() {
           />
         ) : null}
 
-        {/* Controls on the left, the counsel on the right. Collapses to a single column below lg. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto lg:flex-row lg:gap-6 lg:overflow-visible">
-          {/* LEFT — the scene you're in and the moment you're asking about. */}
-          <div className="flex shrink-0 flex-col gap-4 lg:w-[360px] lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-            {/* The scene (where the party is, who's present, the mode) — pinned into Suggest's grounding. */}
-            <SceneControls campaignId={activeCampaignId} />
+        {/* The scene (where the party is, who's present, the mode) — pinned into Suggest's grounding. */}
+        <SceneControls campaignId={activeCampaignId} />
 
-            <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-              {mode === 'attitudes' && (
-                <Input
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  placeholder="Optional goal — what are you trying to achieve? e.g. learn where Glasstaff is"
-                  className="text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault()
-                      submit()
-                    }
-                  }}
-                />
-              )}
-              <Textarea
-                value={situation}
-                onChange={(e) => setSituation(e.target.value)}
-                rows={3}
-                placeholder={
-                  mode === 'attitudes'
-                    ? "e.g. The mayor just admitted he's been paying off the Redbrands. The party turns to you."
-                    : 'Optional — where do things stand? e.g. We just got back to Phandalin after clearing the hideout.'
+        {/* The moment you're asking about — the composer, full width on top (one column, like Converse). */}
+        <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
+          {mode === 'attitudes' && (
+            <Input
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="Optional goal — what are you trying to achieve? e.g. learn where Glasstaff is"
+              className="text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault()
+                  submit()
                 }
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault()
-                    submit()
-                  }
-                }}
-              />
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ModeToggle mode={mode} setMode={changeMode} />
-                  <SpeedToggle speed={speed} setSpeed={setSpeed} />
-                  <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
-                </div>
-                {thinking ? (
-                  <Button variant="outline" size="sm" onClick={suggest.cancel}>
-                    Stop
-                  </Button>
-                ) : (
-                  <Button size="sm" onClick={submit} disabled={!canSubmit}>
-                    Seek counsel
-                  </Button>
-                )}
-              </div>
+              }}
+            />
+          )}
+          <Textarea
+            value={situation}
+            onChange={(e) => setSituation(e.target.value)}
+            rows={3}
+            placeholder={
+              mode === 'attitudes'
+                ? "e.g. The mayor just admitted he's been paying off the Redbrands. The party turns to you."
+                : 'Optional — where do things stand? e.g. We just got back to Phandalin after clearing the hideout.'
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <ModeToggle mode={mode} setMode={changeMode} />
+              <SpeedToggle speed={speed} setSpeed={setSpeed} />
+              <AsOfSelect sessions={sessions} value={asOf} onChange={setAsOf} />
             </div>
-          </div>
-
-          {/* RIGHT — the counsel. Cards lay out by the pane's own width (container query), not the viewport. */}
-          <div className="@container space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-            {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
-
-            {suggest.status === 'idle' && (
-              <LensIdle starters={SUGGEST_STARTERS} recent={recent} onPick={setSituation} />
-            )}
-
-            {thinking && (
-              <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
-                <Sparkles className="size-4 animate-pulse text-primary" />
-                {mode === 'attitudes'
-                  ? 'Weighing how your character would react…'
-                  : 'Looking for where your character would take things…'}
-              </div>
-            )}
-
-            {suggest.status === 'error' && (
-              <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
-                Something went wrong: {suggest.error}
-              </Banner>
-            )}
-
-            {suggest.status === 'done' && suggest.result && !suggest.result.ok && (
-              <FailureBanner reason={suggest.result.reason} />
-            )}
-
-            {suggest.status === 'done' &&
-              suggest.result?.ok &&
-              suggest.result.mode === 'attitudes' && (
-                <div className="space-y-4">
-                  <div className="grid gap-3 @lg:grid-cols-2">
-                    {suggest.result.recommendations.map((r) => (
-                      <MomentCard key={r.primaryTag} rec={r} />
-                    ))}
-                  </div>
-                  {/* Re-roll the same moment, nudged — replaces the spread rather than stacking a transcript. */}
-                  <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-                    <span className="inscribed text-[10px]">Refine</span>
-                    {REFINE_NUDGES.map((n) => (
-                      <Button
-                        key={n}
-                        variant="outline"
-                        size="sm"
-                        className="h-7 rounded-full text-xs font-normal"
-                        onClick={() => refine(n)}
-                      >
-                        {n}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            {suggest.status === 'done' &&
-              suggest.result?.ok &&
-              suggest.result.mode === 'directions' && (
-                <DirectionsList suggestions={suggest.result.suggestions} />
-              )}
-
-            {suggest.status === 'done' && suggest.result?.ok && suggest.result.cost && (
-              <p className="text-right font-mono text-[10px] text-muted-foreground">
-                {formatRunCost(suggest.result.cost)}
-              </p>
+            {thinking ? (
+              <Button variant="outline" size="sm" onClick={suggest.cancel}>
+                Stop
+              </Button>
+            ) : (
+              <Button size="sm" onClick={submit} disabled={!canSubmit}>
+                Seek counsel
+              </Button>
             )}
           </div>
         </div>
-      </div>
+
+        {/* The counsel — stacked in one wide column below (like Converse). */}
+        <div className="flex-1 space-y-4 overflow-y-auto">
+          {(prose || recent.length > 0) && <LensResultBar prose={prose} history={recent} />}
+
+          {suggest.status === 'idle' && (
+            <LensIdle starters={SUGGEST_STARTERS} recent={recent} onPick={setSituation} />
+          )}
+
+          {thinking && (
+            <div className="flex items-center justify-center gap-2 pt-8 text-sm text-muted-foreground">
+              <Sparkles className="size-4 animate-pulse text-primary" />
+              {mode === 'attitudes'
+                ? 'Weighing how your character would react…'
+                : 'Looking for where your character would take things…'}
+            </div>
+          )}
+
+          {suggest.status === 'error' && (
+            <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+              Something went wrong: {suggest.error}
+            </Banner>
+          )}
+
+          {suggest.status === 'done' && suggest.result && !suggest.result.ok && (
+            <FailureBanner reason={suggest.result.reason} />
+          )}
+
+          {suggest.status === 'done' &&
+            suggest.result?.ok &&
+            suggest.result.mode === 'attitudes' && (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {suggest.result.recommendations.map((r) => (
+                    <MomentCard key={r.primaryTag} rec={r} />
+                  ))}
+                </div>
+                {/* Re-roll the same moment, nudged — replaces the spread rather than stacking a transcript. */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                  <span className="inscribed text-[10px]">Refine</span>
+                  {REFINE_NUDGES.map((n) => (
+                    <Button
+                      key={n}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-full text-xs font-normal"
+                      onClick={() => refine(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {suggest.status === 'done' &&
+            suggest.result?.ok &&
+            suggest.result.mode === 'directions' && (
+              <DirectionsList suggestions={suggest.result.suggestions} />
+            )}
+
+          {suggest.status === 'done' && suggest.result?.ok && suggest.result.cost && (
+            <p className="text-right font-mono text-[10px] text-muted-foreground">
+              {formatRunCost(suggest.result.cost)}
+            </p>
+          )}
+        </div>
+      </PaneBody>
     </div>
   )
 }

@@ -7,7 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui
 // Shared view chrome — the banner/setup-card/progress/header/body pieces every AI pane used to copy
 // locally (they had drifted apart; consolidated in the 2026-07-02 simplification pass). The unified
 // PaneHeader is a compact toolbar (icon + title + action); PaneBody is the centered scroll column
-// beneath it — 'reading' (max-w-3xl), 'form' (max-w-2xl), or 'wide' (max-w-[1600px]; Counsel).
+// beneath it — 'reading' (max-w-3xl), 'form' (max-w-2xl), or 'wide' (max-w-[1600px]). Callers may pass a
+// `className` max-w-* to override (e.g. Converse + Counsel both use size="reading" + max-w-4xl).
 
 /** The unified page header: a compact toolbar — an optional leading (type) icon + the title + an
  *  optional right-side action slot. Every top-level view uses this so the app chrome is consistent; the
