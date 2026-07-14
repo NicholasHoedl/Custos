@@ -30,6 +30,10 @@ function migrationsFolder(): string {
  */
 function migrateLegacyLedgerData(): void {
   const userData = app.getPath('userData') // e.g. %APPDATA%\Custos
+  // Only carry over into the DEFAULT install location. A `--user-data-dir` override (e2e throwaway dirs,
+  // portable runs) redirects `userData` but NOT `appData`, so without this guard the real %APPDATA%\Ledger
+  // data would leak into every isolated run — which polluted the e2e suite with the live campaign.
+  if (userData !== join(app.getPath('appData'), app.getName())) return
   if (fs.existsSync(join(userData, 'custos.db'))) return // already have Custos data
   const legacyDir = join(app.getPath('appData'), 'Ledger')
   if (!fs.existsSync(join(legacyDir, 'ledger.db'))) return // fresh install — nothing to carry over
