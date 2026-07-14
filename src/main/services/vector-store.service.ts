@@ -197,13 +197,19 @@ export class BruteForceVectorStore implements VectorStore {
       .leftJoin(schema.entity, eq(schema.entity.id, schema.noteEntity.entityId))
       .leftJoin(schema.session, eq(schema.session.id, schema.note.sessionId))
       .where(
-        asOf === undefined
-          ? eq(schema.note.campaignId, campaignId)
-          : and(
-              eq(schema.note.campaignId, campaignId),
-              // No future leak: only notes from sessions <= N; undated (null-session) notes pass through.
-              or(isNull(schema.note.sessionId), lte(schema.session.number, asOf))
-            )
+        and(
+          // ADR-052: score ONLY current-model vectors. Migration 0012 purges old-dim rows on a model swap,
+          // but this also guards a partial/interrupted re-index — a mismatched-dim vector would otherwise
+          // dot-product to a garbage score (the dot() Math.min truncation) and pollute the ranking.
+          eq(schema.noteEmbedding.model, EMBED_MODEL),
+          asOf === undefined
+            ? eq(schema.note.campaignId, campaignId)
+            : and(
+                eq(schema.note.campaignId, campaignId),
+                // No future leak: only notes from sessions <= N; undated (null-session) notes pass through.
+                or(isNull(schema.note.sessionId), lte(schema.session.number, asOf))
+              )
+        )
       )
       .orderBy(schema.entity.name)
       .all()
@@ -236,7 +242,12 @@ export class BruteForceVectorStore implements VectorStore {
       })
       .from(schema.entityEmbedding)
       .innerJoin(schema.entity, eq(schema.entity.id, schema.entityEmbedding.entityId))
-      .where(eq(schema.entity.campaignId, campaignId))
+      .where(
+        and(
+          eq(schema.entity.campaignId, campaignId),
+          eq(schema.entityEmbedding.model, EMBED_MODEL) // ADR-052: current-model vectors only
+        )
+      )
       .all()
 
     for (const e of entityRows) {

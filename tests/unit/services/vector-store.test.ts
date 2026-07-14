@@ -7,6 +7,8 @@ import { createNote } from '../../../src/main/services/note.service'
 import { createSession } from '../../../src/main/services/session.service'
 import { BruteForceVectorStore, nameMatchScore } from '../../../src/main/services/vector-store.service'
 import { makeTestDb } from '../../helpers/test-db'
+import { eq } from 'drizzle-orm'
+import * as schema from '../../../src/main/db/schema'
 
 // Deterministic unit vectors (no embedding model needed) so similarity ordering is exact.
 function vec(...hot: number[]): Float32Array {
@@ -69,6 +71,19 @@ describe('vector-store (brute-force cosine)', () => {
     expect(store.noteHash(n.id)).toBe('h2')
     store.removeNote(n.id)
     expect(store.noteHash(n.id)).toBeNull()
+  })
+
+  it('ADR-052: search excludes vectors from a different (stale) embedding model', () => {
+    const n = createNote(ctx, { campaignId, entityIds: [npc.id], content: 'stale model note' })
+    store.upsertNote(n.id, vec(0), 'h')
+    // Simulate a leftover row from a previous embedder (migration 0012 normally purges these on a swap).
+    ctx.drizzle
+      .update(schema.noteEmbedding)
+      .set({ model: 'Xenova/all-MiniLM-L6-v2' })
+      .where(eq(schema.noteEmbedding.noteId, n.id))
+      .run()
+    // The model-filter must skip it — a mismatched-dim vector would otherwise dot-product to a garbage score.
+    expect(store.search(vec(0), campaignId, 5).some((c) => c.noteId === n.id)).toBe(false)
   })
 
   it('surfaces an entity-less lore note as a chunk with null entity fields, campaign-scoped', () => {

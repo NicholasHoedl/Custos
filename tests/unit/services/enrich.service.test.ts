@@ -42,7 +42,11 @@ import { createSession } from '../../../src/main/services/session.service'
 import { createEntity, updateEntity } from '../../../src/main/services/entity.service'
 import { createLink } from '../../../src/main/services/link.service'
 import { createNote } from '../../../src/main/services/note.service'
-import { enrichEntity, listTouchedEntities } from '../../../src/main/services/enrich.service'
+import {
+  enrichEntity,
+  listTouchedEntities,
+  selectEnrichRoster
+} from '../../../src/main/services/enrich.service'
 
 const sig = (): AbortSignal => new AbortController().signal
 
@@ -302,5 +306,30 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
     )
     expect(long.ok).toBe(false)
     if (!long.ok) expect(long.reason).toBe('too_long')
+  })
+})
+
+describe('selectEnrichRoster (B1: roster scans the full note history)', () => {
+  const spider = { id: 'spider', name: 'The Black Spider' }
+  const manor = { id: 'manor', name: 'Tresendar Manor' } // a live tie endpoint, never named in notes
+  const bystander = { id: 'bystander', name: 'Unrelated Bystander' }
+
+  it('includes an entity mentioned only in an OLD note (beyond the prompt cap) + tie endpoints', () => {
+    const notes = [
+      { content: 'Session 1: he served The Black Spider.' }, // the ONLY mention — an "old" note
+      ...Array.from({ length: 30 }, () => ({ content: 'later, unrelated goings-on' }))
+    ]
+    const ids = selectEnrichRoster([spider, manor, bystander], notes, new Set(['manor'])).map(
+      (e) => e.id
+    )
+    expect(ids).toContain('spider') // named anywhere in history → kept (B1)
+    expect(ids).toContain('manor') // tie endpoint → kept even though never named
+    expect(ids).not.toContain('bystander') // neither → dropped
+  })
+
+  it('respects the cap', () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ id: `e${i}`, name: `Name${i}` }))
+    const notes = many.map((e) => ({ content: e.name }))
+    expect(selectEnrichRoster(many, notes, new Set(), 25)).toHaveLength(25)
   })
 })

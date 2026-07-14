@@ -34,8 +34,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **12 migrations (0000–0011)** — 0011 (entity
-  portrait `image`, ADR-039) is the nullable-ADD case: a clean 1-line `ALTER`, NOT the table-rebuild.
+  `.sql`, keep `_journal.json` + the snapshot. Currently **13 migrations (0000–0012)** — 0011 (entity
+  portrait `image`, ADR-039) is the nullable-ADD case: a clean 1-line `ALTER`, NOT the table-rebuild; **0012
+  (ADR-052) is a DATA-only migration** — `DELETE FROM note_embedding/entity_embedding` (no schema change;
+  its snapshot is hand-re-chained from 0011), purging old 384-dim vectors after the embedder swap so backfill
+  re-embeds at 768.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -52,7 +55,13 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
 - **Two-tier extraction (ADR-035): `ExtractionMode = 'capture' | 'full'`** replaced the old `withChanges`
   boolean. **'capture'** (the session **Extract** tool + the Transcribe dialog) proposes entities +
   notes + **statusChanges ONLY** — the schema *omits* the tie/field arrays (closed schema; the model
-  can't emit them) and the roster context carries no current fields. Status stays in tier 1 because it
+  can't emit them) and the roster context carries no current fields. **B2 (dedup):** the existing-entity
+  roster the model sees is ranked by `rankExistingForExtraction` (`claude.service`) — full-name substring,
+  then any name-TOKEN present in the paste ("Sildar" surfaces "Sildar Hallwinter"), then the rest — BEFORE the
+  100-cap, so a partial reference in a >100-entity campaign still surfaces the real entity to LINK rather than
+  duplicate; and the review's "similar existing" row becomes a loud destructive **link-instead** nudge when a
+  proposed CREATE scores ≥0.7 against an existing entity (`import-rows.tsx` `strongMiss`; `seedEntity` still
+  auto-links only at ≥0.9). Status stays in tier 1 because it
   drives as-of chronology (ADR-017). **Chronicle entries save as PLAIN log lines — no per-entry AI**:
   extraction runs from the **Extract** button on the Sessions page (`capture/ExtractDialog.tsx`, ADR-051),
   a PLAIN closeable dialog that joins the selected session's entries oldest-first, runs ONE tier-1
@@ -65,7 +74,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   default now that nothing auto-chains) → ONE focused
   call per entity (`enrich.service` → `enrichChangeset`; grounding = full note history capped 30 +
   current profile + id-bearing live-tie lines + a SLIM roster of tie endpoints + note-mentioned entities
-  capped 25) proposing ONLY relationship/field changes with
+  capped 25 — the roster is the pure `selectEnrichRoster`, whose mention-scan reads ALL notes not just the
+  capped-30 prompt window (**B1**), so a tie to an entity named only in an OLD note stays proposable) proposing ONLY relationship/field changes with
   **REAL-ID refs** (never `#index`; never new entities/notes/status/type) → renderer merges (cross-entity
   tie dedup via `inverseKey`, `use-enrich`) → shared `ChangesetReview` → ONE `import.apply` stamped at
   the enriched session (ties open intervals at N). Field changes stay existing-only + un-versioned
@@ -78,9 +88,28 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `form` ties dropped (`findOpenLink`) + direction-equivalent intra-batch dupes (`canonicalRelKey`),
   status/scalar no-ops dropped — re-running the same text OR re-Illuminating a session yields a
   near-empty changeset. An EMPTY per-entity enrichment is `ok:true` (the sweep steady-state), unlike
-  extract's `'empty'` failure. Extracted statuses SNAP to the type's curated presets (case-insensitive →
+  extract's `'empty'` failure — but **A1:** `EnrichDialog` now distinguishes a `'failed'` row (a REAL
+  per-entity error: `api`/`invalid`/`too_long`) from empty. The done/review branches render a destructive
+  failure banner + the failed rows (via the pure `summarizeFailures`, `lib/enrich-progress.ts`) + a "Try
+  again", so a sweep NEVER reads as "nothing new" when entities actually errored (the masking that hid the
+  Haiku 400). Global reasons (`no_key`/`bad_key`/`offline`) still abort to the error/review states. Extracted statuses SNAP to the type's curated presets (case-insensitive →
   canonical label + the preset's EXPLICIT lifecycle, the only path to `presumed_ended`; `STATUS_VOCAB` is
   generated from `ENTITY_PROFILES`; free text stays allowed). **No migration** (mode is TS-level).
+- **Local search / retrieval (ADR-052):** embeddings run **`Alibaba-NLP/gte-base-en-v1.5`** (768-dim,
+  long-context — full notes, not MiniLM's ~256-token cut) on **`@huggingface/transformers` v3**
+  (`embedding.service.ts`; backend = onnxruntime-node **cpu**, `dtype:'q8'`, `device` OMITTED — `wasm` is
+  invalid in Node, and gte logs a benign `"Unknown model class 'new'"` that constructs from base). `EMBED_MODEL`/
+  `EMBED_DIM` live in `embedding-constants.ts`; the ready-marker is **model-id-derived**, so changing the model
+  flips `isModelReady()` false → the existing "Download model" cards (Settings/Lore/Counsel) re-fetch. A model
+  swap MUST ship a **data-only migration that purges the embedding tables** (backfill is content-hash-only + won't
+  overwrite unchanged rows) — see migration **0012**; `vector-store.search` also filters rows to the current
+  `model` (mixed dims dot-product to garbage via `dot()`'s `Math.min`). All three lenses retrieve through
+  **`hybridRetrieve` (`retrieval.service.ts`)**: dense (a WIDER pool when reranking) + model-free fuzzy name-match
+  → dedupe → **cross-encoder rerank to top-N** via **`rerank.service`** (`mixedbread-ai/mxbai-rerank-xsmall-v1`,
+  own marker, downloaded after the embedder, always-on when present, gated `isRerankerReady() && !fakeAiEnabled()`
+  → inert under the fake seam). Graceful degradation preserved: dense skipped when the model's absent, fuzzy always
+  runs. `applyRerankScores` is the pure, unit-tested ordering core. One-time upgrade cost: ~225 MB re-download +
+  full re-embed (surfaced via the not-ready UI).
 - **AI-grounding seams:** `formatState` + `buildUserContent` / `buildSuggestUserContent` /
   `buildConverseUserContent` in `claude.service.ts` are where entity state (lifecycle → `[ended]` /
   `[presumed ended — unconfirmed]`), relationships, and note `confidence` (→ `· (rumored)` / `· (suspected)`,
@@ -229,7 +258,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`. Renderer
   CRASHES also reach that log (ErrorBoundary + window handlers → `RENDERER_ERROR_CHANNEL` → `ipc/app.ts`).
 - **App shell & cost accounting (docs/ROADMAP.md P0, as-built):** every claude.service call records
-  usage centrally — `structuredCall` opts REQUIRE a `feature: AiFeature` tag (a new lens must pick one;
+  usage centrally. **`structuredCall` gates `thinking:{type:'adaptive'}` + `output_config.effort` on model
+  support** (`supportsAdaptiveThinking`/`buildStructuredParams` — Opus 4.6+/Sonnet 4.6+; **Haiku 4.5 rejects
+  BOTH with a 400** ["adaptive thinking is not supported on this model"], so it gets a plain json_schema call
+  — the ADR-051 Illuminate-on-Haiku bug that swallowed every enrich as "nothing new"; add a model to the set
+  when Settings offers it). `structuredCall` opts REQUIRE a `feature: AiFeature` tag (a new lens must pick one;
   `usage.service` prices it, persists monthly buckets to `userData/usage.json`, Settings shows the
   totals) and optional `onUsage` threads per-run cost onto ok-results (`cost?: AiRunCost`) for the muted
   cost lines. Campaign **import** now exists (`import-campaign.service`, one txn, ids preserved, rejects

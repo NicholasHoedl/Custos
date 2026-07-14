@@ -4,9 +4,11 @@ import { join } from 'node:path'
 import type { ModelDownloadProgress } from '@shared/recall-types'
 import { EMBED_DIM, EMBED_MODEL } from './embedding-constants'
 
-// Local sentence embeddings via Transformers.js (ADR-001/002). Runs in the main process; weights live
-// in userData/models so a normal launch never touches the network (offline-retrieval guarantee).
-// @xenova/transformers is ESM-only, but the main bundle is CJS — so it is loaded via dynamic import().
+// Local sentence embeddings via Transformers.js (ADR-001/002; ADR-052 upgraded the runtime to v3 + the
+// gte-base-en-v1.5 embedder). Runs in the main process; weights live in userData/models so a normal launch
+// never touches the network (offline-retrieval guarantee). @huggingface/transformers is ESM-only, but the
+// main bundle is CJS — so it is loaded via dynamic import(). Backend = onnxruntime-node (cpu); NOT wasm
+// (invalid in Node) — so `device` is omitted (defaults to cpu) and `dtype: 'q8'` gives the quantized weights.
 
 export { EMBED_DIM, EMBED_MODEL }
 
@@ -15,10 +17,10 @@ type EmbedPipeline = (
   opts: { pooling: 'mean'; normalize: boolean }
 ) => Promise<{ data: Float32Array }>
 
-type Transformers = typeof import('@xenova/transformers')
+type Transformers = typeof import('@huggingface/transformers')
 let tfMod: Transformers | null = null
 async function tf(): Promise<Transformers> {
-  if (!tfMod) tfMod = await import('@xenova/transformers')
+  if (!tfMod) tfMod = await import('@huggingface/transformers')
   return tfMod
 }
 
@@ -29,7 +31,11 @@ function modelsDir(): string {
   return join(app.getPath('userData'), 'models')
 }
 function readyMarker(): string {
-  return join(modelsDir(), '.all-MiniLM-L6-v2.ready')
+  // Model-specific marker (ADR-052): swapping EMBED_MODEL invalidates the old model's readiness, so an
+  // existing install re-downloads the new weights via the "Download model" affordances (Settings/Lore/
+  // Counsel) instead of falsely reporting ready while holding stale, wrong-dimension vectors.
+  const slug = EMBED_MODEL.replace(/[^a-z0-9]+/gi, '-')
+  return join(modelsDir(), `.${slug}.ready`)
 }
 
 async function configureEnv(allowRemote: boolean): Promise<void> {
@@ -50,7 +56,7 @@ async function getPipeline(): Promise<EmbedPipeline> {
       await configureEnv(false) // never hit the network on the hot path
       const { pipeline } = await tf()
       pipe = (await pipeline('feature-extraction', EMBED_MODEL, {
-        quantized: true
+        dtype: 'q8' // int8-quantized weights (v3 replaced v2's `quantized: true`); device omitted → cpu
       })) as unknown as EmbedPipeline
       return pipe
     })()
@@ -58,7 +64,7 @@ async function getPipeline(): Promise<EmbedPipeline> {
   return loading
 }
 
-/** Embed text → a 384-dim normalized Float32Array (so cosine similarity == dot product). */
+/** Embed text → a 768-dim normalized Float32Array (so cosine similarity == dot product). */
 export async function embed(text: string): Promise<Float32Array> {
   const p = await getPipeline()
   const out = await p(text, { pooling: 'mean', normalize: true })
@@ -82,7 +88,7 @@ export async function downloadModel(
       try {
         const { pipeline } = await tf()
         pipe = (await pipeline('feature-extraction', EMBED_MODEL, {
-          quantized: true,
+          dtype: 'q8',
           progress_callback: (info: {
             status?: string
             file?: string

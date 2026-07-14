@@ -134,7 +134,9 @@ describe('note M2M migration (0003 backfill + 0004 column drop)', () => {
     const db = seededPreReworkDb('OFF')
     applyInTransaction(
       db,
-      migrationFiles().filter((f) => f >= '0003')
+      // Stop before 0012 (which intentionally PURGES embeddings, ADR-052) — this test guards the 0004
+      // rebuild's FK-off child preservation, not the later purge (covered by its own test below).
+      migrationFiles().filter((f) => f >= '0003' && f < '0012')
     )
 
     // The legacy association became a join row.
@@ -175,7 +177,8 @@ describe('chronology migration (0005 lifecycle backfill + validity intervals)', 
     const db = seededPreChronologyDb('OFF')
     applyInTransaction(
       db,
-      migrationFiles().filter((f) => f >= '0005')
+      // Before 0012's embedding purge (ADR-052) — this guards the 0005 rebuild's FK-off child preservation.
+      migrationFiles().filter((f) => f >= '0005' && f < '0012')
     )
 
     const life = (id: string): string =>
@@ -239,7 +242,8 @@ describe('note campaign_id + confidence migration (0006 table rebuild)', () => {
     const db = seededPre0006Db('OFF')
     applyInTransaction(
       db,
-      migrationFiles().filter((f) => f >= '0006')
+      // Before 0012's embedding purge (ADR-052) — this guards the 0006 rebuild's FK-off child preservation.
+      migrationFiles().filter((f) => f >= '0006' && f < '0012')
     )
 
     // Each note's campaign_id resolves independently from its own tagged entity's campaign.
@@ -295,6 +299,15 @@ describe('note campaign_id + confidence migration (0006 table rebuild)', () => {
     // DROP TABLE note cascades to its embedding + join rows (the loss the index.ts FK toggle prevents).
     // If either assertion ever flips to a nonzero count, the FK-off guard around migrate() is gone.
     expect(db.prepare('SELECT count(*) AS c FROM note_entity').get()).toEqual({ c: 0 })
+    expect(db.prepare('SELECT count(*) AS c FROM note_embedding').get()).toEqual({ c: 0 })
+    db.close()
+  })
+})
+
+describe('embeddings purge migration (0012, ADR-052)', () => {
+  it('empties embeddings through 0012 so the new 768-dim model re-embeds them (counterpart to 0004 survival)', () => {
+    const db = seededPreReworkDb('OFF') // seeds a note_embedding row (which survives the rebuilds to 0011)
+    applyInTransaction(db, migrationFiles().filter((f) => f >= '0003')) // …now run the full tail, incl. 0012
     expect(db.prepare('SELECT count(*) AS c FROM note_embedding').get()).toEqual({ c: 0 })
     db.close()
   })

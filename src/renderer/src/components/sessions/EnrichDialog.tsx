@@ -20,6 +20,7 @@ import {
 import { ChangesetReview } from '@renderer/components/capture/ChangesetReview'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { Banner, SetupCard } from '@renderer/components/chrome'
+import { summarizeFailures } from '@renderer/lib/enrich-progress'
 
 // Illuminate (code name enrich, ADR-035) — the manual tier-2 pass over one session: pick which of its
 // touched entities to enrich, one focused Keeper call each (grounded in that entity's FULL note history),
@@ -50,6 +51,25 @@ export function EnrichDialog({
 
   const checkedCount = enrich.checked.size
   const running = enrich.phase === 'running'
+  // A1: surface entities that FAILED so a sweep never silently reads as "nothing new". A settled 'failed'
+  // row is always a non-global error (key/offline aborts route to the error/review states, never 'done').
+  const failed = summarizeFailures(enrich.progress)
+  const failureNotice = failed ? (
+    <>
+      <Banner icon={<AlertTriangle className="size-4" />} tone="destructive">
+        {failed.count} of {enrich.progress.length}{' '}
+        {plural(enrich.progress.length, 'entity', 'entities')} couldn&apos;t be read.{' '}
+        {reasonCopy(failed.reasons[0])} Nothing was recorded for them.
+      </Banner>
+      <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+        {enrich.progress
+          .filter((p) => p.state === 'failed')
+          .map((p) => (
+            <ProgressRow key={p.entityId} p={p} />
+          ))}
+      </div>
+    </>
+  ) : null
 
   return (
     <Dialog open={open} onOpenChange={(o) => !running && onOpenChange(o)}>
@@ -127,6 +147,7 @@ export function EnrichDialog({
                 {reasonCopy(enrich.globalReason)} Showing what was found before it stopped.
               </Banner>
             )}
+            {!running && !enrich.globalReason && failureNotice}
             {!running && (
               <div className="flex max-h-[60vh] min-h-0 min-w-0 flex-col">
                 <ChangesetReview
@@ -148,36 +169,45 @@ export function EnrichDialog({
           </>
         ) : enrich.phase === 'done' ? (
           <>
-            <div className="rounded-lg border border-border bg-card/60 p-4">
-              {enrich.result ? (
-                <p className="text-sm text-foreground">
-                  Recorded <strong>{enrich.result.relationshipChangesApplied}</strong>{' '}
-                  {plural(enrich.result.relationshipChangesApplied, 'tie', 'ties')} ·{' '}
-                  <strong>{enrich.result.fieldChangesApplied}</strong> profile{' '}
-                  {plural(enrich.result.fieldChangesApplied, 'edit', 'edits')} for Session{' '}
-                  {session.number}.
-                </p>
-              ) : (
-                <p className="text-sm text-foreground">
-                  Nothing new — every profile already reflects this session&apos;s annals.
-                </p>
-              )}
-              {enrich.result && enrich.result.skipped.length > 0 && (
-                <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                  {enrich.result.skipped.map((s, i) => (
-                    <li key={i}>
-                      Skipped a {s.kind}: {s.reason}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {enrich.cost && (
-                <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-                  This sweep used {formatRunCost(enrich.cost)}
-                </p>
-              )}
-            </div>
+            {failureNotice}
+            {(enrich.result || !failed) && (
+              <div className="rounded-lg border border-border bg-card/60 p-4">
+                {enrich.result ? (
+                  <p className="text-sm text-foreground">
+                    Recorded <strong>{enrich.result.relationshipChangesApplied}</strong>{' '}
+                    {plural(enrich.result.relationshipChangesApplied, 'tie', 'ties')} ·{' '}
+                    <strong>{enrich.result.fieldChangesApplied}</strong> profile{' '}
+                    {plural(enrich.result.fieldChangesApplied, 'edit', 'edits')} for Session{' '}
+                    {session.number}.
+                  </p>
+                ) : (
+                  <p className="text-sm text-foreground">
+                    Nothing new — every profile already reflects this session&apos;s annals.
+                  </p>
+                )}
+                {enrich.result && enrich.result.skipped.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                    {enrich.result.skipped.map((s, i) => (
+                      <li key={i}>
+                        Skipped a {s.kind}: {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {enrich.cost && (
+                  <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                    This sweep used {formatRunCost(enrich.cost)}
+                  </p>
+                )}
+              </div>
+            )}
             <DialogFooter>
+              {enrich.result === null && failed && (
+                <Button size="sm" variant="outline" onClick={() => void enrich.run()}>
+                  <Sparkles className="size-3.5" />
+                  Try again
+                </Button>
+              )}
               <Button size="sm" onClick={() => onOpenChange(false)}>
                 Close
               </Button>

@@ -8,6 +8,7 @@ import { getDb, dbHealthCheck, closeDb } from './db'
 import { registerIpcHandlers } from './ipc/handlers'
 import { loadWindowState, trackWindowState } from './window-state'
 import { warm } from './services/embedding.service'
+import { warmReranker } from './services/rerank.service'
 import icon from '../../resources/icon.png?asset'
 
 app.setName(APP_NAME)
@@ -128,6 +129,7 @@ if (!gotTheLock) {
     registerIpcHandlers(() => mainWindow)
     createWindow()
     warm() // preload the embedding pipeline if the model is already downloaded
+    warmReranker() // and the reranker (ADR-052), if downloaded
 
     // Global quick-add hotkey. ADR-010: Phase 0 ships the focus-main behavior; the
     // popup-vs-focus decision is made in Phase 1. The hotkey is configurable (Settings).

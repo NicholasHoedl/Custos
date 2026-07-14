@@ -76,6 +76,29 @@ function fail(reason: ExtractFailureReason, message?: string): EnrichEntityResul
 }
 
 /**
+ * The slim prompt roster (ADR-035 cost tuning): current tie endpoints first (a sever must reference them),
+ * then entities NAMED anywhere in `notesForMention`, alphabetical, capped. **B1:** the caller passes the
+ * entity's FULL note history here (not just the capped prompt window), so a tie to an entity mentioned only
+ * in an older note stays proposable. Pure + unit-tested; the validator stays permissive over the full campaign.
+ */
+export function selectEnrichRoster<E extends { id: string; name: string }>(
+  others: E[],
+  notesForMention: { content: string }[],
+  tieEndpointIds: Set<string>,
+  cap: number = ENRICH_ROSTER_CAP
+): E[] {
+  const haystack = notesForMention.map((n) => n.content.toLowerCase()).join('\n')
+  return others
+    .filter((e) => tieEndpointIds.has(e.id) || haystack.includes(e.name.toLowerCase()))
+    .sort(
+      (a, b) =>
+        (tieEndpointIds.has(a.id) ? 0 : 1) - (tieEndpointIds.has(b.id) ? 0 : 1) ||
+        a.name.localeCompare(b.name)
+    )
+    .slice(0, cap)
+}
+
+/**
  * Enrich ONE entity: gather (full live notes capped to the newest 30, current profile, live ties,
  * roster) → one structured model call → validate through the SHARED change validators (ADR-031/033
  * rules) with a REAL-ID-ONLY resolver ("#index" resolves to nothing) → tier-2 post-filters: every field
@@ -101,19 +124,10 @@ export async function enrichEntity(
     const views = listForEntity(ctx, req.entityId) // live ties
     const tieLines = tieLinesWithIds(subject.name, views)
     const others = listEntities(ctx, req.campaignId).filter((e) => e.id !== subject.id)
-    // Slim roster (ADR-035 cost tuning): current tie endpoints (a sever must reference them) first,
-    // then entities NAMED in the grounding notes, capped. The validator stays permissive over the full
-    // campaign (byId below) — this only bounds what the prompt carries.
-    const haystack = capped.map((n) => n.content.toLowerCase()).join('\n')
+    // Slim prompt roster: tie endpoints + note-mentioned entities, capped — scanning ALL notes (B1), so a
+    // tie to an entity named only in an older note stays proposable. Validator stays permissive (byId below).
     const tieEndpointIds = new Set(views.map((v) => v.other.id))
-    const roster = others
-      .filter((e) => tieEndpointIds.has(e.id) || haystack.includes(e.name.toLowerCase()))
-      .sort(
-        (a, b) =>
-          (tieEndpointIds.has(a.id) ? 0 : 1) - (tieEndpointIds.has(b.id) ? 0 : 1) ||
-          a.name.localeCompare(b.name)
-      )
-      .slice(0, ENRICH_ROSTER_CAP)
+    const roster = selectEnrichRoster(others, allNotes, tieEndpointIds)
 
     // Illuminate has its OWN model/effort (ADR-051 — decoupled from extraction; defaults to Haiku·medium):
     // structured, validated, review-gated, and the cost driver since it runs one call per entity.

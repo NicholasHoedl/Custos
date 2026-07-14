@@ -15,9 +15,10 @@ import type { RelationshipView } from '@shared/graph-types'
 import { addRunCost, type AiRunCost } from '@shared/usage-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
-import type { RetrievedChunk, VectorStore } from './vector-store.service'
+import type { VectorStore } from './vector-store.service'
 import { resolveEntityState, stateAsOf } from './chronology.service'
-import { embed, isModelReady } from './embedding.service'
+import { isModelReady } from './embedding.service'
+import { hybridRetrieve } from './retrieval.service'
 import { getEntity, listEntities, listEntitiesByIds } from './entity.service'
 import { generatePersona, getPersona } from './persona.service'
 import { getSettings } from './settings.service'
@@ -143,21 +144,8 @@ export async function suggest(
 
     // Directions mode allows an empty situation; fall back to the PC's name so retrieval still runs.
     const queryText = situation.trim() || pc.name
-    // e2e fake-AI seam (ADR-043): skip embeddings/dense (no model on disk); keep the model-free fuzzy match.
-    let denseChunks: RetrievedChunk[] = []
-    if (!fakeAiEnabled()) {
-      const situationVec = await embed(queryText)
-      denseChunks = store.search(situationVec, campaignId, TOP_K, asOf)
-    }
-    // Hybrid retrieval (same as Recall): fold in entities whose NAME the query fuzzily matches.
-    const fuzzy = store.fuzzyEntityChunks(
-      campaignId,
-      queryText,
-      new Set(denseChunks.map((c) => c.entityId).filter((id): id is string => id !== null)),
-      2,
-      asOf
-    )
-    const chunks: RetrievedChunk[] = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
+    // Hybrid retrieval (ADR-052; same pipeline as Recall): dense + fuzzy name-match, reranked to top TOP_K.
+    const chunks = await hybridRetrieve(store, queryText, { campaignId, asOf, finalK: TOP_K })
 
     const campaign = ctx.drizzle
       .select({ name: schema.campaign.name, description: schema.campaign.description })

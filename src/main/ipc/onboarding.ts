@@ -3,6 +3,7 @@ import { IPC, MODEL_DOWNLOAD_PROGRESS_CHANNEL } from '@shared/ipc-types'
 import type { OnboardingStatus } from '@shared/recall-types'
 import { keyExists } from '../services/key.service'
 import { downloadModel, isModelReady, warm } from '../services/embedding.service'
+import { downloadReranker, warmReranker } from '../services/rerank.service'
 import { getSettings } from '../services/settings.service'
 import { listCampaigns } from '../services/campaign.service'
 import { fakeAiEnabled, tutorialSkipped } from '../services/ai-fake'
@@ -36,7 +37,16 @@ export function registerOnboardingHandlers(
   )
   ipcMain.handle(IPC.modelDownload, async () => {
     await downloadModel((p) => send(MODEL_DOWNLOAD_PROGRESS_CHANNEL, p))
+    // ADR-052: the cross-encoder reranker is a SECOND, optional model — download it after the embedder,
+    // forwarding progress to the same bar. A failure here must NOT block the embedder's readiness (retrieval
+    // simply runs un-reranked until it's present), so it is swallowed.
+    try {
+      await downloadReranker((p) => send(MODEL_DOWNLOAD_PROGRESS_CHANNEL, p))
+    } catch {
+      /* embedder is ready; reranking stays off until a later successful download */
+    }
     warm()
+    warmReranker()
     void reindex()
   })
   ipcMain.handle(IPC.onboardingReindex, () => reindex())

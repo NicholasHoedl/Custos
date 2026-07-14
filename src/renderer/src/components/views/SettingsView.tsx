@@ -410,8 +410,8 @@ export function SettingsView() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">Local search model</h2>
           <p className="text-sm text-muted-foreground">
-            Powers semantic search over your notes, used by Lore and Counsel. This small model
-            (about 25 MB) runs entirely on your device — nothing it reads ever leaves your machine.
+            Powers semantic search over your notes, used by Lore and Counsel. These models
+            (about 225 MB) run entirely on your device — nothing they read ever leaves your machine.
           </p>
           {onb.modelReady ? (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -434,7 +434,7 @@ export function SettingsView() {
               {modelError && <p className="text-xs text-destructive">{modelError}</p>}
               <Button size="sm" variant="outline" onClick={download}>
                 <Download className="size-4" />
-                {modelError ? 'Retry download' : 'Download model (~25 MB)'}
+                {modelError ? 'Retry download' : 'Download models (~225 MB)'}
               </Button>
             </div>
           )}

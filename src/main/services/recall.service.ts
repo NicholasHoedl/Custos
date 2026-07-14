@@ -13,7 +13,8 @@ import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import type { RetrievedChunk, VectorStore } from './vector-store.service'
 import { resolveEntityState } from './chronology.service'
-import { embed, isModelReady } from './embedding.service'
+import { isModelReady } from './embedding.service'
+import { hybridRetrieve } from './retrieval.service'
 import { getEntity, listEntitiesByIds } from './entity.service'
 import { generatePersona, getPersona } from './persona.service'
 import { getSettings } from './settings.service'
@@ -77,22 +78,9 @@ export async function ask(
 
     // Chronology (ADR-017): when asOfSession is set, clamp retrieval + reconstructed state to ≤ N.
     const asOf = req.asOfSession
-    let denseChunks: RetrievedChunk[] = []
-    if (!fakeAiEnabled()) {
-      const queryVec = await embed(query)
-      denseChunks = store.search(queryVec, campaignId, TOP_K, asOf)
-    }
-    // Hybrid retrieval: dense embeddings miss a misspelled proper noun ("glastav" → "Glasstaff").
-    // Fuzzy-match the query against entity NAMES and fold those entities in (description + a few notes)
-    // so the thing the player named always surfaces, even when the spelling is off.
-    const fuzzy = store.fuzzyEntityChunks(
-      campaignId,
-      query,
-      new Set(denseChunks.map((c) => c.entityId).filter((id): id is string => id !== null)),
-      2,
-      asOf
-    )
-    const chunks = fuzzy.length ? [...fuzzy, ...denseChunks] : denseChunks
+    // Hybrid retrieval (ADR-052): dense embeddings + model-free fuzzy name-match (so a misspelled proper
+    // noun like "glastav" → "Glasstaff" still surfaces), reranked to the top TOP_K.
+    const chunks = await hybridRetrieve(store, query, { campaignId, asOf, finalK: TOP_K })
 
     // Instant grounding (overhaul): push the retrieved sources NOW, before the LLM streams — the Sources
     // list shows in ~1s. The done event later marks which of these the answer actually cited.

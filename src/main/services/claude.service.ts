@@ -742,24 +742,47 @@ interface StructuredCallOpts {
 }
 
 /**
- * Shared single-shot structured call (ADR-008/009): Opus-class model + adaptive thinking + a
- * json_schema output format. Returns the parsed JSON object (UNVALIDATED). Throws on no key, refusal,
- * truncation, or unparseable output.
+ * Models that support **adaptive thinking** (`thinking: {type:'adaptive'}`) AND the `output_config.effort`
+ * control — Opus 4.6+ / Sonnet 4.6+. Haiku 4.5 supports NEITHER (it returns 400 "adaptive thinking is not
+ * supported on this model") but DOES support the json_schema output format, so a model outside this set
+ * gets a PLAIN structured call. Add a model here when Settings starts offering it. (ADR-051 pointed
+ * Illuminate at Haiku, which surfaced the bug — every enrich call 400'd and was swallowed as "nothing new".)
+ */
+const ADAPTIVE_THINKING_MODELS = new Set<string>(['claude-opus-4-8', 'claude-sonnet-4-6'])
+
+export function supportsAdaptiveThinking(model: string): boolean {
+  return ADAPTIVE_THINKING_MODELS.has(model)
+}
+
+/** Build the `messages.create` params for a structured call, gating adaptive thinking + effort on model
+ *  support (see `ADAPTIVE_THINKING_MODELS`). Every offered model supports the json_schema output format. */
+export function buildStructuredParams(
+  opts: StructuredCallOpts
+): Anthropic.MessageCreateParamsNonStreaming {
+  const format = { type: 'json_schema' as const, schema: opts.schema }
+  const params: Anthropic.MessageCreateParamsNonStreaming = {
+    model: opts.model,
+    max_tokens: opts.maxTokens ?? 8192,
+    output_config: { format },
+    system: opts.system,
+    messages: [{ role: 'user', content: opts.content }]
+  }
+  if (supportsAdaptiveThinking(opts.model)) {
+    params.thinking = { type: 'adaptive' }
+    params.output_config = { effort: opts.effort, format }
+  }
+  return params
+}
+
+/**
+ * Shared single-shot structured call (ADR-008/009): a json_schema output format, with adaptive thinking +
+ * effort on models that support them (a plain call otherwise — see `buildStructuredParams`). Returns the
+ * parsed JSON object (UNVALIDATED). Throws on no key, refusal, truncation, or unparseable output.
  */
 async function structuredCall(opts: StructuredCallOpts): Promise<Record<string, unknown>> {
   const c = getClient()
   if (!c) throw new Error('no_key')
-  const message = await c.messages.create(
-    {
-      model: opts.model,
-      max_tokens: opts.maxTokens ?? 8192,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: opts.effort, format: { type: 'json_schema', schema: opts.schema } },
-      system: opts.system,
-      messages: [{ role: 'user', content: opts.content }]
-    },
-    { signal: opts.signal }
-  )
+  const message = await c.messages.create(buildStructuredParams(opts), { signal: opts.signal })
   // Record BEFORE the outcome checks — refused/truncated calls still billed whatever they used.
   opts.onUsage?.(recordUsage(opts.feature, opts.model, usageOf(message)))
   if (message.stop_reason === 'refusal') throw new Error('refusal')
@@ -1039,6 +1062,40 @@ export interface ExtractExistingEntity {
   attributes?: Record<string, unknown>
 }
 
+// B2: mention-ranking for the extraction roster. Full-name substring is the strongest "referenced" signal,
+// but a partial/first-name token match ("Sildar" for "Sildar Hallwinter") should also surface the entity so
+// a large campaign's roster still shows it and the model LINKS instead of creating a duplicate. Pure; the
+// text is tokenized once (not per entity — unlike nameMatchScore, which would also DB-couple this module).
+const EXTRACT_RANK_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'was', 'were', 'are', 'has', 'had', 'have',
+  'into', 'out', 'off', 'all', 'his', 'her', 'him', 'she', 'they', 'them', 'you', 'your', 'who',
+  'what', 'when', 'where', 'then', 'their'
+])
+function extractionWordSet(text: string): Set<string> {
+  const s = new Set<string>()
+  for (const w of text.toLowerCase().match(/[a-z0-9']{3,}/g) ?? []) {
+    if (!EXTRACT_RANK_STOPWORDS.has(w)) s.add(w)
+  }
+  return s
+}
+
+/** Rank existing entities for the extraction prompt so the model can LINK, not duplicate: full-name exact
+ *  substring (0) → any name-token present in the text (1) → neither (2); stable, then capped. */
+export function rankExistingForExtraction<E extends { name: string }>(
+  existing: E[],
+  text: string,
+  cap = 100
+): E[] {
+  const lower = text.toLowerCase()
+  const words = extractionWordSet(text)
+  const rank = (name: string): number => {
+    if (lower.includes(name.toLowerCase())) return 0
+    const tokens = name.toLowerCase().match(/[a-z0-9']{3,}/g) ?? []
+    return tokens.some((t) => !EXTRACT_RANK_STOPWORDS.has(t) && words.has(t)) ? 1 : 2
+  }
+  return [...existing].sort((a, b) => rank(a.name) - rank(b.name)).slice(0, cap)
+}
+
 /** The user turn for extraction: the existing-entity list (linking + field changes) + the raw pasted text.
  *  `backstorySubject` (ADR-030 v3): the character whose personal backstory the text is — named so the
  *  standing ties anchor to them. */
@@ -1050,14 +1107,12 @@ export function buildExtractionUserContent(
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
   if (existing.length) {
-    // Surface entities whose name appears in the text first, then cap — keeps the list bounded + relevant.
+    // B2: rank the roster so the model LINKS instead of duplicating — full-name substring first, then a
+    // partial/first-name token match ("Sildar" → "Sildar Hallwinter"), then the rest; capped. Field values
+    // (full mode only, below) still gate on an exact substring mention.
     const lower = text.toLowerCase()
     const mentioned = (name: string): boolean => lower.includes(name.toLowerCase())
-    const ranked = [...existing].sort(
-      (a, b) => (mentioned(a.name) ? 0 : 1) - (mentioned(b.name) ? 0 : 1)
-    )
-    const list = ranked
-      .slice(0, 100)
+    const list = rankExistingForExtraction(existing, text)
       .map((e) => {
         const base = `- ${e.id} · ${e.name} (${e.type})`
         // Only for a FULL extraction, and only for entities the text references: append the CURRENT

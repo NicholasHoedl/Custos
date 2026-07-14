@@ -66,6 +66,9 @@ export function EntityRow({
 }) {
   const included = entity.action !== 'skip'
   const top = matches[0]
+  // B2: a proposed CREATE that strongly matches an existing entity — make the nudge loud so the reviewer
+  // doesn't skim past it and apply a duplicate (seedEntity only auto-links at >=0.9).
+  const strongMiss = entity.action === 'create' && (top?.score ?? 0) >= 0.7
   return (
     <div className={rowCls(included, compact)}>
       <div className="flex items-center gap-2">
@@ -100,10 +103,24 @@ export function EntityRow({
       </div>
 
       {included && matches.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs">
-          <span className="text-muted-foreground">
-            Similar existing: <span className="text-foreground">{top.name}</span> ({top.type},{' '}
-            {Math.round(top.score * 100)}%)
+        <div
+          className={cn(
+            'mt-2 flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-xs',
+            strongMiss ? 'border border-destructive/40 bg-destructive/10' : 'bg-muted/40'
+          )}
+        >
+          <span className={strongMiss ? 'text-foreground' : 'text-muted-foreground'}>
+            {strongMiss ? (
+              <>
+                <span className="font-medium">{top.name}</span> already exists ({top.type},{' '}
+                {Math.round(top.score * 100)}%) — link instead of creating a duplicate?
+              </>
+            ) : (
+              <>
+                Similar existing: <span className="text-foreground">{top.name}</span> ({top.type},{' '}
+                {Math.round(top.score * 100)}%)
+              </>
+            )}
           </span>
           <div className="ml-auto inline-flex overflow-hidden rounded border border-border">
             <button

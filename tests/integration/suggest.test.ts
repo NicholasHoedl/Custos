@@ -17,6 +17,12 @@ vi.mock('../../src/main/services/embedding.service', () => ({
   isModelReady: () => true,
   embed: embedFn
 }))
+// ADR-052: hybridRetrieve now imports the reranker. Stub it OFF (isRerankerReady=false) + identity so
+// retrieval order is unchanged and no cross-encoder model loads in the test.
+vi.mock('../../src/main/services/rerank.service', () => ({
+  isRerankerReady: () => false,
+  rerank: async (_q: string, chunks: unknown[], topN: number) => chunks.slice(0, topN)
+}))
 vi.mock('../../src/main/services/settings.service', () => ({
   getSettings: () => ({
     recallModel: 'claude-sonnet-4-6',

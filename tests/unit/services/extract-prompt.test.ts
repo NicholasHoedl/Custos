@@ -7,12 +7,37 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
-const { buildExtractionSystem, buildExtractionUserContent, extractionSchema } = await import(
-  '../../../src/main/services/claude.service'
-)
+const {
+  buildExtractionSystem,
+  buildExtractionUserContent,
+  extractionSchema,
+  rankExistingForExtraction
+} = await import('../../../src/main/services/claude.service')
 
 const textOf = (blocks: unknown[]): string =>
   blocks.map((b) => (b as { text?: string }).text ?? '').join('\n')
+
+describe('rankExistingForExtraction (B2: roster ranking so the model links, not duplicates)', () => {
+  const sildar = { name: 'Sildar Hallwinter' }
+  const glasstaff = { name: 'Glasstaff' }
+  const bystander = { name: 'Unrelated Bystander' }
+
+  it('surfaces a first-name/partial reference above unmentioned entities', () => {
+    // The log says only "Sildar" — the old exact-substring check missed "Sildar Hallwinter".
+    const ranked = rankExistingForExtraction([bystander, sildar], 'We met Sildar at the inn.')
+    expect(ranked[0].name).toBe('Sildar Hallwinter')
+  })
+
+  it('ranks a full-name substring above a partial-token match', () => {
+    const ranked = rankExistingForExtraction([sildar, glasstaff], 'Glasstaff plotted; Sildar worried.')
+    expect(ranked[0].name).toBe('Glasstaff') // exact full-name (rank 0) beats the "Sildar" token (rank 1)
+  })
+
+  it('caps the roster', () => {
+    const many = Array.from({ length: 150 }, (_, i) => ({ name: `Name${i}` }))
+    expect(rankExistingForExtraction(many, 'nothing matches here', 100)).toHaveLength(100)
+  })
+})
 
 describe('extraction prompt — mode split (ADR-035)', () => {
   it('capture keeps STATUS CHANGES (chronology) but drops the tie/field instructions', () => {
