@@ -44,8 +44,20 @@ describe('import.service — applyChangeset', () => {
       campaignId,
       sessionId: session.id,
       entities: [
-        { index: 0, action: 'create', type: 'npc', name: 'Sister Garaele', attributes: { race: 'Elf' } },
-        { index: 1, action: 'link', type: 'location', name: 'Phandalin', linkToEntityId: phandalin.id }
+        {
+          index: 0,
+          action: 'create',
+          type: 'npc',
+          name: 'Sister Garaele',
+          attributes: { race: 'Elf' }
+        },
+        {
+          index: 1,
+          action: 'link',
+          type: 'location',
+          name: 'Phandalin',
+          linkToEntityId: phandalin.id
+        }
       ],
       notes: [
         {
@@ -238,7 +250,12 @@ describe('import.service — applyChangeset v2 (backfill changes, ADR-018)', () 
       entities: [],
       notes: [],
       statusChanges: [
-        { entityRef: { kind: 'existing', entityId: npc.id }, lifecycle: 'active', status: 'Busy', include: true }
+        {
+          entityRef: { kind: 'existing', entityId: npc.id },
+          lifecycle: 'active',
+          status: 'Busy',
+          include: true
+        }
       ],
       relationshipChanges: [
         {
@@ -303,7 +320,7 @@ describe('import.service — applyChangeset undated batch (pre-campaign backgrou
 })
 
 describe('import.service — applyChangeset status presets (ADR-031 as-built)', () => {
-  it('a created entity whose status matches a preset adopts the preset lifecycle (npc "Missing" → presumed lost)', () => {
+  it('a created entity whose status matches a preset adopts the preset lifecycle over the heuristic (creature "Defeated" → ended)', () => {
     const ctx = makeTestDb()
     const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'C' }).id
@@ -311,14 +328,17 @@ describe('import.service — applyChangeset status presets (ADR-031 as-built)', 
     applyChangeset(ctx, store, {
       campaignId,
       sessionId: null,
-      entities: [{ index: 0, action: 'create', type: 'npc', name: 'Mira', status: 'Missing' }],
+      entities: [
+        { index: 0, action: 'create', type: 'creature', name: 'The Nothic', status: 'Defeated' }
+      ],
       notes: []
     })
 
-    const mira = listEntities(ctx, campaignId, 'npc')[0]
-    // The heuristic can never derive presumed_ended (ADR-021) — the preset's explicit lifecycle must win.
-    expect(mira.lifecycle).toBe('presumed_ended')
-    expect(mira.status).toBe('Missing')
+    const nothic = listEntities(ctx, campaignId, 'creature')[0]
+    // The heuristic would read "Defeated" as active (not an ended-keyword) — the preset's explicit
+    // `ended` must win (ADR-021/031).
+    expect(nothic.lifecycle).toBe('ended')
+    expect(nothic.status).toBe('Defeated')
   })
 })
 
@@ -348,19 +368,77 @@ describe('import.service — applyChangeset field changes (ADR-028)', () => {
       entities: [],
       notes: [],
       fieldChanges: [
-        { entityRef: ex(glasstaff.id), field: 'traits', op: 'add', value: 'Reckless', oldValue: null, include: true },
-        { entityRef: ex(glasstaff.id), field: 'traits', op: 'alter', value: 'Wary', oldValue: 'Cautious', include: true }, // compounds
-        { entityRef: ex(glasstaff.id), field: 'flaws', op: 'add', value: 'Greedy', oldValue: null, include: true },
-        { entityRef: ex(nothic.id), field: 'weakness', op: 'alter', value: 'fire', oldValue: null, include: true }, // scalar set
-        { entityRef: ex(nothic.id), field: 'abilities', op: 'add', value: 'Reality Warp', oldValue: null, include: true },
-        { entityRef: ex(nothic.id), field: 'abilities', op: 'cut', value: null, oldValue: 'Rotting Gaze', include: true }, // compounds
-        { entityRef: ex(glasstaff.id), field: 'traits', op: 'add', value: 'Excluded', oldValue: null, include: false }, // not applied
-        { entityRef: ex('does-not-exist'), field: 'traits', op: 'add', value: 'X', oldValue: null, include: true } // skipped
+        {
+          entityRef: ex(glasstaff.id),
+          field: 'traits',
+          op: 'add',
+          value: 'Reckless',
+          oldValue: null,
+          include: true
+        },
+        {
+          entityRef: ex(glasstaff.id),
+          field: 'traits',
+          op: 'alter',
+          value: 'Wary',
+          oldValue: 'Cautious',
+          include: true
+        }, // compounds
+        {
+          entityRef: ex(glasstaff.id),
+          field: 'flaws',
+          op: 'add',
+          value: 'Greedy',
+          oldValue: null,
+          include: true
+        },
+        {
+          entityRef: ex(nothic.id),
+          field: 'weakness',
+          op: 'alter',
+          value: 'fire',
+          oldValue: null,
+          include: true
+        }, // scalar set
+        {
+          entityRef: ex(nothic.id),
+          field: 'abilities',
+          op: 'add',
+          value: 'Reality Warp',
+          oldValue: null,
+          include: true
+        },
+        {
+          entityRef: ex(nothic.id),
+          field: 'abilities',
+          op: 'cut',
+          value: null,
+          oldValue: 'Rotting Gaze',
+          include: true
+        }, // compounds
+        {
+          entityRef: ex(glasstaff.id),
+          field: 'traits',
+          op: 'add',
+          value: 'Excluded',
+          oldValue: null,
+          include: false
+        }, // not applied
+        {
+          entityRef: ex('does-not-exist'),
+          field: 'traits',
+          op: 'add',
+          value: 'X',
+          oldValue: null,
+          include: true
+        } // skipped
       ]
     })
 
     expect(result.fieldChangesApplied).toBe(6)
-    expect(result.skipped.some((s) => s.kind === 'change' && /field change/.test(s.reason))).toBe(true)
+    expect(result.skipped.some((s) => s.kind === 'change' && /field change/.test(s.reason))).toBe(
+      true
+    )
 
     const g = getEntity(ctx, glasstaff.id)!
     expect(g.traits).toEqual(['Wary', 'Reckless']) // Cautious→Wary after Reckless appended (re-read compounds)
@@ -416,7 +494,14 @@ describe('import.service — applyChangeset (Illuminate payload, ADR-035)', () =
           oldValue: null,
           include: true
         },
-        { entityRef: ex(glasstaff.id), field: 'traits', op: 'add', value: 'Duplicitous', oldValue: null, include: true }
+        {
+          entityRef: ex(glasstaff.id),
+          field: 'traits',
+          op: 'add',
+          value: 'Duplicitous',
+          oldValue: null,
+          include: true
+        }
       ]
     }
 

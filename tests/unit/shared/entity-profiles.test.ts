@@ -62,7 +62,12 @@ describe('entity-profiles', () => {
     expect(life('quest', 'Failed')).toBe('ended')
     expect(life('faction', 'Disbanded')).toBe('ended')
     expect(life('location', 'Destroyed')).toBe('ended')
-    expect(life('npc', 'Missing')).toBe('presumed_ended')
-    expect(life('item', 'Lost')).toBe('presumed_ended')
+  })
+
+  it('keeps whereabouts-unknown presets active — live threads, never presumed ended (Web must not hide them)', () => {
+    const life = (t: EntityType, label: string): Lifecycle | undefined =>
+      profileFor(t).status?.find((p) => p.label === label)?.lifecycle
+    expect(life('npc', 'Missing')).toBe('active')
+    expect(life('item', 'Lost')).toBe('active')
   })
 })

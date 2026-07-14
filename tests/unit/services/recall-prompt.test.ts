@@ -8,9 +8,8 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
-const { buildSystem, buildUserContent, formatRelationships, formatState, formatScene } = await import(
-  '../../../src/main/services/claude.service'
-)
+const { buildSystem, buildUserContent, formatRelationships, formatState, formatScene } =
+  await import('../../../src/main/services/claude.service')
 type Chunk = Parameters<typeof buildUserContent>[1][number]
 
 function chunk(over: Partial<Chunk> = {}): Chunk {
@@ -193,10 +192,10 @@ describe('current-state grounding', () => {
 
   it('marks presumed_ended as UNCONFIRMED so the model hedges, not asserts (C2)', () => {
     const out = formatState(null, [
-      { name: 'Gundren', type: 'npc', status: 'Missing', lifecycle: 'presumed_ended' },
+      { name: 'Gundren', type: 'npc', status: 'Presumed dead', lifecycle: 'presumed_ended' },
       { name: 'Vanished', type: 'creature', status: null, lifecycle: 'presumed_ended' }
     ])
-    expect(out).toContain('- Gundren (npc) [presumed ended — unconfirmed]: Missing')
+    expect(out).toContain('- Gundren (npc) [presumed ended — unconfirmed]: Presumed dead')
     expect(out).toContain('- Vanished (creature) [presumed ended — unconfirmed]') // surfaced w/o status
     expect(out).not.toContain('[ended]') // distinct from the confirmed-ended marker
   })
@@ -212,14 +211,21 @@ describe('current-state grounding', () => {
   })
 
   it('returns null with no anchor and nothing to surface, but keeps a lone anchor', () => {
-    expect(formatState(null, [{ name: 'X', type: 'npc', status: null, lifecycle: 'active' }])).toBeNull()
+    expect(
+      formatState(null, [{ name: 'X', type: 'npc', status: null, lifecycle: 'active' }])
+    ).toBeNull()
     expect(
       formatState('Session 1', [{ name: 'X', type: 'npc', status: null, lifecycle: 'active' }])
     ).toContain('Session 1')
   })
 
   it('buildUserContent inserts the state block (as present/FACT) before the query', () => {
-    const content = buildUserContent('Q?', [], null, "- The party's most recent session is Session 3.")
+    const content = buildUserContent(
+      'Q?',
+      [],
+      null,
+      "- The party's most recent session is Session 3."
+    )
     expect(content[content.length - 1]).toEqual({ type: 'text', text: 'Q?' })
     const text = content.map((b) => ('text' in b ? b.text : '')).join('\n')
     expect(text).toContain('Session 3')
@@ -257,5 +263,4 @@ describe('scene grounding', () => {
       })
     ).toBeNull()
   })
-
 })

@@ -18,7 +18,8 @@ export interface ProfileField {
 
 /** A curated status option and the coarse lifecycle it implies (ADR-017). Picking it sets BOTH the
  *  free-text status and the lifecycle; a custom typed status falls back to `lifecycleHeuristic`.
- *  `presumed_ended` is only reached via a preset (Missing/Lost) or the "presumed" toggle — never derived. */
+ *  `presumed_ended` is reached ONLY via the "presumed" toggle (a deliberate flip of `ended`) — never a
+ *  status preset ("Missing"/"Lost" are live threads, not presumed gone) and never the heuristic. */
 export interface StatusPreset {
   label: string
   lifecycle: Lifecycle
@@ -63,7 +64,10 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
     status: [
       { label: 'Alive', lifecycle: 'active' },
       { label: 'Dead', lifecycle: 'ended' },
-      { label: 'Missing', lifecycle: 'presumed_ended' },
+      // A missing NPC is a live thread — whereabouts unknown, but still very much in play (the search for
+      // them IS the plot). Lifecycle `active` so they stay fully visible (Web view) and the AI is never
+      // told they're "presumed ended". "Unknown" is for a genuinely unclear fate; "Dead" for a confirmed one.
+      { label: 'Missing', lifecycle: 'active' },
       { label: 'Unknown', lifecycle: 'unknown' }
     ],
     fields: [
@@ -85,7 +89,12 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
     ],
     fields: [
       { key: 'abilities', label: 'Abilities', kind: 'list', placeholder: 'Add an ability' },
-      { key: 'tactics', label: 'Tactics', kind: 'textarea', placeholder: 'How it fights or behaves' },
+      {
+        key: 'tactics',
+        label: 'Tactics',
+        kind: 'textarea',
+        placeholder: 'How it fights or behaves'
+      },
       { key: 'weakness', label: 'Weakness', kind: 'text', placeholder: 'e.g. vulnerable to fire' },
       { key: 'habitat', label: 'Habitat', kind: 'text', placeholder: 'e.g. deep forest' }
     ]
@@ -150,7 +159,9 @@ export const ENTITY_PROFILES: Record<EntityType, EntityProfile> = {
     status: [
       { label: 'Owned', lifecycle: 'active' },
       { label: 'Stashed', lifecycle: 'active' },
-      { label: 'Lost', lifecycle: 'presumed_ended' },
+      // A lost item is a live thread — whereabouts unknown, but recovering it is the quest, so it stays
+      // visible (Web view) and un-ended. Mirrors the npc "Missing" fix; `presumed_ended` is toggle-only now.
+      { label: 'Lost', lifecycle: 'active' },
       { label: 'Destroyed', lifecycle: 'ended' }
     ],
     fields: [

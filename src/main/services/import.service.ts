@@ -113,8 +113,7 @@ export async function extract(
     // Surface the two actionable causes distinctly instead of the catch-all "couldn't read that":
     // a big paste that exhausts the output budget mid-JSON ('truncated' → too_long), and a rejected
     // API key (401 → bad_key). Everything else falls through to the shared classifier.
-    const reason: ExtractFailureReason =
-      message === 'truncated' ? 'too_long' : classifyError(err) // classifyError yields bad_key for 401s
+    const reason: ExtractFailureReason = message === 'truncated' ? 'too_long' : classifyError(err) // classifyError yields bad_key for 401s
     return { ok: false, reason, message }
   }
 }
@@ -197,9 +196,16 @@ function validateExtraction(
     status: v.status,
     attributes: v.attributes,
     matches: existing
-      .map((e) => ({ entityId: e.id, name: e.name, type: e.type, score: nameMatchScore(v.name, e.name) }))
+      .map((e) => ({
+        entityId: e.id,
+        name: e.name,
+        type: e.type,
+        score: nameMatchScore(v.name, e.name)
+      }))
       .filter((m) => m.score >= FUZZY_THRESHOLD)
-      .sort((a, b) => (a.type === v.type ? 0 : 1) - (b.type === v.type ? 0 : 1) || b.score - a.score)
+      .sort(
+        (a, b) => (a.type === v.type ? 0 : 1) - (b.type === v.type ? 0 : 1) || b.score - a.score
+      )
       .slice(0, 3)
   }))
 
@@ -246,7 +252,9 @@ function validateExtraction(
     seenNoteNorms.add(norm)
     if (existingNorms.some((ex) => ex.norm === norm)) continue // already recorded verbatim
     const tokens = noteTokens(content)
-    const possibleDuplicate = existingNorms.some((ex) => jaccard(tokens, ex.tokens) >= NOTE_DUP_THRESHOLD)
+    const possibleDuplicate = existingNorms.some(
+      (ex) => jaccard(tokens, ex.tokens) >= NOTE_DUP_THRESHOLD
+    )
     const tags = (Array.isArray(n.tags) ? n.tags : [])
       .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
       .map((t) => t.trim())
@@ -376,7 +384,8 @@ export function validateRelationshipChanges(
     // Tie enrichment (ADR-033) — only meaningful on a FORM (a new edge carries the metadata; sever closes
     // an existing one). Cap lengths; snap confidence to the note vocabulary (default confirmed).
     const isForm = rc.action === 'form'
-    const cap = (s: string | undefined, n: number): string | null => strOrUndef(s)?.slice(0, n) ?? null
+    const cap = (s: string | undefined, n: number): string | null =>
+      strOrUndef(s)?.slice(0, n) ?? null
     const confidence: NoteConfidence =
       isForm && (rc.confidence === 'rumored' || rc.confidence === 'suspected')
         ? rc.confidence
@@ -421,7 +430,8 @@ export function validateFieldChanges(
     const oldValue = strOrUndef(fc.oldValue) ?? null
 
     const isDescription = field === 'description'
-    const isPromoted = !isDescription && (field === 'traits' || field === 'goals' || field === 'flaws')
+    const isPromoted =
+      !isDescription && (field === 'traits' || field === 'goals' || field === 'flaws')
     if (isPromoted && !profileFor(ent.type)[field as 'traits' | 'goals' | 'flaws']) continue
     const profField =
       isPromoted || isDescription ? null : profileFor(ent.type).fields.find((f) => f.key === field)
@@ -492,7 +502,11 @@ function normalizeNoteText(s: string): string {
 
 /** Meaningful words (≥3 chars) as a set — order/casing/punctuation don't matter for similarity. */
 function noteTokens(s: string): Set<string> {
-  return new Set(normalizeNoteText(s).split(' ').filter((t) => t.length >= 3))
+  return new Set(
+    normalizeNoteText(s)
+      .split(' ')
+      .filter((t) => t.length >= 3)
+  )
 }
 
 function jaccard(a: Set<string>, b: Set<string>): number {
@@ -553,8 +567,8 @@ export function applyChangeset(
         name: ce.name,
         description: ce.description,
         status: ce.status,
-        // A preset status carries an explicit lifecycle (npc "Missing" → presumed_ended) that the
-        // heuristic can never derive (ADR-021) — adopt it, exactly like the form's combobox does.
+        // A preset status carries an explicit lifecycle (creature "Defeated" → ended, which the heuristic
+        // would read as active) — adopt it, exactly like the form's combobox does (ADR-021).
         lifecycle: presetStatusFor(ce.type, ce.status ?? null)?.lifecycle,
         attributes: ce.attributes,
         // Backfill (ADR-018): stamp the baseline at the entity's intro session, falling back to the
@@ -600,7 +614,10 @@ export function applyChangeset(
       const fromId = resolve(rc.fromRef)
       const toId = resolve(rc.toRef)
       if (!fromId || !toId || fromId === toId) {
-        result.skipped.push({ kind: 'change', reason: 'a relationship change had no valid endpoints' })
+        result.skipped.push({
+          kind: 'change',
+          reason: 'a relationship change had no valid endpoints'
+        })
         continue
       }
       if (rc.action === 'form') {
