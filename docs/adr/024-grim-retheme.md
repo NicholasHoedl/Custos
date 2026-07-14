@@ -11,7 +11,7 @@ Accepted
 
 The renderer shipped on the original Phase-0 palette — a cool cyan/slate "charcoal-teal canvas with one
 vivid cyan accent" (ARCHITECTURE §1). It was clean but generic, and it never carried the *mood* of the
-product: Ledger is a cold tally of "debts, deeds, and the dead," a grim record that outlives everyone in
+product: Custos is a cold tally of "debts, deeds, and the dead," a grim record that outlives everyone in
 it. A standing developer directive (recorded in agent memory) is that the UI must be **distinctive, never
 generic AI beige** — a recurring failure mode. The visual identity had drifted from the product's spine.
 

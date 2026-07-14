@@ -1,4 +1,4 @@
-# Ledger — Architecture Document
+# Custos — Architecture Document
 
 **Version:** 0.1 (MVP Planning)
 **Date:** 2026-06-25 · **Last currency review:** 2026-07-12 (through ADR-045)
@@ -182,7 +182,7 @@ Transformers.js with ONNX runs the same model family in the Node.js main process
 
 ### Window Layout (single-window)
 
-Ledger is a **single-window** app with **panel switching** (confirmed by the developer over a multi-panel layout). The window is a persistent left **Sidebar** (campaign selector + nav: Journal / Capture / Recall / Suggest / Converse / Settings / entity browser) plus a single **MainPanel** that renders exactly one feature view at a time; clicking a sidebar item swaps the active view. There is **no persistent secondary "AI drawer"** — Recall, Suggest, and Converse are their own full panels, not always-on side rails. View switching is client-side (a lightweight router / tab switcher in the renderer; the active view lives in renderer state — see ADR-007). The global quick-add hotkey (below) is the one path that surfaces capture without first switching panels.
+Custos is a **single-window** app with **panel switching** (confirmed by the developer over a multi-panel layout). The window is a persistent left **Sidebar** (campaign selector + nav: Journal / Capture / Recall / Suggest / Converse / Settings / entity browser) plus a single **MainPanel** that renders exactly one feature view at a time; clicking a sidebar item swaps the active view. There is **no persistent secondary "AI drawer"** — Recall, Suggest, and Converse are their own full panels, not always-on side rails. View switching is client-side (a lightweight router / tab switcher in the renderer; the active view lives in renderer state — see ADR-007). The global quick-add hotkey (below) is the one path that surfaces capture without first switching panels.
 
 ### Security Boundary
 
@@ -196,7 +196,7 @@ The renderer process is an untrusted environment (it runs Chromium, which could 
 
 ### Global Quick-Add Hotkey (accounted for from Phase 0)
 
-The developer wants a **system-level global quick-add hotkey** that works even when Ledger is not focused, so the window/main-process architecture accommodates it from the start rather than bolting it on later:
+The developer wants a **system-level global quick-add hotkey** that works even when Custos is not focused, so the window/main-process architecture accommodates it from the start rather than bolting it on later:
 
 - `app.requestSingleInstanceLock()` in `src/main/index.ts` — a single instance owns the global shortcut; a second launch focuses the existing window.
 - `globalShortcut.register()` (configurable; default e.g. `Ctrl+Alt+L`) registered on `app.whenReady()`, released on `will-quit`.

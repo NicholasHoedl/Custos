@@ -1,4 +1,4 @@
-# Ledger — Product Specification
+# Custos — Product Specification
 
 **Version:** 0.1 (MVP Planning)
 **Date:** 2026-06-25
@@ -16,7 +16,7 @@ The core failure modes are:
 - **Retrieval failure**: Even when notes exist, finding a specific detail from three sessions ago means reading through walls of text.
 - **Context blindness**: When deciding how a character would act, players have no fast way to surface what the character knows, wants, and has experienced.
 
-Ledger solves all three.
+Custos solves all three.
 
 ---
 
@@ -79,7 +79,7 @@ AI semantic search over the user's notes. Natural-language queries return synthe
 > mechanics. The 4-of-7-attitudes design described below is the original MVP model, kept here as the
 > historical record.
 
-In-character action options during live play. Rather than a single suggestion, Ledger surfaces a **spread of plausible in-character responses** so the player can choose. Given the active PC's traits, goals, and the campaign's current situation, Claude determines which **4 attitudes** the PC is *most likely* to adopt and writes a **unique in-character action for each**.
+In-character action options during live play. Rather than a single suggestion, Custos surfaces a **spread of plausible in-character responses** so the player can choose. Given the active PC's traits, goals, and the campaign's current situation, Claude determines which **4 attitudes** the PC is *most likely* to adopt and writes a **unique in-character action for each**.
 
 **What it means:**
 - Tied to the currently active player character and campaign context
@@ -174,7 +174,7 @@ shipped as post-MVP additions — see §10.)*
 - Analytics, telemetry, or crash reporting
 - Automated session summarization
 - Calendar or session scheduling
-- Character sheet management (Ledger tracks narrative, not stats)
+- Character sheet management (Custos tracks narrative, not stats)
 
 ---
 
@@ -194,7 +194,7 @@ The MVP is successful when the developer can:
 
 ### Flow A: Starting a Session
 
-1. Launch Ledger
+1. Launch Custos
 2. Select active campaign from sidebar (or create new campaign)
 3. Create new session (auto-incrementing number, today's date, optional title)
 4. Session is now active — quick-add bar is live
@@ -231,14 +231,14 @@ The MVP is successful when the developer can:
 - **Not a VTT (virtual tabletop).** No maps, tokens, dice, or initiative.
 - **Not a multi-user tool.** No sharing, collaboration, or cloud sync.
 - **Not a general AI assistant.** Claude powers the app's *specific* AI features — Recall, Suggest, Converse, the Journal/Import extraction, and Recap — not an open, free-form chat interface.
-- **Not a campaign creator.** Ledger tracks what has happened, not what could happen (no random tables, no generators).
+- **Not a campaign creator.** Custos tracks what has happened, not what could happen (no random tables, no generators).
 - **Not a web app.** Electron desktop only; no browser hosting.
 
 ---
 
 ## 8. Assumptions (Stated Explicitly)
 
-1. The developer is always the sole user of a given Ledger installation.
+1. The developer is always the sole user of a given Custos installation.
 2. A typical campaign will have 20–100 sessions and a few hundred to a few thousand individual notes/entities — not millions of records. This informs the choice to use SQLite and a simple vector store rather than a production-scale database.
 3. The developer has a stable Anthropic API key and accepts that Recall synthesis and Suggest require internet connectivity.
 4. The developer is willing to run a local embedding model on their Windows 11 machine; CPU-only inference is acceptable given the modest data volume.

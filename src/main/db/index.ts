@@ -17,15 +17,43 @@ let rawDb: Database.Database | null = null
 
 function migrationsFolder(): string {
   // Dev: <repo>/drizzle (out/main -> ../../drizzle). Packaged: resources/drizzle (electron-builder extraResources).
-  return app.isPackaged
-    ? join(process.resourcesPath, 'drizzle')
-    : join(__dirname, '../../drizzle')
+  return app.isPackaged ? join(process.resourcesPath, 'drizzle') : join(__dirname, '../../drizzle')
+}
+
+/**
+ * One-time rebrand carry-over (Ledger → Custos). The app was renamed, which moves its data folder from
+ * `%APPDATA%\Ledger` to `%APPDATA%\Custos` and the DB from `ledger.db` to `custos.db`. If this is a fresh
+ * Custos folder but a legacy Ledger folder with a `ledger.db` exists, copy the legacy contents over —
+ * renaming `ledger.db*` → `custos.db*` — so an existing user keeps their campaign, API key, downloaded
+ * model, settings, and backups. Non-destructive: never overwrites anything already in the new folder, and
+ * leaves the old folder untouched as a fallback. Runs only when there is no `custos.db` yet.
+ */
+function migrateLegacyLedgerData(): void {
+  const userData = app.getPath('userData') // e.g. %APPDATA%\Custos
+  if (fs.existsSync(join(userData, 'custos.db'))) return // already have Custos data
+  const legacyDir = join(app.getPath('appData'), 'Ledger')
+  if (!fs.existsSync(join(legacyDir, 'ledger.db'))) return // fresh install — nothing to carry over
+  try {
+    fs.mkdirSync(userData, { recursive: true })
+    for (const entry of fs.readdirSync(legacyDir)) {
+      const renamed = entry.startsWith('ledger.db')
+        ? entry.replace('ledger.db', 'custos.db')
+        : entry
+      const dest = join(userData, renamed)
+      if (fs.existsSync(dest)) continue // never clobber anything already in the new folder
+      fs.cpSync(join(legacyDir, entry), dest, { recursive: true })
+    }
+    dlog.info('rebrand: carried existing Ledger data over to Custos')
+  } catch (e) {
+    dlog.warn('rebrand: Ledger → Custos data carry-over failed', e)
+  }
 }
 
 /** Opens (once) the local SQLite database, applies pending migrations, and returns the Drizzle handle. */
 export function getDb(): LedgerDb {
   if (db) return db
-  const file = join(app.getPath('userData'), 'ledger.db')
+  migrateLegacyLedgerData() // carry a pre-rename %APPDATA%\Ledger install over to \Custos, once
+  const file = join(app.getPath('userData'), 'custos.db')
   const existedBeforeOpen = fs.existsSync(file) // BEFORE open — opening creates the file
   rawDb = new Database(file)
   rawDb.pragma('journal_mode = WAL')

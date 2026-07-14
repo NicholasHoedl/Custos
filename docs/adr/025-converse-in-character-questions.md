@@ -12,7 +12,7 @@ Accepted
 A core loop of tabletop play is drawing out another PC's or an NPC's backstory and goals. Doing it well is
 a whole cognitive chain: hold what's been revealed about the target, notice the open threads and suspicions,
 recall their web of connections to quests / places / people, register how the *asking* character would feel
-about them — and only then phrase an actual question in that character's voice. Ledger already stores every
+about them — and only then phrase an actual question in that character's voice. Custos already stores every
 input to that chain (entities, notes with **confidence**, **Ties**, **chronology**, **PC personas**), but
 nothing assembles them into "what could my character *ask*?"
 

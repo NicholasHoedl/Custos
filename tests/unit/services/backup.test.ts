@@ -17,7 +17,7 @@ function tempDir(): string {
   return d
 }
 function makeDb(dir: string): Database.Database {
-  const db = new Database(join(dir, 'ledger.db'))
+  const db = new Database(join(dir, 'custos.db'))
   open.push(db)
   db.exec('CREATE TABLE t (v TEXT)')
   db.prepare('INSERT INTO t (v) VALUES (?)').run('hello')

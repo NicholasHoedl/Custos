@@ -142,8 +142,8 @@ describe('import-campaign.service — round-trip', () => {
     >
     const fresh = makeTestDb()
     expect(() => importCampaign(fresh, { ...snapshot, version: 99 })).toThrow(/version 99/)
-    expect(() => importCampaign(fresh, { nonsense: true })).toThrow(/not a Ledger campaign export/)
-    expect(() => importCampaign(fresh, 'a string')).toThrow(/not a Ledger campaign export/)
+    expect(() => importCampaign(fresh, { nonsense: true })).toThrow(/not a Custos campaign export/)
+    expect(() => importCampaign(fresh, 'a string')).toThrow(/not a Custos campaign export/)
   })
 
   it('drops rows whose referents are missing (hand-edited file) instead of aborting', () => {

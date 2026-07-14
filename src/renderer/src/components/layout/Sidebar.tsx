@@ -54,10 +54,16 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <BookOpen className="size-5 text-metal" />
-        <span className="font-display text-2xl font-semibold uppercase tracking-[0.18em] text-metal">
-          Ledger
-        </span>
+        <BookOpen className="size-5 shrink-0 text-metal" />
+        <div className="flex flex-col gap-0.5">
+          <span className="font-display text-2xl font-semibold uppercase leading-none tracking-[0.18em] text-metal">
+            Custos
+          </span>
+          {/* A minimalist dictionary gloss — pronunciation + definition (Custos = Latin "keeper"). */}
+          <span className="font-mono text-[10px] tracking-wide text-muted-foreground/60">
+            ˈkus-tōs · keeper, custodian
+          </span>
+        </div>
       </div>
 
       <div className="space-y-2 px-3">

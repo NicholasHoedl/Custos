@@ -1,6 +1,6 @@
-# Architecture Decision Records — Ledger
+# Architecture Decision Records — Custos
 
-This directory records the significant architecture decisions for **Ledger**, a local-first
+This directory records the significant architecture decisions for **Custos**, a local-first
 Electron desktop app for D&D narrative tracking with Claude-powered Recall (RAG) and a
 multi-tag Counsel feature.
 

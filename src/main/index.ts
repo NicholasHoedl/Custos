@@ -107,11 +107,11 @@ if (!gotTheLock) {
       log.error('database failed to open or migrate', err)
       const choice = dialog.showMessageBoxSync({
         type: 'error',
-        title: 'Ledger cannot start',
+        title: 'Custos cannot start',
         message: 'Your notes database could not be opened or upgraded.',
         detail:
           'Automatic backups live in the "backups" folder inside your data folder — restore one by ' +
-          `replacing ledger.db. Details are in logs\\main.log.\n\n${String(err)}`,
+          `replacing custos.db. Details are in logs\\main.log.\n\n${String(err)}`,
         buttons: ['Open data folder', 'Quit'],
         defaultId: 0,
         cancelId: 1,

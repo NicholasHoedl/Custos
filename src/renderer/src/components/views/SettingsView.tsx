@@ -431,7 +431,7 @@ export function SettingsView() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">Your data</h2>
           <p className="text-sm text-muted-foreground">
-            Everything lives on this device. Ledger snapshots the database on every launch (the five
+            Everything lives on this device. Custos snapshots the database on every launch (the five
             newest are kept in the backups folder) — take one on demand before anything you might
             regret.
           </p>
@@ -458,7 +458,7 @@ export function SettingsView() {
             </Button>
           </div>
           {appInfo && (
-            <p className="pt-1 text-xs text-muted-foreground">Ledger v{appInfo.version}</p>
+            <p className="pt-1 text-xs text-muted-foreground">Custos v{appInfo.version}</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
             {updateStatus?.state === 'downloaded' ? (

@@ -25,7 +25,7 @@ The open sub-decision is **what the hotkey does when pressed**.
 
 ### Option A: Focus/show the main window with the quick-add bar focused
 - **Pros:** reuses the existing `QuickAddBar`; simplest to build; one window to manage.
-- **Cons:** pulls the user out of their current app into the full Ledger window — a heavier
+- **Cons:** pulls the user out of their current app into the full Custos window — a heavier
   context switch at the table.
 
 ### Option B: A dedicated frameless, always-on-top quick-capture popup

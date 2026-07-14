@@ -12,7 +12,7 @@ integration tests: open-edge filter, forward labels, dangling-edge drop; keyless
 
 ## Context
 
-Ledger already knows every tie between entities (ADR-017's interval-based `entity_link`), but the only way
+Custos already knows every tie between entities (ADR-017's interval-based `entity_link`), but the only way
 to see them was one entity at a time in the `RelationshipEditor`. The audit asked for a single visual map
 of the campaign's web of relationships — who is allied, who owns what, who is where — as an at-a-glance
 picture and a navigation surface.

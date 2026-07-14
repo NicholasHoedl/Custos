@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <pre className="max-h-40 overflow-auto rounded-md border border-destructive/40 bg-destructive/10 p-3 text-left font-mono text-xs text-foreground">
             {error.message}
           </pre>
-          <Button onClick={() => location.reload()}>Reload Ledger</Button>
+          <Button onClick={() => location.reload()}>Reload Custos</Button>
         </div>
       </div>
     )

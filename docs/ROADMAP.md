@@ -1,4 +1,4 @@
-# Ledger — professionalization roadmap
+# Custos — professionalization roadmap
 
 Source: the 2026-07-09 professional-grade audit (deployment readiness · missing features · clunky UI ·
 coherence). This is the living plan for that work. Each item lists its intended shape and key files so
@@ -42,7 +42,7 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
   Import campaign (also reachable from the Sidebar menu).
 
 ### P0-3 ☑ Finished-app shell (version + window state + renderer errors → main.log)
-- **About/version**: IPC `app:info` → `app.getVersion()`; display "Ledger vX.Y.Z" in the Settings
+- **About/version**: IPC `app:info` → `app.getVersion()`; display "Custos vX.Y.Z" in the Settings
   "Your data"/About section (today the version exists nowhere in the UI).
 - **Window-state persistence**: main-only `window-state.ts` — persist bounds+maximized to
   `userData/window-state.json` (debounced on resize/move, flushed on close); restore on create with

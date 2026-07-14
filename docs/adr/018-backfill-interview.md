@@ -20,7 +20,7 @@ Full design, edge cases, testing plan, and decision log:
 
 ## Context
 
-The developer is adopting Ledger ~10 sessions into a running campaign, with a backlog that is part
+The developer is adopting Custos ~10 sessions into a running campaign, with a backlog that is part
 written notes, part memory. Paste-and-Extract Import (ADR-014) covers text ingestion but is passive
 (a blank paste box), attaches every note to ONE session, and extracts no status/relationship changes
 — so a backfilled past would be invisible to Chronology's as-of reconstruction (ADR-017) and the

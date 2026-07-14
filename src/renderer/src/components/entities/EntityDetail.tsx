@@ -210,7 +210,7 @@ export function EntityDetail({
 
         {fallen && (
           <p className="border-t border-border/60 pt-3 font-display text-[13px] italic text-muted-foreground">
-            “Another name for the Ledger of the Fallen.” — the Keeper
+            “Another name for the Custos of the Fallen.” — the Keeper
           </p>
         )}
       </div>

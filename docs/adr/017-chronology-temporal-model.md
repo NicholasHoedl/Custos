@@ -12,7 +12,7 @@ Full design, limitations, testing plan, and decision log: [docs/design/chronolog
 
 ## Context
 
-Ledger stores only current, overwritten state: `entity.status`, relationships (`entity_link`), and
+Custos stores only current, overwritten state: `entity.status`, relationships (`entity_link`), and
 `attributes` each hold a single value. When the duke dies or an alliance flips, the prior truth is
 lost — so the AI (Recall/Suggest) is blind to *when* facts were true and can present stale facts (a
 dead NPC, a broken alliance) as current. We want Recall/Suggest to be time-aware — reconstruct state

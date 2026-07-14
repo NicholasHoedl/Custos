@@ -155,7 +155,7 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
         <header className="flex items-center gap-2 border-b border-border px-6 py-4">
           <BookOpen className="size-5 text-primary" />
           <span className="font-display text-lg font-semibold text-foreground">
-            Welcome to Ledger
+            Welcome to Custos
           </span>
           <span className="ml-auto font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             Step {stepNumber} of {totalSteps}
@@ -294,7 +294,7 @@ function StepBody(props: {
     case 'apikey':
       return (
         <Field
-          title="Ledger's memory is powered by Claude."
+          title="Custos's memory is powered by Claude."
           hint="The Keeper needs an Anthropic API key to answer with Lore, Counsel, and Converse. It's stored encrypted on this device and only ever used to call Anthropic. This step is required to continue."
         >
           <p className="text-sm font-medium text-foreground">No key yet? Here's how:</p>

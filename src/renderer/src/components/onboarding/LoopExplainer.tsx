@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowRight, X } from 'lucide-react'
 import { LOOP_STEPS } from '@renderer/lib/guide-content'
 
-// One-time "here's how Ledger remembers" card (ROADMAP P1-3). The audit's biggest coherence gap was
+// One-time "here's how Custos remembers" card (ROADMAP P1-3). The audit's biggest coherence gap was
 // that the core loop — Chronicle → Close out → Illuminate → Ask — is invisible: onboarding teaches
 // SETUP (key, model, campaign) but never the USAGE flow. This names the ritual right where it starts,
 // at the top of the Chronicle. Mirrors OnboardingChecklist's localStorage-gated, self-dismissing card
@@ -24,7 +24,7 @@ export function LoopExplainer() {
     // Own margin (single mount site) so dismissing to null leaves no empty gap in JournalView.
     <div className="mx-4 mt-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="font-display text-base font-semibold text-foreground">How Ledger remembers</h2>
+        <h2 className="font-display text-base font-semibold text-foreground">How Custos remembers</h2>
         <button
           type="button"
           onClick={dismiss}

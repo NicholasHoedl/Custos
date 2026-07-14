@@ -1,5 +1,5 @@
-appId: com.ledger.app
-productName: Ledger
+appId: com.custos.app
+productName: Custos
 directories:
   buildResources: build
 files:
@@ -26,4 +26,4 @@ win:
 publish:
   provider: github
   owner: NicholasHoedl
-  repo: Ledger
+  repo: Custos

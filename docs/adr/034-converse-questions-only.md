@@ -15,7 +15,7 @@ direct-fetch grounding decision there still holds).
 ## Context
 
 In D&D, much story and lore is gated behind conversation — reachable only by players who ask good
-questions. Ledger already solves the *tracking* half (notes, ties, confidence, chronology). Converse
+questions. Custos already solves the *tracking* half (notes, ties, confidence, chronology). Converse
 should own the *asking* half. The shipped lens (ADR-025) returned a **briefing** (known / suspected /
 connections) plus generic **questions**. Two problems: the briefing **duplicates** what Codex and the
 other lenses already surface, and the questions were **untyped and thin** — no sense of what makes a

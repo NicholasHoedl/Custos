@@ -83,7 +83,7 @@ export function OnboardingChecklist() {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary" />
-          <h2 className="font-display text-lg font-semibold text-foreground">Welcome to Ledger</h2>
+          <h2 className="font-display text-lg font-semibold text-foreground">Welcome to Custos</h2>
         </div>
         {hasCampaign && (
           <button

@@ -1,4 +1,4 @@
-# Ledger — project guide for coding agents
+# Custos — project guide for coding agents
 
 Local-first desktop app for tracking a tabletop RPG campaign with a time-aware, AI-backed memory
 (Chronicle · Sessions · Character · Codex · Web · Lore · Counsel · Converse — see the label↔code-name
@@ -196,8 +196,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   for per-field approval; on apply `DeriveReview` does `entity.update(fields)` then `persona.generate`
   (best-effort) — it no longer emits its own persona. `PersonaEditor` (generate/regenerate/edit) is the only
   persona surface; `updatePersona` clears `stale` + re-syncs the source hash so a saved brief sticks.
-- **Live-DB safety:** SQLite runs in WAL. Never let a second process write `ledger.db` while the app is
-  open — close it first. Real failures land in `%APPDATA%\Ledger\logs\main.log` (electron-log); Import
+- **Live-DB safety:** SQLite runs in WAL. Never let a second process write `custos.db` while the app is
+  open — close it first. Real failures land in `%APPDATA%\Custos\logs\main.log` (electron-log); Import
   maps a truncated model response → `too_long` and a rejected/invalid key (401) → `bad_key`. Renderer
   CRASHES also reach that log (ErrorBoundary + window handlers → `RENDERER_ERROR_CHANNEL` → `ipc/app.ts`).
 - **App shell & cost accounting (docs/ROADMAP.md P0, as-built):** every claude.service call records
@@ -256,8 +256,24 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `--type-*` tokens) with a corner legend, the MC keeping a brighter/thicker ember ring — the one data-viz
   surface off the single-accent rule, ADR-046 revising ADR-040); the sim is **guarded on
   `activeView === 'web'`** (MainPanel keeps views mounted) — builds/reheats on activation, `stop()`s +
-  cancels rAF when hidden, positions cached in a ref so a data change doesn't scramble. Click a node →
-  `setSelectedEntity` + `setActiveView('capture')` (MC → `'character'`). No migration for the graph.
+  cancels rAF when hidden, positions cached in a ref so a data change doesn't scramble. No migration for the
+  graph. **ENRICHED (ADR-050):** `buildCampaignGraph` now takes an optional **`asOf`** (threaded through the
+  whole IPC chain) — with it the graph is the web AS OF that session: edges live at N via `isIntervalLiveAt`
+  (+ `severed`/`justFormed` flags for the "what changed" pulse + ghost), node lifecycle via
+  `resolveEntityState`, and the node SET stays the full cast so the layout doesn't scramble as the header
+  **time slider + ▶ playback** scrubs. **`GraphEdge` widened** to carry disposition/confidence/description/
+  `directed`/interval → the renderer colours edges by disposition (a warm/cold **keyword heuristic** in
+  `WebView.tsx`), dashes by confidence, draws arrowheads on directed relations
+  (`RELATIONS[k].symmetric === false`), and sizes nodes by **degree**. The view is now an **AI hub** via the
+  new **`openLens`** ui-store seam (`pendingLens = {view,targetId?,query?}`, consumed on mount by
+  `ConverseView`/`RecallView`, cleared via `consumePendingLens`): a node's **right-click menu** → Converse an
+  NPC / ask Lore about it / Open; **shift-click two nodes** → Lore "what's between them?". Plus interactive
+  **type-filter chips** (the legend is now clickable) + hide-fallen, **search/jump-to-node** (centres on a
+  match), **click-to-focus** (isolate 1-hop neighbours; background-tap clears), opt-in **clustering** (a gentle
+  grouping force by `located_in`/`member_of` parent, derived from the live edges), and **PNG export**. Plain
+  node-open moved into the context menu (MC → `'character'`, else `setSelectedEntity` + `'capture'`).
+  **Shortest-path + graph-side merge/set-portrait deferred; no new dep** (native range slider + hand-rolled
+  overlay menu, not shadcn/Radix).
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.
@@ -280,7 +296,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `plantKeyAndReload` (`helpers.ts`); one spec per lens (`suggest`/`converse`/`recall`/`recap`/`transcribe`/
   `draft`/`close-out`). **17 e2e specs currently green** (17 tests across 13 spec files).
 - **Distribution + auto-update (docs/ROADMAP.md P2-1, ADR-042):** `npm run dist` builds the NSIS installer
-  (`Ledger Setup X.Y.Z.exe`) via `electron-builder.yml`; the `publish: github` block makes it also emit
+  (`Custos Setup X.Y.Z.exe`) via `electron-builder.yml`; the `publish: github` block makes it also emit
   `latest.yml` (the electron-updater feed). **Auto-update is PACKAGED-ONLY** — `services/updater.service.ts`
   (`initAutoUpdater`/`checkForUpdates`/`quitAndInstall`) guards on `!app.isPackaged`, so it no-ops in dev
   and e2e (the Settings control reports `disabled`); it's wired via `ipc/update.ts` `registerUpdateHandlers(send)`

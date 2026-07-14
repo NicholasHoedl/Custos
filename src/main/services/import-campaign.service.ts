@@ -28,14 +28,14 @@ function chunked<T>(rows: T[], run: (slice: T[]) => void, size = 50): void {
 /** Structural validation with user-readable failures — this parses files from disk, not our own calls. */
 function assertShape(raw: unknown): CampaignExport {
   const bad = (): never => {
-    throw new Error('This file is not a Ledger campaign export.')
+    throw new Error('This file is not a Custos campaign export.')
   }
   if (typeof raw !== 'object' || raw === null) bad()
   const d = raw as Partial<CampaignExport>
   if (typeof d.version !== 'number') bad()
   if (d.version !== CAMPAIGN_EXPORT_VERSION) {
     throw new Error(
-      `This export is version ${d.version}; this build of Ledger reads version ${CAMPAIGN_EXPORT_VERSION}.`
+      `This export is version ${d.version}; this build of Custos reads version ${CAMPAIGN_EXPORT_VERSION}.`
     )
   }
   if (typeof d.campaign !== 'object' || d.campaign === null) bad()

@@ -9,7 +9,7 @@ Accepted
 
 ## Context
 
-Ledger has two "event" concepts. The **`event_log` table** is the session log — timestamped beats of
+Custos has two "event" concepts. The **`event_log` table** is the session log — timestamped beats of
 what the party did and experienced at the table ("we stormed the manor", a dropped quote). The
 **`event` entity type** is a full graph node (date/outcome/significance attributes, `involves` /
 `involved_in` edges, embeddings). Nothing bridges them, their purposes were never delineated, and the

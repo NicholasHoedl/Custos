@@ -1,5 +1,5 @@
 {
-  "name": "ledger",
+  "name": "custos",
   "version": "0.1.0",
   "description": "Local-first D&D narrative tracker with Claude-powered recall and in-character suggestions",
   "main": "./out/main/index.js",
@@ -9,10 +9,10 @@
   },
   "license": "UNLICENSED",
   "private": true,
-  "homepage": "https://github.com/NicholasHoedl/Ledger#readme",
+  "homepage": "https://github.com/NicholasHoedl/Custos#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NicholasHoedl/Ledger.git"
+    "url": "git+https://github.com/NicholasHoedl/Custos.git"
   },
   "engines": {
     "node": ">=22"

@@ -13,7 +13,7 @@ for its backup/logging/recovery scope). No migration. Verified: typecheck + lint
 
 ## Context
 
-Ledger already produced a versioned NSIS installer (`npm run dist` → `Ledger Setup X.Y.Z.exe`), but had no
+Custos already produced a versioned NSIS installer (`npm run dist` → `Custos Setup X.Y.Z.exe`), but had no
 way to **ship updates**, no license file (despite a stale `"MIT"` in `package.json`), and no release
 automation. ADR-020 had deliberately deferred auto-update ("out of scope for a local-first single-user
 app; the rotating local snapshot is the 80/20"). Now that the app is audit-complete (P0/P1/P2) and ready

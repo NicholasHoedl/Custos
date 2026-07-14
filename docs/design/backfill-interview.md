@@ -12,7 +12,7 @@ design context. See ADR-018 "Status" for as-built notes.
 
 ## 1. Summary
 
-A **guided, session-aware backfill interview** for adopting Ledger mid-campaign (~10 sessions in):
+A **guided, session-aware backfill interview** for adopting Custos mid-campaign (~10 sessions in):
 the app prompts the user (roster first, then session by session), turning freeform answers + partial
 pasted notes into structured entities, notes, and **dated status/relationship changes** — attributed
 to the right session, reviewed, and applied in one transaction per batch. The backfilled past becomes

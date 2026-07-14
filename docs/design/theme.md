@@ -1,4 +1,4 @@
-# Theme — Grim Dark-Fantasy ("the Ledger")
+# Theme — Grim Dark-Fantasy ("the Custos")
 
 **Status:** Implemented. The re-theme shipped across the renderer — palette, typography touches, the
 glossary, the death motif, and a targeted Keeper voice. This doc is the as-built reference.
@@ -13,14 +13,16 @@ glossary, the death motif, and a targeted Keeper voice. This doc is the as-built
 - **Voice:** *targeted* — the Keeper register lands on high-visibility copy (empty/idle states, key
   toasts, the Fallen footer); functional micro-copy (field labels, error details, example queries)
   stays plain.
-- **No taglines.** The wordmark stands alone — there is no subtitle under "Ledger" (an explicit
-  directive; the old "Phase 1 · capture" footer was removed too).
+- **No marketing taglines** — but the wordmark carries a small **dictionary gloss**: one muted line under
+  "Custos" giving the pronunciation + the dictionary definition (`ˈkus-tōs · keeper, custodian` — the
+  official English sense, per Merriam-Webster), editorial, not a slogan. (The old "Phase 1 · capture" status footer stays gone.)
 
 ## The spine
 
-The app is named **Ledger** — a cold tally of debts, deeds, and the dead. The Ledger is a grim record
-that remembers everything and outlives everyone in it. The AI is a single persona, **the Keeper**, who
-consults the lore, gives counsel, and transcribes your scattered pages. One metaphor, names reinforcing.
+The app is named **Custos** — Latin for *keeper*, *guardian*, *watchman*: the one who keeps the record of
+debts, deeds, and the dead. Custos is a grim vigil that remembers everything and outlives everyone in it.
+The AI is a single persona, **the Keeper**, who consults the lore, gives counsel, and transcribes your
+scattered pages. One metaphor, names reinforcing — the Custos is kept by the Keeper.
 
 ## Glossary (as shipped)
 
@@ -30,7 +32,7 @@ rename point, compile-guarded by exhaustive typing.
 
 | Surface | Shipped term | Notes |
 |---|---|---|
-| App identity | **Ledger** (kept) | wordmark only — no subtitle |
+| App identity | **Custos** (kept) | wordmark only — no subtitle |
 | The AI | **the Keeper** | one persona; surfaces in high-visibility copy |
 | Journal | **Chronicle** | the running log (internal table stays `event_log`) |
 | Capture (entity hub) | **Codex** | the reference collection |
@@ -129,7 +131,7 @@ The existing lifecycle + note-confidence model *becomes* the visual language —
 for generic AI beige:
 - **Fallen** = name struck through + a `--blood` skull (in both EntityDetail and the entity list);
   **Presumed lost** = ghosted + a faint skull. A single Keeper line closes a Fallen entity's page:
-  *"Another name for the Ledger of the Fallen."*
+  *"Another name for the Custos of the Fallen."*
 - **Confidence** on Annals: Known = unmarked · Hearsay / Whispered = a dashed mark (`CircleDashed`) in
   pewter (`text-metal`).
 

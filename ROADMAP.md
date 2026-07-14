@@ -1,4 +1,4 @@
-# Ledger — Development Roadmap
+# Custos — Development Roadmap
 
 **Version:** 0.1 (MVP Planning)
 **Date:** 2026-06-25 · **Status updated:** 2026-07-02
@@ -51,12 +51,12 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Create `src/renderer/styles/globals.css` with CSS custom properties for the confirmed color palette (cool cyan→slate→charcoal; dark-first — dominant = jet-black/slate, single sharp accent = vivid cyan `#32e5eb`; see ARCHITECTURE §1 "Color Palette & Design Language" for the full Tailwind palette and the anti-"beige ledger" guardrails), plus font-face declarations for Bricolage Grotesque, Fraunces, and JetBrains Mono
 - Expose the semantic tokens to Tailwind via an `@theme inline` block in globals.css (Tailwind v4 CSS-first; no `tailwind.config.ts`)
 - Verify fonts render correctly in the Electron window
-- Expected output: A styled "Ledger" heading in Fraunces renders; a shadcn Button renders; no inline styles present
+- Expected output: A styled "Custos" heading in Fraunces renders; a shadcn Button renders; no inline styles present
 
 **P0-03: SQLite + Drizzle setup**
 - Install `better-sqlite3` and its TypeScript types; install `drizzle-orm` and `drizzle-kit`
 - Write `src/main/db/schema.ts` with all tables from the data model (Campaign, Session, Entity, Note, EntityLink, EventLog) — no vector tables yet
-- Write the initial Drizzle migration; run it against a dev database at `app.getPath('userData')/ledger.db`
+- Write the initial Drizzle migration; run it against a dev database at `app.getPath('userData')/custos.db`
 - Write a thin `src/main/db/index.ts` singleton that opens the connection and applies migrations on startup
 - Expected output: App starts, database file is created, migration runs without error; `better-sqlite3` opens the file and a test query returns a result
 
@@ -83,7 +83,7 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 - Add `app.requestSingleInstanceLock()` in `src/main/index.ts`; on a second instance, focus the existing window
 - Register a `globalShortcut` (configurable; default e.g. `Ctrl+Alt+L`) on `app.whenReady()` and release it on `will-quit`. For Phase 0 it can simply show/focus the main window (full quick-capture behavior lands in Phase 1)
 - Decide the trigger behavior — focus main window vs. dedicated quick-capture popup window — and record it as ADR-010
-- Expected output: pressing the global hotkey while another app is focused brings Ledger to the foreground; only one instance can run
+- Expected output: pressing the global hotkey while another app is focused brings Custos to the foreground; only one instance can run
 
 ### Done Criteria for Phase 0 — ✅ all met
 
@@ -100,7 +100,7 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 
 ## Phase 1: Capture
 
-**Goal:** A fully functional note-taking UI for live play. The developer can run Ledger at a D&D session and capture campaigns, sessions, NPCs, locations, quests, items, events, and quotes — all with fast entry and persistent local storage. No AI. No embeddings yet.
+**Goal:** A fully functional note-taking UI for live play. The developer can run Custos at a D&D session and capture campaigns, sessions, NPCs, locations, quests, items, events, and quotes — all with fast entry and persistent local storage. No AI. No embeddings yet.
 
 ### Key Tasks
 
@@ -145,10 +145,10 @@ Phase 4+ — Later         (deferred; listed for planning reference)
 **P1-07: Quick-add bar + global hotkey**
 - Build `QuickAddBar` as a persistent element in the Capture view (always visible when a session is active)
 - In-app shortcut: focus the quick-add bar with `Ctrl+K`
-- **Global hotkey** (scaffolded in P0-07): pressing the system-level hotkey when Ledger is not focused triggers the chosen quick-capture path (focus main window with quick-add focused, or the dedicated quick-capture popup — per ADR-010), writes to the active campaign/session, and returns the user to their game
+- **Global hotkey** (scaffolded in P0-07): pressing the system-level hotkey when Custos is not focused triggers the chosen quick-capture path (focus main window with quick-add focused, or the dedicated quick-capture popup — per ADR-010), writes to the active campaign/session, and returns the user to their game
 - Flow: type name, Tab to type selector, Tab to brief note field, Enter to save
 - Saves as an Entity (if name implies one) or as an EventLog entry
-- Expected output: Developer presses the global hotkey while another window is focused, captures "Aldric Vane" as an NPC in under 5 seconds, without manually switching to Ledger first
+- Expected output: Developer presses the global hotkey while another window is focused, captures "Aldric Vane" as an NPC in under 5 seconds, without manually switching to Custos first
 
 **P1-08: Event/quote log**
 - Build `EventFeed` component showing all EventLog entries for the active session in chronological order

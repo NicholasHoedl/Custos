@@ -15,12 +15,12 @@ test.afterAll(async () => {
   cleanup(userDataDir)
 })
 
-test('launches with the Ledger window title', async () => {
-  expect(await page.title()).toBe('Ledger')
+test('launches with the Custos window title', async () => {
+  expect(await page.title()).toBe('Custos')
 })
 
-test('renders the Ledger wordmark', async () => {
-  await expect(page.getByText('Ledger').first()).toBeVisible()
+test('renders the Custos wordmark', async () => {
+  await expect(page.getByText('Custos').first()).toBeVisible()
 })
 
 test('typed IPC bridge round-trips: campaign.list() -> []', async () => {

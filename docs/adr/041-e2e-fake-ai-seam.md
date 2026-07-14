@@ -13,7 +13,7 @@ e2e (10 tests, incl. the new `close-out.spec.ts` — 2 cases).
 ## Context
 
 The **"Close out session" wizard** (`capture/CloseOutDialog.tsx`) is the most complex, highest-risk UI in
-Ledger — a *locked* multi-step ritual: extract → review → apply (DB) → Illuminate scan → enrich → review →
+Custos — a *locked* multi-step ritual: extract → review → apply (DB) → Illuminate scan → enrich → review →
 apply → done. It had **zero** automated coverage, because the flow calls Claude twice (tier-1 extraction,
 tier-2 enrichment) and the e2e harness is keyless/offline. `suggest.spec.ts` had already conceded that the
 live-AI path "requires a real API key + network and is covered by the manual harness, not e2e." So the

@@ -1,4 +1,4 @@
-# Ledger
+# Custos
 
 A local-first desktop app for tracking a tabletop RPG campaign — with a memory that understands
 **time**. Capture the people, places, factions, quests, and events of your game; then ask questions
@@ -41,10 +41,10 @@ Drizzle ORM · local sentence embeddings via Transformers.js (all-MiniLM-L6-v2) 
 
 ## Download & install
 
-Grab the latest `Ledger Setup X.Y.Z.exe` from the [Releases](https://github.com/NicholasHoedl/Ledger/releases)
+Grab the latest `Custos Setup X.Y.Z.exe` from the [Releases](https://github.com/NicholasHoedl/Custos/releases)
 page and run it (a per-user install, no admin needed). The installer is **not yet code-signed**, so
 Windows SmartScreen may warn about an "unknown publisher" — choose **More info → Run anyway**. Once
-installed, Ledger **updates itself**: it checks for new releases on launch and installs them in the
+installed, Custos **updates itself**: it checks for new releases on launch and installs them in the
 background, and you can check manually from **Settings → Your data → Check for updates**.
 
 ## Getting started (from source)
@@ -80,11 +80,11 @@ either; Lore and Counsel need both; Converse and the Character page's AI tools n
 
 ## Your data
 
-Everything is stored under the app's user-data directory (`%APPDATA%\Ledger` on Windows):
+Everything is stored under the app's user-data directory (`%APPDATA%\Custos` on Windows):
 
-- `ledger.db` — the campaign database (SQLite/WAL).
+- `custos.db` — the campaign database (SQLite/WAL).
 - `backups/` — a rotating snapshot of the DB taken before migrations on each launch (keeps the 5
-  newest). To restore, replace `ledger.db` with a backup while the app is closed.
+  newest). To restore, replace `custos.db` with a backup while the app is closed.
 - `logs/main.log` — the main-process log (rotates at 1 MiB).
 - `models/` — the downloaded embedding model.
 - `anthropic.key.enc` — your encrypted API key.

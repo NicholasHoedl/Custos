@@ -9,7 +9,7 @@ Accepted
 
 ## Context
 
-Weeks pass between D&D sessions and the table opens with "wait, where were we?". Ledger already
+Weeks pass between D&D sessions and the table opens with "wait, where were we?". Custos already
 stores a session's beats (the `event_log`) and its notes, so it can produce a "Previously on…"
 recap on demand. This is the feature the MVP spec deferred as "automated session summarization"
 (SPEC §4, out of scope) — now in scope.

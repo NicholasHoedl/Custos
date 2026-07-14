@@ -120,7 +120,7 @@ export const ANTHROPIC_CONSOLE_LABEL = 'console.anthropic.com'
 
 export const API_KEY_STEPS: string[] = [
   'Open the Anthropic Console at console.anthropic.com and sign in — or create a free account.',
-  'Add a little billing credit — API usage is pay-as-you-go, and a few dollars is plenty to try Ledger.',
+  'Add a little billing credit — API usage is pay-as-you-go, and a few dollars is plenty to try Custos.',
   'Go to API keys → Create Key, then copy the key (it starts with “sk-ant-”).',
-  "Paste it into Ledger and verify — it's stored encrypted on this device and only ever used to call Anthropic."
+  "Paste it into Custos and verify — it's stored encrypted on this device and only ever used to call Anthropic."
 ]

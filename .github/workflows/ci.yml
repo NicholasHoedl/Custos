@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: windows-latest # target-OS fidelity: Ledger ships Windows-only
+    runs-on: windows-latest # target-OS fidelity: Custos ships Windows-only
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

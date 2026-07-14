@@ -45,7 +45,7 @@ Ship an operational-safety layer, main-process-first:
    uncaught main exceptions/rejections. The five scattered `console.*` sites are migrated to scoped
    loggers. The previously-silent WAL-checkpoint failure now logs an error.
 3. **Startup recovery dialog.** `getDb()` + the health check are wrapped in try/catch; a failure logs
-   the error and shows a native `dialog.showMessageBoxSync` ("Ledger cannot start" → *Open data
+   the error and shows a native `dialog.showMessageBoxSync` ("Custos cannot start" → *Open data
    folder* / *Quit*) that points at the backups and the log, then quits cleanly (firing the
    WAL-checkpoint close). No window, IPC, or hotkey starts on the failure path.
 4. **Renderer resilience.** A hand-rolled `ErrorBoundary` (React still needs a class for
@@ -89,7 +89,7 @@ Ship an operational-safety layer, main-process-first:
 `npm run dist` packages with `electron-builder --config.npmRebuild=false`. `better-sqlite3` is
 already compiled for the Electron ABI by the `postinstall` (`electron-builder install-app-deps`), so
 the package-time rebuild is redundant — and it also tries to rebuild **sharp**, an *unused*
-transitive dependency of `@xenova/transformers` (Ledger embeds text only, never images), whose
+transitive dependency of `@xenova/transformers` (Custos embeds text only, never images), whose
 `libvips` DLLs intermittently fail to unlink on Windows. Skipping the rebuild packages the
 already-correct binaries and never touches sharp. A future slim-down could also exclude
 `node_modules/sharp/**` from the bundle, pending a check that transformers' optional sharp-require

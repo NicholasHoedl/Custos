@@ -16,7 +16,7 @@ import {
   DialogTitle
 } from '@renderer/components/ui/dialog'
 
-// The always-available Quickstart guide (ADR-045) — a reference to Ledger's core loop, every tool, and how
+// The always-available Quickstart guide (ADR-045) — a reference to Custos's core loop, every tool, and how
 // to get set up. Opened from an out-of-the-way button at the bottom of the Sidebar. All copy comes from
 // `lib/guide-content.tsx`, shared with the first-run tutorial's tour + the Chronicle LoopExplainer, so the
 // three surfaces never drift. It backstops the loop teaching that the trimmed tutorial no longer runs.
@@ -36,7 +36,7 @@ export function QuickstartGuide({
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Quickstart guide</DialogTitle>
           <DialogDescription>
-            How Ledger works, and what each tool is for. Open this any time from the button at the bottom of
+            How Custos works, and what each tool is for. Open this any time from the button at the bottom of
             the sidebar.
           </DialogDescription>
         </DialogHeader>
