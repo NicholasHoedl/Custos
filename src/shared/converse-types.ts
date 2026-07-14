@@ -136,7 +136,8 @@ export type ConverseFailureReason =
 /**
  * The result of a Converse query. On success: the spread of in-character questions (each tagged). On
  * failure: a reason the renderer can render without try/catch (mirrors SuggestResult). There is no
- * 'no_model' reason — Converse grounds by DIRECT FETCH, not semantic search, so it needs no local model.
+ * 'no_model' reason — Converse grounds by DIRECT FETCH; any focus-scoped retrieval is model-OPTIONAL
+ * (dense only when the model is present, fuzzy always), so it still needs no local model.
  */
 export type ConverseResult =
   | { ok: true; questions: ConverseQuestion[]; cost?: AiRunCost }

@@ -17,7 +17,8 @@ const TARGET = {
   lifecycle: 'active' as const,
   traits: [] as string[],
   goals: [] as string[],
-  flaws: [] as string[]
+  flaws: [] as string[],
+  description: null as string | null
 }
 
 describe('converse prompt assembly', () => {
@@ -117,10 +118,11 @@ describe('converse prompt assembly', () => {
     expect((content[1] as { text: string }).text).toContain('Write only the in-character questions')
   })
 
-  it("renders the target's recorded nature (traits / goals / flaws) as a fact block", () => {
+  it("renders the target's recorded nature (description / traits / goals / flaws) as a fact block", () => {
     const content = buildConverseUserContent({
       target: {
         ...TARGET,
+        description: "The Redbrands' wizard leader.",
         traits: ['smooth-talker'],
         goals: ['serve the Black Spider'],
         flaws: ['vain']
@@ -133,9 +135,59 @@ describe('converse prompt assembly', () => {
       pcName: 'Vargas'
     })
     const all = content.map((b) => ('text' in b ? b.text : '')).join('\n')
+    expect(all).toContain("The Redbrands' wizard leader") // the authored description (Change 1)
     expect(all).toContain('smooth-talker')
     expect(all).toContain('serve the Black Spider')
     expect(all).toContain('vain')
+  })
+
+  it('renders focus-scoped world context as a plain-text fact block, only when provided', () => {
+    const chunk = {
+      kind: 'note' as const,
+      entityId: 'halia',
+      entityName: 'Halia Thornton',
+      entityType: 'npc' as const,
+      noteId: 'n1',
+      sessionId: null,
+      sessionLabel: null,
+      content: 'Runs the Miners Exchange and covets more power in Phandalin.',
+      confidence: 'confirmed' as const,
+      score: 0.9
+    }
+    const withCtx = buildConverseUserContent({
+      target: TARGET,
+      notes: [],
+      connections: null,
+      tie: null,
+      focus: 'the people of Phandalin',
+      worldContext: [chunk],
+      anchorLabel: null,
+      asOf: false,
+      pcName: 'Vargas'
+    })
+    for (const block of withCtx) {
+      // Plain text only — citations are incompatible with structured output.
+      expect(block.type).toBe('text')
+      expect((block as { citations?: unknown }).citations).toBeUndefined()
+    }
+    const all = withCtx.map((b) => ('text' in b ? b.text : '')).join('\n')
+    expect(all).toContain('Halia Thornton') // the retrieved entity's chunk title
+    expect(all).toContain('covets more power in Phandalin') // its content, folded in as world context
+    // The block is omitted entirely when nothing was retrieved.
+    const without = buildConverseUserContent({
+      target: TARGET,
+      notes: [],
+      connections: null,
+      tie: null,
+      focus: 'the people of Phandalin',
+      worldContext: [],
+      anchorLabel: null,
+      asOf: false,
+      pcName: 'Vargas'
+    })
+    expect(without.map((b) => ('text' in b ? b.text : '')).join('\n')).not.toContain(
+      'Halia Thornton'
+    )
   })
 
   it('folds the conversation-so-far exchanges into a follow-up block when history is given (ADR-049)', () => {

@@ -54,7 +54,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerRecallHandlers(ctx, store, send)
   registerRecapHandlers(ctx, send)
   registerSuggestHandlers(ctx, store)
-  registerConverseHandlers(ctx)
+  registerConverseHandlers(ctx, store)
   registerDeriveProfileHandlers(ctx)
   registerImportHandlers(ctx, store)
   registerEnrichHandlers(ctx) // no vector store — enrich creates no notes/entities (ADR-035)

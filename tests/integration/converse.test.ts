@@ -31,6 +31,7 @@ import { createNote } from '../../src/main/services/note.service'
 import { createLink, severLink } from '../../src/main/services/link.service'
 import { updatePersona } from '../../src/main/services/persona.service'
 import { converse } from '../../src/main/services/converse.service'
+import { BruteForceVectorStore } from '../../src/main/services/vector-store.service'
 
 /** A question item in the model's array response (ADR-034: questions only, each { question, tag, read }). */
 const Q = (
@@ -60,6 +61,7 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('grounds the call with persona, the target, its confidence-tagged notes, connections, and the asker tie', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId }) // Session 1 — the present anchor
     const pc = createEntity(ctx, {
@@ -73,7 +75,8 @@ describe('converse pipeline (mocked AI)', () => {
       campaignId,
       type: 'npc',
       name: 'Glasstaff',
-      status: 'Cornered'
+      status: 'Cornered',
+      description: "The Redbrands' wizard leader."
     })
     const manor = createEntity(ctx, { campaignId, type: 'location', name: 'Tresendar Manor' })
     createLink(ctx, {
@@ -102,7 +105,12 @@ describe('converse pipeline (mocked AI)', () => {
 
     claudeConverse.mockResolvedValue(OK)
 
-    const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: glasstaff.id }, sig())
+    const res = await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: glasstaff.id },
+      sig()
+    )
 
     expect(res.ok).toBe(true)
     if (res.ok) expect(res.questions).toHaveLength(4)
@@ -115,7 +123,7 @@ describe('converse pipeline (mocked AI)', () => {
         pcRace: string | null
         pcClass: string | null
       }
-      target: { name: string; status: string | null }
+      target: { name: string; status: string | null; description: string | null }
       notes: Array<{ content: string; confidence: string }>
       connections: string | null
       tie: string | null
@@ -128,6 +136,7 @@ describe('converse pipeline (mocked AI)', () => {
     expect(call.context.pcClass).toBe('paladin') // from pc.attributes.class
     expect(call.target.name).toBe('Glasstaff')
     expect(call.target.status).toBe('Cornered') // resolved state surfaced
+    expect(call.target.description).toBe("The Redbrands' wizard leader.") // authored description (Change 1)
     expect(call.notes.some((n) => n.content.includes('Redbrands'))).toBe(true)
     expect(call.notes.some((n) => n.confidence === 'rumored')).toBe(true) // the rumor is carried
     expect(call.connections).toContain('Tresendar Manor') // the target's 1-hop tie
@@ -138,6 +147,7 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('speed "quick" runs Sonnet + medium (default rides the Settings model/effort) — ADR-049', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId })
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
@@ -145,7 +155,7 @@ describe('converse pipeline (mocked AI)', () => {
     const npc = createEntity(ctx, { campaignId, type: 'npc', name: 'Glasstaff' })
     claudeConverse.mockResolvedValue(OK)
 
-    await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id, speed: 'quick' }, sig())
+    await converse(ctx, store, { campaignId, pcId: pc.id, targetId: npc.id, speed: 'quick' }, sig())
     const call = claudeConverse.mock.calls[0][0] as { model: string; effort: string }
     expect(call.model).toBe('claude-sonnet-4-6')
     expect(call.effort).toBe('medium')
@@ -153,6 +163,7 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('as-of: a tie severed by session N drops out of the connections at N', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     const s1 = createSession(ctx, { campaignId }) // Session 1
     const s2 = createSession(ctx, { campaignId }) // Session 2
@@ -172,18 +183,29 @@ describe('converse pipeline (mocked AI)', () => {
     claudeConverse.mockResolvedValue(OK)
 
     // Live at Session 1 → the tie is present.
-    await converse(ctx, { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 1 }, sig())
+    await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 1 },
+      sig()
+    )
     const at1 = (claudeConverse.mock.calls.at(-1)![0] as { connections: string | null }).connections
     expect(at1).toContain('The Redbrands')
 
     // At Session 2 the interval has closed → the tie is gone.
-    await converse(ctx, { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 2 }, sig())
+    await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 2 },
+      sig()
+    )
     const at2 = (claudeConverse.mock.calls.at(-1)![0] as { connections: string | null }).connections
     expect(at2 == null || !at2.includes('The Redbrands')).toBe(true)
   })
 
   it('as-of clamps the target notes to what was known by that session (the notes leak fix)', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId }) // number 1 (advances the counter so the next is number 2)
     const s2 = createSession(ctx, { campaignId }) // number 2
@@ -196,14 +218,19 @@ describe('converse pipeline (mocked AI)', () => {
     claudeConverse.mockResolvedValue(OK)
 
     // As of Session 1: the pre-tracking baseline note is in; the session-2 note must NOT leak.
-    await converse(ctx, { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 1 }, sig())
+    await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: iarno.id, asOfSession: 1 },
+      sig()
+    )
     const at1 = (claudeConverse.mock.calls.at(-1)![0] as { notes: Array<{ content: string }> })
       .notes
     expect(at1.some((n) => n.content.includes('BASELINE'))).toBe(true)
     expect(at1.some((n) => n.content.includes('LATER'))).toBe(false)
 
     // "Now" (no as-of): both notes present.
-    await converse(ctx, { campaignId, pcId: pc.id, targetId: iarno.id }, sig())
+    await converse(ctx, store, { campaignId, pcId: pc.id, targetId: iarno.id }, sig())
     const now = (claudeConverse.mock.calls.at(-1)![0] as { notes: Array<{ content: string }> })
       .notes
     expect(now.some((n) => n.content.includes('BASELINE'))).toBe(true)
@@ -212,6 +239,7 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('an empty target (no notes, no ties) still yields a questions-only result', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId })
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
@@ -225,22 +253,33 @@ describe('converse pipeline (mocked AI)', () => {
       Q('motivation', 'What is it you want in Phandalin?', 'their aim')
     ])
 
-    const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: stranger.id }, sig())
+    const res = await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: stranger.id },
+      sig()
+    )
     expect(res.ok).toBe(true)
     if (res.ok) expect(res.questions).toHaveLength(4)
   })
 
   it('rejects a non-character target and the asking PC itself (you talk WITH a character)', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
     const mine = createEntity(ctx, { campaignId, type: 'location', name: 'Wave Echo Cave' })
 
-    const asLocation = await converse(ctx, { campaignId, pcId: pc.id, targetId: mine.id }, sig())
+    const asLocation = await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: mine.id },
+      sig()
+    )
     expect(asLocation.ok).toBe(false)
     if (!asLocation.ok) expect(asLocation.reason).toBe('invalid')
 
-    const asSelf = await converse(ctx, { campaignId, pcId: pc.id, targetId: pc.id }, sig())
+    const asSelf = await converse(ctx, store, { campaignId, pcId: pc.id, targetId: pc.id }, sig())
     expect(asSelf.ok).toBe(false)
     if (!asSelf.ok) expect(asSelf.reason).toBe('invalid')
 
@@ -249,20 +288,27 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('fails no_pc when no PC is set, and invalid for an unknown target', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
 
-    const noPc = await converse(ctx, { campaignId, pcId: '', targetId: 'x' }, sig())
+    const noPc = await converse(ctx, store, { campaignId, pcId: '', targetId: 'x' }, sig())
     expect(noPc.ok).toBe(false)
     if (!noPc.ok) expect(noPc.reason).toBe('no_pc')
 
-    const bad = await converse(ctx, { campaignId, pcId: pc.id, targetId: 'nonexistent' }, sig())
+    const bad = await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: 'nonexistent' },
+      sig()
+    )
     expect(bad.ok).toBe(false)
     if (!bad.ok) expect(bad.reason).toBe('invalid')
   })
 
   it('validates the spread: drops invalid tags, blank text, and duplicate tags; caps at 4', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId })
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
@@ -283,7 +329,7 @@ describe('converse pipeline (mocked AI)', () => {
       { question: 'q8', tag: 'challenge', read: 'r' }
     ])
 
-    const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
+    const res = await converse(ctx, store, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
     expect(res.ok).toBe(true)
     if (res.ok) {
       expect(res.questions).toHaveLength(4) // capped at 4
@@ -295,6 +341,7 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('retries once, then fails invalid when too few usable questions survive', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId })
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
@@ -303,7 +350,7 @@ describe('converse pipeline (mocked AI)', () => {
 
     claudeConverse.mockResolvedValue([Q('open-probe', 'q1', 'r'), Q('lore', 'q2', 'r')]) // only 2 < floor 4
 
-    const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
+    const res = await converse(ctx, store, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toBe('invalid')
     expect(claudeConverse).toHaveBeenCalledTimes(2) // one retry
@@ -311,6 +358,7 @@ describe('converse pipeline (mocked AI)', () => {
 
   it('recovers when the retry returns a usable spread', async () => {
     const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
     const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
     createSession(ctx, { campaignId })
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
@@ -321,9 +369,40 @@ describe('converse pipeline (mocked AI)', () => {
       .mockResolvedValueOnce([Q('open-probe', 'q1', 'r')]) // too few
       .mockResolvedValueOnce(OK) // good on retry
 
-    const res = await converse(ctx, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
+    const res = await converse(ctx, store, { campaignId, pcId: pc.id, targetId: npc.id }, sig())
     expect(res.ok).toBe(true)
     if (res.ok) expect(res.questions).toHaveLength(4)
     expect(claudeConverse).toHaveBeenCalledTimes(2)
+  })
+
+  it('focus-scoped world context: fuzzy-matches an off-target entity and excludes the target (model-free)', async () => {
+    const ctx = makeTestDb()
+    const store = new BruteForceVectorStore(ctx)
+    const campaignId = createCampaign(ctx, { name: 'Phandelver' }).id
+    createSession(ctx, { campaignId })
+    const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Vargas' })
+    updatePersona(ctx, pc.id, 'BRIEF')
+    const glasstaff = createEntity(ctx, { campaignId, type: 'npc', name: 'Glasstaff' })
+    createEntity(ctx, {
+      campaignId,
+      type: 'faction',
+      name: 'The Redbrands',
+      description: 'A gang of thugs terrorizing Phandalin.'
+    })
+    claudeConverse.mockResolvedValue(OK)
+
+    // The model is absent in the test env, so dense retrieval auto-skips; the model-free fuzzy name-match
+    // still folds the focus-named entity into world context, and the target is never duplicated there.
+    await converse(
+      ctx,
+      store,
+      { campaignId, pcId: pc.id, targetId: glasstaff.id, focus: 'the Redbrands' },
+      sig()
+    )
+    const call = claudeConverse.mock.calls[0][0] as {
+      worldContext?: Array<{ entityId: string | null; entityName: string | null }>
+    }
+    expect(call.worldContext?.some((c) => c.entityName === 'The Redbrands')).toBe(true)
+    expect(call.worldContext?.every((c) => c.entityId !== glasstaff.id)).toBe(true)
   })
 })

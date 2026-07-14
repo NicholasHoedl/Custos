@@ -16,6 +16,8 @@ import { generatePersona, getPersona } from './persona.service'
 import { getEntityContext, listForEntity } from './link.service'
 import { listSessions } from './session.service'
 import { getSettings } from './settings.service'
+import { embed, isModelReady } from './embedding.service'
+import type { RetrievedChunk, VectorStore } from './vector-store.service'
 import {
   converse as claudeConverse,
   formatRelationships,
@@ -33,6 +35,10 @@ const TAG_SET = new Set<string>(CONVERSE_TAGS)
 // The spread is FOUR focused questions (cap 4, floor 4 → exactly four survive), mirroring Counsel.
 const CONVERSE_CAP = 4
 const CONVERSE_FLOOR = 4
+// Optional focus-scoped world context (Change 2): supplementary, so lighter than Suggest's TOP_K=8.
+const CONVERSE_TOP_K = 6
+const CONVERSE_FUZZY_LIMIT = 2
+const CONVERSE_CONTEXT_CAP = 6
 
 /**
  * Enforce what the JSON schema can't (ADR-034): a spread of questions with DISTINCT tags and a non-empty
@@ -56,14 +62,58 @@ function validateConverse(raw: ConverseQuestion[]): ConverseQuestion[] | null {
 }
 
 /**
+ * Optional focus-scoped world context (Change 2 — mirrors Suggest's hybrid retrieval, but SUPPLEMENTARY and
+ * model-GRACEFUL): dense search only when the embedding model is on disk (never before download / under the
+ * fake-AI seam); the fuzzy name-match always runs (model-free). The target's OWN chunks are dropped (it's
+ * already grounded by direct fetch), the merged list is deduped by the mapSources key and capped tight, and
+ * an embed hiccup degrades to whatever fuzzy found — so Converse never fails for lack of the model.
+ */
+async function gatherWorldContext(
+  store: VectorStore,
+  campaignId: string,
+  targetId: string,
+  focus: string,
+  asOf: number | undefined
+): Promise<RetrievedChunk[]> {
+  const query = focus.trim()
+  let dense: RetrievedChunk[] = []
+  if (isModelReady() && !fakeAiEnabled()) {
+    try {
+      dense = store.search(await embed(query), campaignId, CONVERSE_TOP_K, asOf)
+    } catch {
+      dense = [] // retrieval is a bonus — a broken/absent model must never sink Converse
+    }
+  }
+  const exclude = new Set<string>([
+    targetId,
+    ...dense.map((c) => c.entityId).filter((id): id is string => id !== null)
+  ])
+  const fuzzy = store.fuzzyEntityChunks(campaignId, query, exclude, CONVERSE_FUZZY_LIMIT, asOf)
+  const seen = new Set<string>()
+  const out: RetrievedChunk[] = []
+  for (const c of [...fuzzy, ...dense]) {
+    if (c.entityId === targetId) continue // the target is already grounded by direct fetch
+    const key = `${c.entityId ?? 'lore'}:${c.noteId ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(c)
+    if (out.length === CONVERSE_CONTEXT_CAP) break
+  }
+  return out
+}
+
+/**
  * Run a Converse query: resolve the asking PC + persona → gather the TARGET's grounding by DIRECT FETCH
  * (notes via getEntityContext, as-of-clamped; connections + the PC↔target tie via listForEntity, which is
  * as-of-correct; state via resolveEntityState) → ask Claude (structured, single-shot) for a spread of
  * tagged in-character questions → validate (retry once). Returns a discriminated ConverseResult so the renderer can show
- * offline / no-key / no-PC states without try/catch (ADR-008, ADR-009). No embedding model: direct fetch.
+ * offline / no-key / no-PC states without try/catch (ADR-008, ADR-009). Grounding is direct-fetch; an
+ * OPTIONAL focus-scoped retrieval adds world context only when a thread is set AND the model is present
+ * (skipped otherwise), so Converse still needs no local model.
  */
 export async function converse(
   ctx: DbContext,
+  store: VectorStore,
   req: ConverseRequest,
   signal: AbortSignal
 ): Promise<ConverseResult> {
@@ -124,6 +174,11 @@ export async function converse(
       }
     ])
 
+    // Optional focus-scoped world context (Change 2): only when a thread is set; model-graceful (see helper).
+    const worldContext = focus?.trim()
+      ? await gatherWorldContext(store, campaignId, targetId, focus, asOf)
+      : []
+
     const anchorLabel =
       asOf !== undefined
         ? `Session ${asOf}`
@@ -150,12 +205,14 @@ export async function converse(
           lifecycle: targetState.lifecycle,
           traits: target.traits,
           goals: target.goals,
-          flaws: target.flaws
+          flaws: target.flaws,
+          description: target.description
         },
         notes: targetCtx.notes,
         connections,
         tie,
         focus,
+        worldContext,
         history: req.history,
         anchorLabel,
         asOf: asOf !== undefined,

@@ -1568,11 +1568,14 @@ export function buildConverseUserContent(p: {
     traits: string[]
     goals: string[]
     flaws: string[]
+    description: string | null
   }
   notes: { confidence: NoteConfidence; content: string }[]
   connections: string | null
   tie: string | null
   focus?: string
+  /** Optional focus-scoped world context (retrieved only when a thread is set; model-graceful). */
+  worldContext?: RetrievedChunk[]
   /** Follow-up loop (ADR-049): the conversation so far — question asked + answer, per turn, oldest-first. */
   history?: { question: string; answer: string }[]
   anchorLabel: string | null
@@ -1597,6 +1600,7 @@ export function buildConverseUserContent(p: {
     text: `Who ${p.pcName} is preparing to speak with: ${p.target.name} (${p.target.type})${mark}${status}.${anchorLine}`
   })
   const nature: string[] = []
+  if (p.target.description?.trim()) nature.push(`Description: ${p.target.description.trim()}`)
   if (p.target.traits.length) nature.push(`Traits: ${p.target.traits.join(', ')}`)
   if (p.target.goals.length) nature.push(`Goals: ${p.target.goals.join(', ')}`)
   if (p.target.flaws.length) nature.push(`Flaws: ${p.target.flaws.join(', ')}`)
@@ -1632,6 +1636,13 @@ export function buildConverseUserContent(p: {
       text: `Thread — what ${p.pcName} wants to dig into (aim most questions here): ${p.focus.trim()}`
     })
   }
+  if (p.worldContext?.length) {
+    const worldNotes = p.worldContext.map((c) => `## ${chunkTitle(c)}\n${c.content}`).join('\n\n')
+    content.push({
+      type: 'text',
+      text: `What ${p.pcName}'s party knows about that thread — treat as FACT for anything about the world (people, places, and history beyond ${p.target.name}):\n\n${worldNotes}`
+    })
+  }
   if (p.history?.length) {
     const said = p.history
       .map((h, i) => `${i + 1}. You asked: "${h.question}" — They said: "${h.answer}"`)
@@ -1657,11 +1668,14 @@ export interface ConverseParams {
     traits: string[]
     goals: string[]
     flaws: string[]
+    description: string | null
   }
   notes: { confidence: NoteConfidence; content: string }[]
   connections: string | null
   tie: string | null
   focus?: string
+  /** Optional focus-scoped world context (retrieved only when a thread is set; model-graceful). */
+  worldContext?: RetrievedChunk[]
   /** Follow-up loop (ADR-049): the conversation so far — question asked + answer, per turn, oldest-first. */
   history?: { question: string; answer: string }[]
   anchorLabel: string | null
@@ -1689,6 +1703,7 @@ export async function converse(params: ConverseParams): Promise<ConverseQuestion
       connections: params.connections,
       tie: params.tie,
       focus: params.focus,
+      worldContext: params.worldContext,
       history: params.history,
       anchorLabel: params.anchorLabel,
       asOf: params.asOf,
