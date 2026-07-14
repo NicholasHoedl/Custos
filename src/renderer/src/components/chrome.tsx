@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui
 // Shared view chrome — the banner/setup-card/progress/header/body pieces every AI pane used to copy
 // locally (they had drifted apart; consolidated in the 2026-07-02 simplification pass). The unified
 // PaneHeader is a compact toolbar (icon + title + action); PaneBody is the centered scroll column
-// beneath it — 'reading' (max-w-3xl), 'form' (max-w-2xl), or 'wide' (max-w-[1600px]). Callers may pass a
+// beneath it — 'reading' (max-w-3xl) or 'form' (max-w-2xl). Callers may pass a
 // `className` max-w-* to override (e.g. Converse + Counsel both use size="reading" + max-w-4xl).
 
 /** The unified page header: a compact toolbar — an optional leading (type) icon + the title + an
@@ -40,7 +40,7 @@ export function PaneBody({
   className,
   children
 }: {
-  size?: 'reading' | 'form' | 'wide'
+  size?: 'reading' | 'form'
   className?: string
   children: ReactNode
 }) {
@@ -48,7 +48,7 @@ export function PaneBody({
     <div
       className={cn(
         'mx-auto flex w-full flex-1 flex-col gap-4 overflow-y-auto p-6',
-        size === 'reading' ? 'max-w-3xl' : size === 'wide' ? 'max-w-[1600px]' : 'max-w-2xl',
+        size === 'reading' ? 'max-w-3xl' : 'max-w-2xl',
         className
       )}
     >
