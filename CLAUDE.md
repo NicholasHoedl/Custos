@@ -103,7 +103,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (`components/lens/LensPromptInfo.tsx`) info popover with a **Using it** how-to + a **Writing a good query**
   best-practices section — copy in `lib/guide-content.tsx` `LENS_PROMPT_TIPS` (`{name,does,using,query}`; it
   generalized the old inline `CounselInfo`, so all three popovers share one shape, and the `query` bullets are
-  live weak-vs-strong A/B-validated per lens). Codex
+  live weak-vs-strong A/B-validated per lens). **Chronicle's header carries a parallel `capture/ChronicleInfo.tsx`**
+  (same `InfoPopover` primitive, in the action slot beside `SessionControl`) fed by `guide-content.tsx`
+  `CHRONICLE_TIPS` (`{name,does,using,writing}`); its **`writing`** bullets are how to phrase entries for good
+  tier-1 Extract + tier-2 Illuminate — real consistent names → entities, who-did-what → tie direction, plain
+  status changes → chronology, flagged rumor/hunch → note confidence. Codex
   reuses the ADR-046 `ENTITY_TYPE_COLOR`/`ENTITY_TYPE_ICON` maps for its
   filter chips + list badges (as do `EntityBadge`, `EntityDetail`, the command palette).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header

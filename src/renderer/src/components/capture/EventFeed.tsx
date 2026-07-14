@@ -10,6 +10,7 @@ import { formatTime } from '@renderer/lib/format'
 import { PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
 import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
+import { ChronicleInfo } from '@renderer/components/capture/ChronicleInfo'
 import { DeleteEventDialog } from '@renderer/components/capture/DeleteEventDialog'
 import { SessionControl } from '@renderer/components/sessions/SessionControl'
 
@@ -104,7 +105,12 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
         icon={NotebookPen}
         title="Chronicle"
         action={
-          activeCampaignId ? <SessionControl campaignId={activeCampaignId} className="w-64" /> : null
+          <div className="flex items-center gap-1">
+            <ChronicleInfo />
+            {activeCampaignId && (
+              <SessionControl campaignId={activeCampaignId} className="w-64" />
+            )}
+          </div>
         }
       />
 

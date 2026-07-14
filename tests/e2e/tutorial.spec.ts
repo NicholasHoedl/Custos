@@ -63,7 +63,7 @@ test('tutorial: forced, non-skippable, and finishes with a usable campaign', asy
   // The overlay is gone and the real app is usable: landed on the Chronicle with the campaign + MC live.
   // No close-out ran, so there's no extracted data — the surviving setup (locked MC + Session 1) is the proof.
   await expect(wiz).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Chronicle' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Chronicle', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Playing as Vargas/ })).toBeVisible()
 
   // The Quickstart guide — the loop teaching the trimmed tutorial no longer runs — opens from the sidebar.

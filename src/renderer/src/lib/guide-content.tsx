@@ -84,6 +84,29 @@ export const LENS_PROMPT_TIPS: Record<
   }
 }
 
+/**
+ * Copy for the Chronicle header info popover (`components/capture/ChronicleInfo.tsx`) — the capture-side
+ * counterpart to `LENS_PROMPT_TIPS`. `writing` is the important half: how to phrase entries so the tier-1
+ * Extract (real names → entities, plain status changes → chronology, rumor/suspicion → note confidence) and
+ * tier-2 Illuminate (who-did-what → relationship direction) read them well. The Keeper only knows what you write.
+ */
+export const CHRONICLE_TIPS: { name: string; does: string; using: string[]; writing: string[] } = {
+  name: 'Chronicle',
+  does: 'A plain running log of your session. Later, Extract turns it into people, places, and notes, and Illuminate fills in how they connect — so the Keeper can answer from what you actually played.',
+  using: [
+    'Jot one plain line as things happen — a sentence or two, no polish needed. The newest sits at the bottom, like a transcript.',
+    'Type “/” to drop in an entity by name — or “/npc”, “/loc”, “/que”… to browse a type — without leaving the composer to look it up.',
+    'When the night’s over, open the Sessions page and run Extract, then Illuminate. Editing a line afterward won’t rewrite notes you’ve already extracted — they’re separate records.'
+  ],
+  writing: [
+    'Use real names, spelled the same way every time. “Glasstaff”, “Sildar”, “Tresendar Manor” become entities the Keeper can track; “the wizard” or “him” give it nothing, and a name spelled two ways can split into two.',
+    'Say who did what to whom. “Glasstaff leads the Redbrands”, “Sildar hired us to find Gundren” — a clear subject and object let Illuminate draw the right relationship, in the right direction.',
+    'Record status changes the moment they land. “Sildar is captured”, “Iarno is dead”, “the Redbrands are broken” — state drives the timeline, so the Keeper knows what’s true as of each session.',
+    'Flag rumor and hunches. “We heard Cragmaw took Gundren”, “we suspect the mayor’s lying” — kept as rumor or suspicion, so the Keeper hedges instead of stating them as fact.',
+    'The Keeper only knows what you write. One concrete line beats a page of vague ones — and you can always add detail before you Extract.'
+  ]
+}
+
 /** The tools, grouped into the three teaching screens (nav order within each). */
 export const TOUR_GROUPS: Record<
   'tour-capture' | 'tour-world' | 'tour-ask',

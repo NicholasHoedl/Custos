@@ -29,7 +29,7 @@ test('mention: /npc offers an entity and inserts its name', async () => {
   await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
 
   // Back to Chronicle and start a session so the capture composer renders.
-  await page.getByRole('button', { name: 'Chronicle' }).click()
+  await page.getByRole('button', { name: 'Chronicle', exact: true }).click()
   await page.getByRole('button', { name: 'New session' }).click()
 
   const composer = page.getByPlaceholder(/What happened/)
@@ -61,4 +61,12 @@ test('mention: free-text /<name> fuzzy-searches all types (multi-word, no catego
 
   await expect(composer).toHaveValue(/Aldric Vane\s/)
   await expect(composer).not.toHaveValue(/\/aldric/)
+})
+
+// The Chronicle header info popover (ChronicleInfo) — same variety as the AI lenses' LensPromptInfo, with
+// the extraction/insight best-practices. Static copy, so a plain UI check (reuses the campaign above).
+test('chronicle: the header info popover explains writing for extraction', async () => {
+  await page.getByRole('button', { name: 'About Chronicle' }).click()
+  await expect(page.getByText('Writing for the Keeper')).toBeVisible()
+  await expect(page.getByText(/Use real names/)).toBeVisible()
 })
