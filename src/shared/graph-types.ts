@@ -1,16 +1,29 @@
-import type { Entity, EntityLink, EntityType, Lifecycle, Note, NoteConfidence } from './entity-types'
+import type {
+  Entity,
+  EntityLink,
+  EntityType,
+  Lifecycle,
+  Note,
+  NoteConfidence
+} from './entity-types'
 
 export type LinkDirection = 'out' | 'in'
 
-// The campaign relationship graph (P2-3): a flat node/edge slice of the campaign's LIVE ties, consumed by
-// the "Web" view. Deliberately minimal — just what the d3-force layout + SVG render need. Severed
-// (closed-interval) edges are excluded upstream; this is the "as it stands now" picture.
+// The campaign relationship graph (P2-3, enriched in the Web feature pass): a node/edge slice of the
+// campaign's ties, consumed by the "Web" view. Carries the tie ENRICHMENT (disposition/confidence/
+// description) so edges can be styled by feeling + certainty, the DIRECTION so directed relations draw an
+// arrowhead, and the CHRONOLOGY interval so a session `asOf` can reconstruct the web at any point in time.
+// `buildCampaignGraph(ctx, campaignId, asOf?)`: with no `asOf` it's the live "as it stands now" picture
+// (open-interval edges only); with an `asOf` it's the web AS OF that session — edges live then, plus those
+// just-formed / just-severed at N, and node lifecycle reconstructed to N (`faded` de-emphasizes the fallen
+// and the not-yet-present).
 export interface GraphNode {
   id: string
   name: string
   type: EntityType
   image: string | null // portrait data URL (P2-2), clipped into the node when present
-  lifecycle: Lifecycle // drives the dimmed treatment for fallen / presumed entities
+  lifecycle: Lifecycle // live lifecycle, or reconstructed AS OF the query session when `asOf` is set
+  faded: boolean // de-emphasize: fallen/presumed (now), or ended / not-yet-present (as-of)
 }
 
 export interface GraphEdge {
@@ -19,6 +32,15 @@ export interface GraphEdge {
   to: string // target entity id
   relation: string // the stored relation key (free text; may be an unknown key)
   label: string // the forward display label (RELATIONS[relation].forward, or the raw key)
+  description: string | null // the tie's "why/when" — shown in the edge tooltip
+  fromDisposition: string | null // how `from` feels about `to` (ADR-033) — drives edge warmth
+  toDisposition: string | null // how `to` feels about `from`
+  confidence: NoteConfidence // 'confirmed' | 'rumored' | 'suspected' — drives the line dash
+  directed: boolean // draw an arrowhead (RELATIONS[relation].symmetric === false)
+  startSessionNumber: number | null // chronology interval start (null = pre-tracking)
+  endSessionNumber: number | null // chronology interval end (null = still live)
+  severed: boolean // as-of only: ended exactly at the query session — render as a fading ghost
+  justFormed: boolean // as-of only: started exactly at the query session — pulse/highlight
 }
 
 export interface CampaignGraph {

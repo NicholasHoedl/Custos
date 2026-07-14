@@ -15,7 +15,7 @@ import type {
 import { RELATIONS, isRelationAllowed, isRelationKey } from '@shared/relations'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
-import { isIntervalLiveAt } from './chronology.service'
+import { isIntervalLiveAt, resolveEntityState } from './chronology.service'
 import { getEntity, listEntities } from './entity.service'
 import { listNotesForEntity } from './note.service'
 import { resolveCaptureSessionNumber } from './session.service'
@@ -137,7 +137,8 @@ export function updateLink(ctx: DbContext, id: string, patch: UpdateLinkInput): 
   // Only the provided fields change; endpoints + relation stay immutable (ADR-033).
   const set: Partial<typeof schema.entityLink.$inferInsert> = {}
   if (patch.description !== undefined) set.description = patch.description?.trim() || null
-  if (patch.fromDisposition !== undefined) set.fromDisposition = patch.fromDisposition?.trim() || null
+  if (patch.fromDisposition !== undefined)
+    set.fromDisposition = patch.fromDisposition?.trim() || null
   if (patch.toDisposition !== undefined) set.toDisposition = patch.toDisposition?.trim() || null
   if (patch.confidence !== undefined) set.confidence = patch.confidence
   if (Object.keys(set).length > 0) {
@@ -161,32 +162,64 @@ export function listLinksForCampaign(ctx: DbContext, campaignId: string): Entity
 }
 
 /**
- * The campaign relationship graph (P2-3): every entity as a node and every LIVE tie as a labelled edge,
- * for the "Web" view. Only open intervals (`endSessionNumber === null`) are edges — a severed tie is
- * history, not a current relationship. Edges whose endpoints aren't in the node set are dropped
- * defensively (they shouldn't occur — deleteEntity cascades — but a dangling ref must never crash the
- * layout). Structural, so no chronology/as-of param; the label is the forward display string.
+ * The campaign relationship graph (P2-3, enriched in the Web feature pass): every entity as a node and its
+ * ties as labelled edges, for the "Web" view. Edges carry the tie ENRICHMENT (disposition/confidence/
+ * description) + DIRECTION + chronology INTERVAL so the renderer can style by feeling/certainty, draw
+ * arrowheads on directed relations, and reconstruct the web at any session. Endpoints not in the node set
+ * are dropped defensively (deleteEntity cascades, so this shouldn't occur — but a dangling ref must never
+ * crash the layout).
+ *
+ * `asOf` (session number) drives the time slider: with no `asOf` it's the live "now" picture (open-interval
+ * edges only, live lifecycle). With an `asOf` it's the web AS OF that session — edges live at N (via
+ * `isIntervalLiveAt`) PLUS ties severed exactly at N (kept as fading `severed` ghosts) and formed exactly at
+ * N (`justFormed`, for the "what changed" pulse); older-severed and future ties are dropped. Node lifecycle
+ * is reconstructed to N via `resolveEntityState`, and `faded` de-emphasizes the fallen (now + as-of) and the
+ * not-yet-present (as-of, whose reconstruction is `unknown`). The node SET is always the full cast so the
+ * layout stays stable as the slider moves — only edges and dimming change.
  */
-export function buildCampaignGraph(ctx: DbContext, campaignId: string): CampaignGraph {
+export function buildCampaignGraph(
+  ctx: DbContext,
+  campaignId: string,
+  asOf?: number
+): CampaignGraph {
   const entities = listEntities(ctx, campaignId)
-  const nodes: GraphNode[] = entities.map((e) => ({
-    id: e.id,
-    name: e.name,
-    type: e.type,
-    image: e.image,
-    lifecycle: e.lifecycle
-  }))
+  const nodes: GraphNode[] = entities.map((e) => {
+    const lifecycle = asOf === undefined ? e.lifecycle : resolveEntityState(ctx, e, asOf).lifecycle
+    const faded =
+      lifecycle === 'ended' ||
+      lifecycle === 'presumed_ended' ||
+      (asOf !== undefined && lifecycle === 'unknown') // reconstructed 'unknown' at N = not present yet
+    return { id: e.id, name: e.name, type: e.type, image: e.image, lifecycle, faded }
+  })
   const ids = new Set(nodes.map((n) => n.id))
   const edges: GraphEdge[] = []
   for (const link of listLinksForCampaign(ctx, campaignId)) {
-    if (link.endSessionNumber !== null) continue // severed — not a current relationship
     if (!ids.has(link.fromEntityId) || !ids.has(link.toEntityId)) continue // defensive: drop dangling
+    let severed = false
+    let justFormed = false
+    if (asOf === undefined) {
+      if (link.endSessionNumber !== null) continue // now: live (open-interval) ties only
+    } else {
+      const live = isIntervalLiveAt(link.startSessionNumber, link.endSessionNumber, asOf)
+      severed = link.endSessionNumber === asOf // just ended AT N (isIntervalLiveAt treats end as exclusive)
+      if (!live && !severed) continue // older-severed or not-yet-formed at N — omit
+      justFormed = link.startSessionNumber === asOf
+    }
     edges.push({
       id: link.id,
       from: link.fromEntityId,
       to: link.toEntityId,
       relation: link.relation,
-      label: isRelationKey(link.relation) ? RELATIONS[link.relation].forward : link.relation
+      label: isRelationKey(link.relation) ? RELATIONS[link.relation].forward : link.relation,
+      description: link.description,
+      fromDisposition: link.fromDisposition,
+      toDisposition: link.toDisposition,
+      confidence: link.confidence,
+      directed: isRelationKey(link.relation) ? !RELATIONS[link.relation].symmetric : false,
+      startSessionNumber: link.startSessionNumber,
+      endSessionNumber: link.endSessionNumber,
+      severed,
+      justFormed
     })
   }
   return { nodes, edges }
@@ -201,7 +234,9 @@ export function listForEntity(ctx: DbContext, entityId: string, asOf?: number): 
   const links = ctx.drizzle
     .select()
     .from(schema.entityLink)
-    .where(or(eq(schema.entityLink.fromEntityId, entityId), eq(schema.entityLink.toEntityId, entityId)))
+    .where(
+      or(eq(schema.entityLink.fromEntityId, entityId), eq(schema.entityLink.toEntityId, entityId))
+    )
     .all()
   const views: RelationshipView[] = []
   for (const l of links) {
@@ -260,9 +295,7 @@ export function getHierarchy(ctx: DbContext, entityId: string, kind: HierarchyKi
     )
     .all({ start: entityId, fwd, inv, maxDepth: MAX_DEPTH }) as Array<{ id: string; depth: number }>
 
-  const ancestors = ancRows
-    .map((r) => getEntity(ctx, r.id))
-    .filter((e): e is Entity => e !== null)
+  const ancestors = ancRows.map((r) => getEntity(ctx, r.id)).filter((e): e is Entity => e !== null)
   const descendants = descRows
     .map((r): HierarchyDescendant | null => {
       const e = getEntity(ctx, r.id)

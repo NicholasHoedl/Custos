@@ -42,6 +42,8 @@ type Speed = 'quick' | 'deep'
 export function RecallView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const pendingLens = useUiStore((s) => s.pendingLens)
+  const consumePendingLens = useUiStore((s) => s.consumePendingLens)
   const { status: onb, progress, downloading, error: setupError, download } = useOnboarding()
   const recall = useRecall()
   const [query, setQuery] = useState('')
@@ -63,6 +65,15 @@ export function RecallView() {
       rememberedRef.current++
     }
   }, [recall.turns, remember])
+
+  // Seeded from elsewhere (the Web graph: a node or node-pair → a Lore question). Pre-fill the box; the
+  // player reviews and presses Ask.
+  useEffect(() => {
+    if (pendingLens?.view === 'recall' && pendingLens.query != null) {
+      setQuery(pendingLens.query)
+      consumePendingLens()
+    }
+  }, [pendingLens, consumePendingLens])
 
   if (!activeCampaignId) {
     return (

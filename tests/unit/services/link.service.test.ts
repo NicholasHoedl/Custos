@@ -177,7 +177,11 @@ describe('link.service', () => {
 
   it('severs a relationship without deleting it, and re-forms a fresh interval', () => {
     const rowsFor = (): (typeof schema.entityLink.$inferSelect)[] =>
-      ctx.drizzle.select().from(schema.entityLink).where(eq(schema.entityLink.fromEntityId, aldric.id)).all()
+      ctx.drizzle
+        .select()
+        .from(schema.entityLink)
+        .where(eq(schema.entityLink.fromEntityId, aldric.id))
+        .all()
 
     const s1 = createSession(ctx, { campaignId }) // session 1
     const l1 = createLink(ctx, {
@@ -294,6 +298,71 @@ describe('link.service', () => {
       const g = buildCampaignGraph(ctx, campaignId)
       expect(g.nodes.map((n) => n.id)).toEqual([aldric.id])
       expect(g.edges).toHaveLength(0) // the dangling edge is dropped, not crashed on
+    })
+
+    it('carries tie enrichment + direction onto edges (no as-of flags on the live graph)', () => {
+      const mira = createEntity(ctx, { campaignId, type: 'npc', name: 'Mira' })
+      createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: inn.id,
+        relation: 'located_in',
+        description: 'Rents the upstairs room.',
+        fromDisposition: 'at home here',
+        confidence: 'rumored'
+      })
+      createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: mira.id,
+        relation: 'ally_of'
+      })
+
+      const g = buildCampaignGraph(ctx, campaignId)
+      const located = g.edges.find((e) => e.relation === 'located_in')!
+      expect(located.description).toBe('Rents the upstairs room.')
+      expect(located.fromDisposition).toBe('at home here')
+      expect(located.confidence).toBe('rumored')
+      expect(located.directed).toBe(true) // located_in is asymmetric → draws an arrowhead
+      expect(located.severed).toBe(false) // no as-of ⇒ no time flags
+      expect(located.justFormed).toBe(false)
+      expect(g.edges.find((e) => e.relation === 'ally_of')!.directed).toBe(false) // symmetric ⇒ no arrow
+    })
+
+    it('as-of reconstructs the web at a session: live + just-formed / just-severed, older history dropped', () => {
+      const mira = createEntity(ctx, { campaignId, type: 'npc', name: 'Mira' })
+      const s1 = createSession(ctx, { campaignId })
+      const s2 = createSession(ctx, { campaignId })
+      const s3 = createSession(ctx, { campaignId })
+      const tie = createLink(ctx, {
+        campaignId,
+        fromEntityId: aldric.id,
+        toEntityId: mira.id,
+        relation: 'ally_of',
+        sessionId: s1.id
+      })
+      severLink(ctx, tie.id, s2.id) // interval [s1, s2)
+
+      // AS OF s1: live, and flagged just-formed.
+      const at1 = buildCampaignGraph(ctx, campaignId, s1.number).edges.find((e) => e.id === tie.id)
+      expect(at1).toBeDefined()
+      expect(at1!.justFormed).toBe(true)
+      expect(at1!.severed).toBe(false)
+      // AS OF s2 (the session it was severed): kept as a fading ghost.
+      const at2 = buildCampaignGraph(ctx, campaignId, s2.number).edges.find((e) => e.id === tie.id)
+      expect(at2).toBeDefined()
+      expect(at2!.severed).toBe(true)
+      // AS OF s3: older history — dropped entirely.
+      expect(
+        buildCampaignGraph(ctx, campaignId, s3.number).edges.find((e) => e.id === tie.id)
+      ).toBeUndefined()
+      // The node SET is stable across time (Mira is present at every asOf).
+      expect(
+        buildCampaignGraph(ctx, campaignId, s1.number).nodes.some((n) => n.id === mira.id)
+      ).toBe(true)
+      expect(
+        buildCampaignGraph(ctx, campaignId, s3.number).nodes.some((n) => n.id === mira.id)
+      ).toBe(true)
     })
   })
 })

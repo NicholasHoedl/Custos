@@ -75,7 +75,7 @@ const api: LedgerApi = {
   graph: {
     context: (entityId, depth) => ipcRenderer.invoke(IPC.graphContext, entityId, depth),
     hierarchy: (entityId, kind) => ipcRenderer.invoke(IPC.graphHierarchy, entityId, kind),
-    campaign: (campaignId) => ipcRenderer.invoke(IPC.graphCampaign, campaignId)
+    campaign: (campaignId, asOf) => ipcRenderer.invoke(IPC.graphCampaign, campaignId, asOf)
   },
   search: {
     text: (query, campaignId) => ipcRenderer.invoke(IPC.searchText, query, campaignId)

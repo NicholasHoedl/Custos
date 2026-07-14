@@ -5,30 +5,44 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
+  type Force,
   type Simulation
 } from 'd3-force'
-import { Waypoints } from 'lucide-react'
-import { ENTITY_TYPE_LABELS, type EntityType } from '@shared/entity-types'
+import {
+  BookOpen,
+  Camera,
+  ExternalLink,
+  MessagesSquare,
+  Pause,
+  Play,
+  Search,
+  Waypoints,
+  X
+} from 'lucide-react'
+import { ENTITY_TYPE_LABELS, type EntityType, type NoteConfidence } from '@shared/entity-types'
+import type { CampaignGraph, GraphEdge, GraphNode } from '@shared/graph-types'
 import { ENTITY_TYPE_COLOR, ENTITY_TYPE_ICON } from '@renderer/lib/entity-visuals'
 import { PaneHeader } from '@renderer/components/chrome'
-import type { CampaignGraph, GraphNode } from '@shared/graph-types'
+import { Button } from '@renderer/components/ui/button'
+import { Input } from '@renderer/components/ui/input'
+import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { useCampaigns, useCampaignGraph } from '@renderer/hooks/use-ledger'
+import { useCampaigns, useCampaignGraph, useSessions } from '@renderer/hooks/use-ledger'
 
-// The "Web" view (P2-3): a read-only, force-directed map of the campaign's LIVE relationships. d3-force
-// computes the layout; we render it as hand-written SVG so it inherits the Ash & Ember theme. Each entity
-// type gets its own muted outline color + icon (ENTITY_TYPE_COLOR / ENTITY_TYPE_ICON → the --type-* tokens):
-// this is the one data-viz surface that leaves the single-accent register, but the main character still
-// stands apart with a brighter, thicker ember ring. Pan (background drag) · zoom (wheel) · drag a node to
-// reposition (it pins) · click a node to open it (MC → Character, else Codex). MainPanel keeps every view
-// mounted, so the simulation only runs while this view is active and stops when hidden.
+// The "Web" view (P2-3, enriched in the Web feature pass): a force-directed map of the campaign's
+// relationships, rendered as hand-written SVG so it inherits the Ash & Ember theme. Beyond the base
+// layout it now expresses the DATA the model already holds: edges are coloured by disposition (allied vs.
+// hostile), dashed by confidence (rumoured/suspected), and arrowed by direction; nodes scale by how
+// connected they are. A session TIME SLIDER (+ playback) reconstructs the web at any point in the story;
+// FILTER / SEARCH / FOCUS tame a large cast; and a node is a launchpad into the AI lenses (Converse an
+// NPC, ask Lore about a node or a pair). MainPanel keeps every view mounted, so the sim runs only while
+// this view is active.
 
-const NODE_R = 22 // node circle radius (world units)
-const LABEL_GAP = 30 // where the name sits below the node center
+const LABEL_GAP = 8 // extra gap below the node edge for the name label
 
-// Legend order — the living (pc/npc/creature) before the structural (faction/location) and the inert
-// (item/quest/event). Every EntityType appears; the maps in entity-visuals keep this exhaustive.
+// Legend / filter order — the living (pc/npc/creature) before the structural (faction/location) and the
+// inert (item/quest/event). Every EntityType appears; the entity-visuals maps keep this exhaustive.
 const LEGEND_ORDER: EntityType[] = [
   'pc',
   'npc',
@@ -40,17 +54,73 @@ const LEGEND_ORDER: EntityType[] = [
   'event'
 ]
 
+// ---- Edge styling: emotional temperature + epistemic weight, from the tie's own fields ----
+type EdgeTone = 'warm' | 'cold' | 'neutral'
+// A tie's temperature, read from the two free-text dispositions (ADR-033) by keyword — imperfect but
+// enough to paint alliances vs. frictions at a glance. Cold wins ties: a one-sided hostility is worth seeing.
+const WARM_WORDS =
+  /\b(all(y|ies|ied)|friend|love|loyal|trust|fond|grateful|protect|admire|respect|devot|kin|family|care|warm)/i
+const COLD_WORDS =
+  /\b(enem|hate|hostile|distrust|wary|fear|afraid|resent|rival|despis|betray|anger|angry|suspicio|contempt|threat|grudge|cold|cruel)/i
+function dispositionTone(text: string | null): EdgeTone {
+  if (!text) return 'neutral'
+  if (COLD_WORDS.test(text)) return 'cold'
+  if (WARM_WORDS.test(text)) return 'warm'
+  return 'neutral'
+}
+function edgeTone(e: GraphEdge): EdgeTone {
+  const a = dispositionTone(e.fromDisposition)
+  const b = dispositionTone(e.toDisposition)
+  if (a === 'cold' || b === 'cold') return 'cold'
+  if (a === 'warm' || b === 'warm') return 'warm'
+  return 'neutral'
+}
+const TONE_COLOR: Record<EdgeTone, string> = {
+  warm: '#5f9c86', // sage — allied
+  cold: '#c9704c', // ember-clay — hostile
+  neutral: 'var(--iron)'
+}
+const CONFIDENCE_DASH: Record<NoteConfidence, string | undefined> = {
+  confirmed: undefined,
+  suspected: '6 5',
+  rumored: '2 5'
+}
+function edgeTitle(e: GraphEdge): string {
+  const bits = [e.label]
+  if (e.confidence !== 'confirmed') bits[0] = `${e.label} (${e.confidence})`
+  if (e.description) bits.push(e.description)
+  if (e.fromDisposition) bits.push(`→ feels: ${e.fromDisposition}`)
+  if (e.toDisposition) bits.push(`← feels: ${e.toDisposition}`)
+  return bits.join(' · ')
+}
+// Node radius grows with degree so the campaign's hubs read as bigger.
+function radiusFor(degree: number): number {
+  return 16 + Math.min(16, degree * 2.2)
+}
+
 interface SimNode extends GraphNode {
   x?: number
   y?: number
+  vx?: number
+  vy?: number
   fx?: number | null
   fy?: number | null
+  r: number // radius (degree-scaled)
+  cluster: string | null // location/faction parent id (for the optional grouping force)
 }
 interface SimLink {
   source: string | SimNode
   target: string | SimNode
   id: string
+  from: string
+  to: string
   label: string
+  directed: boolean
+  tone: EdgeTone
+  dash: string | undefined
+  title: string
+  severed: boolean
+  justFormed: boolean
 }
 
 function initials(name: string): string {
@@ -60,22 +130,66 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-// A stable signature of the graph's shape — the simulation only rebuilds when the node/edge SET changes
-// (add/remove/rename/re-tie), not on every unrelated re-render.
+// A stable signature of the graph's shape + edge styling — the sim rebuilds when the node/edge SET or the
+// styling-relevant fields change (add/remove/rename/re-tie, or a time-slider move that swaps the live edges),
+// preserving positions via posRef so the map never scrambles.
 function graphSignature(g: CampaignGraph): string {
   return (
     g.nodes.map((n) => `${n.id}:${n.lifecycle}`).join(',') +
     '|' +
-    g.edges.map((e) => `${e.id}:${e.label}`).join(',')
+    g.edges.map((e) => `${e.id}:${e.severed ? 's' : e.justFormed ? 'f' : 'l'}`).join(',')
   )
+}
+
+// Cluster = a node's location (`located_in`) or faction (`member_of`) parent, derived from the live edges —
+// no extra query. Used only when the grouping force is toggled on.
+function clusterOf(nodeId: string, edges: GraphEdge[]): string | null {
+  const loc = edges.find((e) => e.from === nodeId && e.relation === 'located_in')
+  if (loc) return loc.to
+  const fac = edges.find((e) => e.from === nodeId && e.relation === 'member_of')
+  if (fac) return fac.to
+  return null
+}
+
+// A gentle grouping force (opt-in): each tick, nudge every node toward the centroid of its cluster
+// siblings so locations/factions read as loose neighbourhoods. Off by default, so it's contained even if
+// the layout it produces is imperfect.
+function clusterForce(): Force<SimNode, SimLink> {
+  let ns: SimNode[] = []
+  const force: Force<SimNode, SimLink> = (alpha) => {
+    const cen = new Map<string, { x: number; y: number; n: number }>()
+    for (const n of ns) {
+      if (!n.cluster || n.x == null || n.y == null) continue
+      const c = cen.get(n.cluster) ?? { x: 0, y: 0, n: 0 }
+      c.x += n.x
+      c.y += n.y
+      c.n += 1
+      cen.set(n.cluster, c)
+    }
+    for (const n of ns) {
+      if (!n.cluster || n.x == null || n.y == null) continue
+      const c = cen.get(n.cluster)!
+      n.vx = (n.vx ?? 0) + (c.x / c.n - n.x) * 0.14 * alpha
+      n.vy = (n.vy ?? 0) + (c.y / c.n - n.y) * 0.14 * alpha
+    }
+  }
+  force.initialize = (nodesArr) => {
+    ns = nodesArr
+  }
+  return force
 }
 
 export function WebView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const setSelectedEntity = useAppStore((s) => s.setSelectedEntity)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const openLens = useUiStore((s) => s.openLens)
   const isActive = useUiStore((s) => s.activeView === 'web')
-  const { graph, refresh } = useCampaignGraph(activeCampaignId)
+  const { sessions } = useSessions(activeCampaignId)
+
+  // Time: null = "now" (live), else the session number the web is reconstructed AS OF.
+  const [asOf, setAsOf] = useState<number | null>(null)
+  const { graph, refresh } = useCampaignGraph(activeCampaignId, asOf ?? undefined)
   const { campaigns } = useCampaigns()
   const mainCharacterId = campaigns.find((c) => c.id === activeCampaignId)?.mainCharacterId ?? null
 
@@ -83,7 +197,6 @@ export function WebView() {
   const svgRef = useRef<SVGSVGElement>(null)
   const simRef = useRef<Simulation<SimNode, SimLink> | null>(null)
   const rafRef = useRef<number | null>(null)
-  // Positions survive a rebuild (re-tie, rename) so the map doesn't scramble on every change.
   const posRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const [, repaint] = useReducer((n: number) => n + 1, 0)
 
@@ -92,7 +205,16 @@ export function WebView() {
   const [nodes, setNodes] = useState<SimNode[]>([])
   const [links, setLinks] = useState<SimLink[]>([])
 
-  // Pointer interaction state (kept in a ref so mid-drag moves don't thrash React state).
+  // View controls.
+  const [hidden, setHidden] = useState<Set<EntityType>>(new Set()) // filtered-out types
+  const [hideFallen, setHideFallen] = useState(false)
+  const [focusId, setFocusId] = useState<string | null>(null) // isolate this node + its neighbours
+  const [pair, setPair] = useState<string[]>([]) // up to 2 nodes, for "what's between them"
+  const [search, setSearch] = useState('')
+  const [cluster, setCluster] = useState(false)
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [playing, setPlaying] = useState(false)
+
   const drag = useRef<{
     mode: 'pan' | 'node' | null
     node: SimNode | null
@@ -102,14 +224,78 @@ export function WebView() {
     moved: boolean
   }>({ mode: null, node: null, startX: 0, startY: 0, startView: view, moved: false })
 
-  const signature = useMemo(() => graphSignature(graph), [graph])
+  const signature = useMemo(() => graphSignature(graph) + (cluster ? '|C' : ''), [graph, cluster])
+  const sessionNumbers = useMemo(
+    () => sessions.map((s) => s.number).sort((a, b) => a - b),
+    [sessions]
+  )
 
-  // Refetch the moment the view becomes active (entitiesVersion covers changes while it's already open).
+  // Degree (how many live ties touch each node) → node size.
+  const degree = useMemo(() => {
+    const d = new Map<string, number>()
+    for (const e of graph.edges) {
+      d.set(e.from, (d.get(e.from) ?? 0) + 1)
+      d.set(e.to, (d.get(e.to) ?? 0) + 1)
+    }
+    return d
+  }, [graph.edges])
+
+  // Neighbours of the focused node (1 hop) — for the isolate/dim treatment.
+  const neighborhood = useMemo(() => {
+    if (!focusId) return null
+    const set = new Set<string>([focusId])
+    for (const e of graph.edges) {
+      if (e.from === focusId) set.add(e.to)
+      if (e.to === focusId) set.add(e.from)
+    }
+    return set
+  }, [focusId, graph.edges])
+
+  // Which node ids are visible after the type / fallen / focus filters.
+  const visibleIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const n of graph.nodes) {
+      if (hidden.has(n.type)) continue
+      if (hideFallen && n.faded) continue
+      if (neighborhood && !neighborhood.has(n.id)) continue
+      set.add(n.id)
+    }
+    return set
+  }, [graph.nodes, hidden, hideFallen, neighborhood])
+
+  const searchMatches = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return null
+    return new Set(graph.nodes.filter((n) => n.name.toLowerCase().includes(q)).map((n) => n.id))
+  }, [search, graph.nodes])
+
   useEffect(() => {
     if (isActive) refresh()
   }, [isActive, refresh])
 
-  // Track the container size so forceCenter puts the cloud in the middle of the visible area.
+  // Playback: step the as-of slider forward one session at a time, then stop at "now".
+  useEffect(() => {
+    if (!playing) return
+    if (sessionNumbers.length === 0) {
+      setPlaying(false)
+      return
+    }
+    const id = setInterval(() => {
+      setAsOf((cur) => {
+        const first = sessionNumbers[0]
+        const last = sessionNumbers[sessionNumbers.length - 1]
+        if (cur === null) return first
+        const next = sessionNumbers.find((n) => n > cur)
+        if (next === undefined || cur >= last) {
+          setPlaying(false)
+          return null // reached the present
+        }
+        return next
+      })
+    }, 1400)
+    return () => clearInterval(id)
+  }, [playing, sessionNumbers])
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -121,8 +307,8 @@ export function WebView() {
     return () => ro.disconnect()
   }, [])
 
-  // Build (or rebuild) the force simulation. Only runs while the view is active; a fresh sim on every
-  // activation is cheap for campaign-sized graphs and lets us reheat + re-center on the current size.
+  // Build (or rebuild) the force simulation. Positions carry over via posRef so a rebuild (re-tie, rename,
+  // time-slider move) settles from where things already are rather than scrambling.
   useEffect(() => {
     if (!isActive || graph.nodes.length === 0) {
       simRef.current?.stop()
@@ -131,12 +317,31 @@ export function WebView() {
     }
     const simNodes: SimNode[] = graph.nodes.map((n) => {
       const prev = posRef.current.get(n.id)
-      return { ...n, x: prev?.x, y: prev?.y }
+      return {
+        ...n,
+        x: prev?.x,
+        y: prev?.y,
+        r: radiusFor(degree.get(n.id) ?? 0),
+        cluster: cluster ? clusterOf(n.id, graph.edges) : null
+      }
     })
     const byId = new Map(simNodes.map((n) => [n.id, n]))
     const simLinks: SimLink[] = graph.edges
       .filter((e) => byId.has(e.from) && byId.has(e.to))
-      .map((e) => ({ source: e.from, target: e.to, id: e.id, label: e.label }))
+      .map((e) => ({
+        source: e.from,
+        target: e.to,
+        id: e.id,
+        from: e.from,
+        to: e.to,
+        label: e.label,
+        directed: e.directed,
+        tone: edgeTone(e),
+        dash: CONFIDENCE_DASH[e.confidence],
+        title: edgeTitle(e),
+        severed: e.severed,
+        justFormed: e.justFormed
+      }))
 
     const sim = forceSimulation<SimNode, SimLink>(simNodes)
       .force('charge', forceManyBody<SimNode>().strength(-420))
@@ -148,7 +353,10 @@ export function WebView() {
           .strength(0.5)
       )
       .force('center', forceCenter(dims.w / 2, dims.h / 2))
-      .force('collide', forceCollide<SimNode>(NODE_R + 14))
+      .force(
+        'collide',
+        forceCollide<SimNode>().radius((d) => d.r + 10)
+      )
       .on('tick', () => {
         for (const n of simNodes) {
           if (n.x != null && n.y != null) posRef.current.set(n.id, { x: n.x, y: n.y })
@@ -161,6 +369,9 @@ export function WebView() {
         }
       })
 
+    // Optional clustering (opt-in): a gentle force pulling location/faction siblings together.
+    if (cluster) sim.force('cluster', clusterForce())
+
     simRef.current = sim
     setNodes(simNodes)
     setLinks(simLinks)
@@ -172,8 +383,6 @@ export function WebView() {
         rafRef.current = null
       }
     }
-    // Keyed on the graph SHAPE (signature) + size — NOT the graph object identity — so unrelated
-    // re-renders don't rebuild the sim mid-settle. `graph`/`repaint` are intentionally omitted.
   }, [isActive, signature, dims.w, dims.h])
 
   function toWorld(clientX: number, clientY: number): { x: number; y: number } {
@@ -185,6 +394,8 @@ export function WebView() {
 
   function onNodePointerDown(e: React.PointerEvent, node: SimNode): void {
     e.stopPropagation()
+    if (e.button === 2) return // right-click handled by onContextMenu
+    setMenu(null)
     svgRef.current?.setPointerCapture(e.pointerId)
     drag.current = {
       mode: 'node',
@@ -198,6 +409,7 @@ export function WebView() {
   }
 
   function onBackgroundPointerDown(e: React.PointerEvent): void {
+    setMenu(null)
     svgRef.current?.setPointerCapture(e.pointerId)
     drag.current = {
       mode: 'pan',
@@ -224,13 +436,18 @@ export function WebView() {
     }
   }
 
-  function onPointerUp(e: React.PointerEvent): void {
+  function onPointerUp(e: React.PointerEvent, shift: boolean): void {
     const d = drag.current
     svgRef.current?.releasePointerCapture(e.pointerId)
     if (d.mode === 'node' && d.node) {
       simRef.current?.alphaTarget(0)
-      // A tap (no real movement) opens the entity; a drag leaves it pinned where dropped.
-      if (!d.moved) openNode(d.node)
+      if (!d.moved) {
+        // A tap: shift-tap builds a 2-node comparison; a plain tap toggles focus on that node.
+        if (shift) togglePair(d.node.id)
+        else setFocusId((cur) => (cur === d.node!.id ? null : d.node!.id))
+      }
+    } else if (d.mode === 'pan' && !d.moved) {
+      setFocusId(null) // tap the background = clear focus
     }
     drag.current = { mode: null, node: null, startX: 0, startY: 0, startView: view, moved: false }
   }
@@ -244,16 +461,72 @@ export function WebView() {
     setView({ k: k2, x: mx - (mx - view.x) * f, y: my - (my - view.y) * f })
   }
 
-  function openNode(node: SimNode): void {
-    if (node.id === mainCharacterId) setActiveView('character')
+  function openNode(id: string): void {
+    if (id === mainCharacterId) setActiveView('character')
     else {
-      setSelectedEntity(node.id)
+      setSelectedEntity(id)
       setActiveView('capture')
     }
   }
 
+  function togglePair(id: string): void {
+    setPair((cur) => {
+      if (cur.includes(id)) return cur.filter((x) => x !== id)
+      return [...cur, id].slice(-2) // keep the two most recent
+    })
+  }
+
+  // Centre the viewport on a node's cached position (jump-to, from search).
+  function centerOn(id: string): void {
+    const p = posRef.current.get(id)
+    if (!p) return
+    setView((v) => ({ ...v, x: dims.w / 2 - p.x * v.k, y: dims.h / 2 - p.y * v.k }))
+  }
+
+  function exportPng(): void {
+    const svg = svgRef.current
+    if (!svg) return
+    const xml = new XMLSerializer().serializeToString(svg)
+    const svg64 = btoa(unescape(encodeURIComponent(xml)))
+    const img = new Image()
+    img.onload = () => {
+      const scale = 2
+      const canvas = document.createElement('canvas')
+      canvas.width = dims.w * scale
+      canvas.height = dims.h * scale
+      const cx = canvas.getContext('2d')
+      if (!cx) return
+      cx.scale(scale, scale)
+      cx.fillStyle =
+        getComputedStyle(document.documentElement).getPropertyValue('--char').trim() || '#17130f'
+      cx.fillRect(0, 0, dims.w, dims.h)
+      cx.drawImage(img, 0, 0)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = 'campaign-web.png'
+      a.click()
+    }
+    img.src = `data:image/svg+xml;base64,${svg64}`
+  }
+
+  const nodeById = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes])
+  const pairNames = pair.map((id) => nodeById.get(id)?.name).filter(Boolean) as string[]
+
+  function askBetween(): void {
+    if (pair.length !== 2) return
+    const [a, b] = pairNames
+    openLens({
+      view: 'recall',
+      query: `What is the relationship and shared history between ${a} and ${b}? What do we know that connects them?`
+    })
+    setPair([])
+  }
+
+  const menuNode = menu ? nodeById.get(menu.id) : null
+
   const hasCampaign = Boolean(activeCampaignId)
   const empty = hasCampaign && graph.nodes.length === 0
+  const asOfLabel = asOf === null ? 'Now' : `Session ${asOf}`
 
   return (
     <div className="flex h-full flex-col">
@@ -262,10 +535,35 @@ export function WebView() {
         title="Web"
         action={
           graph.nodes.length > 0 ? (
-            <span className="font-mono text-[11px] text-muted-foreground">
-              {graph.nodes.length} {graph.nodes.length === 1 ? 'entity' : 'entities'} ·{' '}
-              {graph.edges.length} {graph.edges.length === 1 ? 'tie' : 'ties'}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchMatches && searchMatches.size > 0) {
+                      centerOn([...searchMatches][0])
+                    }
+                  }}
+                  placeholder="Find…"
+                  className="h-7 w-32 pl-7 text-xs"
+                />
+              </div>
+              <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+                {graph.nodes.length} {graph.nodes.length === 1 ? 'entity' : 'entities'} ·{' '}
+                {graph.edges.length} {graph.edges.length === 1 ? 'tie' : 'ties'}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground"
+                title="Save as PNG"
+                onClick={exportPng}
+              >
+                <Camera className="size-4" />
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -285,9 +583,26 @@ export function WebView() {
             style={{ cursor: drag.current.mode === 'pan' ? 'grabbing' : 'grab' }}
             onPointerDown={onBackgroundPointerDown}
             onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
+            onPointerUp={(e) => onPointerUp(e, e.shiftKey)}
             onWheel={onWheel}
+            onContextMenu={(e) => e.preventDefault()}
           >
+            <defs>
+              {(['warm', 'cold', 'neutral'] as EdgeTone[]).map((t) => (
+                <marker
+                  key={t}
+                  id={`web-arrow-${t}`}
+                  viewBox="0 0 8 8"
+                  refX={7}
+                  refY={4}
+                  markerWidth={6}
+                  markerHeight={6}
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0,0 L8,4 L0,8 Z" fill={TONE_COLOR[t]} />
+                </marker>
+              ))}
+            </defs>
             <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
               {links.map((l) => {
                 const s = l.source as SimNode
@@ -295,22 +610,34 @@ export function WebView() {
                 if (s?.x == null || t?.x == null || s.y == null || t.y == null) return null
                 const mx = (s.x + t.x) / 2
                 const my = (s.y + t.y) / 2
+                const inFocus =
+                  !neighborhood || (neighborhood.has(l.from) && neighborhood.has(l.to))
+                const visible = visibleIds.has(l.from) && visibleIds.has(l.to)
+                if (!visible) return null
+                const color = TONE_COLOR[l.tone]
+                const faded = l.severed || !inFocus
                 return (
-                  <g key={l.id}>
+                  <g key={l.id} style={{ opacity: faded ? 0.28 : 1 }}>
+                    {/* Invisible wide hit-line so the thin edge is hoverable. */}
+                    <line x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="transparent" strokeWidth={12}>
+                      <title>{l.title}</title>
+                    </line>
                     <line
                       x1={s.x}
                       y1={s.y}
                       x2={t.x}
                       y2={t.y}
-                      stroke="var(--iron)"
-                      strokeWidth={1.5}
+                      stroke={color}
+                      strokeWidth={l.justFormed ? 2.5 : 1.5}
+                      strokeDasharray={l.severed ? '1 4' : l.dash}
+                      markerEnd={l.directed ? `url(#web-arrow-${l.tone})` : undefined}
                     />
                     <text
                       x={mx}
                       y={my}
                       textAnchor="middle"
                       dy="-0.2em"
-                      className="font-mono"
+                      className="pointer-events-none font-mono"
                       fontSize={8}
                       fill="var(--ash)"
                     >
@@ -322,12 +649,25 @@ export function WebView() {
 
               {nodes.map((n) => {
                 if (n.x == null || n.y == null) return null
+                if (!visibleIds.has(n.id)) return null
                 return (
                   <GraphNodeGlyph
                     key={n.id}
                     node={n}
                     isMain={n.id === mainCharacterId}
+                    inPair={pair.includes(n.id)}
+                    match={searchMatches ? searchMatches.has(n.id) : null}
                     onPointerDown={(e) => onNodePointerDown(e, n)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      const rect = containerRef.current?.getBoundingClientRect()
+                      setMenu({
+                        id: n.id,
+                        x: e.clientX - (rect?.left ?? 0),
+                        y: e.clientY - (rect?.top ?? 0)
+                      })
+                    }}
                   />
                 )
               })}
@@ -335,22 +675,156 @@ export function WebView() {
           </svg>
         )}
 
+        {/* Legend + type filter — click a type to hide/show it. */}
         {!empty && hasCampaign && (
-          <div className="pointer-events-none absolute bottom-3 left-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-border/60 bg-card/70 px-2.5 py-2 backdrop-blur-sm">
-            {LEGEND_ORDER.map((t) => {
-              const Icon = ENTITY_TYPE_ICON[t]
-              return (
-                <div key={t} className="flex items-center gap-1.5">
-                  <Icon className="size-3 shrink-0" style={{ color: ENTITY_TYPE_COLOR[t] }} />
-                  <span className="text-[10px] text-muted-foreground">{ENTITY_TYPE_LABELS[t]}</span>
-                </div>
-              )
-            })}
+          <div className="absolute bottom-3 left-3 flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-border/60 bg-card/80 px-2.5 py-2 backdrop-blur-sm">
+              {LEGEND_ORDER.map((t) => {
+                const Icon = ENTITY_TYPE_ICON[t]
+                const off = hidden.has(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() =>
+                      setHidden((cur) => {
+                        const next = new Set(cur)
+                        if (next.has(t)) next.delete(t)
+                        else next.add(t)
+                        return next
+                      })
+                    }
+                    className={cn(
+                      'flex items-center gap-1.5 rounded px-1 text-left transition-opacity hover:bg-muted/40',
+                      off && 'opacity-35'
+                    )}
+                  >
+                    <Icon className="size-3 shrink-0" style={{ color: ENTITY_TYPE_COLOR[t] }} />
+                    <span className="text-[10px] text-muted-foreground">
+                      {ENTITY_TYPE_LABELS[t]}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <ToggleChip on={hideFallen} onClick={() => setHideFallen((v) => !v)}>
+                Hide fallen
+              </ToggleChip>
+              <ToggleChip on={cluster} onClick={() => setCluster((v) => !v)}>
+                Cluster
+              </ToggleChip>
+              {focusId && (
+                <ToggleChip on onClick={() => setFocusId(null)}>
+                  <X className="size-3" /> Focus
+                </ToggleChip>
+              )}
+            </div>
           </div>
         )}
+
+        {/* Time scrubber + playback. */}
+        {!empty && hasCampaign && sessionNumbers.length > 0 && (
+          <div className="absolute right-3 top-3 flex items-center gap-2 rounded-md border border-border/60 bg-card/80 px-2.5 py-1.5 backdrop-blur-sm">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-muted-foreground"
+              title={playing ? 'Pause' : 'Play through the sessions'}
+              onClick={() => setPlaying((p) => !p)}
+            >
+              {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+            </Button>
+            <input
+              type="range"
+              min={sessionNumbers[0]}
+              max={sessionNumbers[sessionNumbers.length - 1] + 1}
+              step={1}
+              value={asOf ?? sessionNumbers[sessionNumbers.length - 1] + 1}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                setPlaying(false)
+                setAsOf(v > sessionNumbers[sessionNumbers.length - 1] ? null : v)
+              }}
+              className="h-1 w-40 cursor-pointer accent-[var(--ember-bright)]"
+            />
+            <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
+              {asOfLabel}
+            </span>
+          </div>
+        )}
+
+        {/* Pair-compare pill. */}
+        {pair.length === 2 && (
+          <div className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 shadow-lg">
+            <span className="text-xs text-muted-foreground">
+              {pairNames[0]} &amp; {pairNames[1]}
+            </span>
+            <Button size="sm" className="h-6 rounded-full text-xs" onClick={askBetween}>
+              What’s between them?
+            </Button>
+            <button
+              type="button"
+              onClick={() => setPair([])}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Node context menu (right-click). */}
+        {menu && menuNode && (
+          <>
+            <div className="fixed inset-0 z-10" onPointerDown={() => setMenu(null)} />
+            <div
+              className="absolute z-20 min-w-44 overflow-hidden rounded-md border border-border bg-popover py-1 text-sm shadow-lg"
+              style={{ left: menu.x, top: menu.y }}
+            >
+              <div className="truncate px-3 py-1 text-xs font-medium text-muted-foreground">
+                {menuNode.name}
+              </div>
+              <MenuItem
+                icon={ExternalLink}
+                onClick={() => {
+                  openNode(menu.id)
+                  setMenu(null)
+                }}
+              >
+                Open
+              </MenuItem>
+              {(menuNode.type === 'npc' || menuNode.type === 'pc') &&
+                menu.id !== mainCharacterId && (
+                  <MenuItem
+                    icon={MessagesSquare}
+                    onClick={() => {
+                      openLens({ view: 'converse', targetId: menu.id })
+                      setMenu(null)
+                    }}
+                  >
+                    Prepare questions
+                  </MenuItem>
+                )}
+              <MenuItem
+                icon={BookOpen}
+                onClick={() => {
+                  openLens({
+                    view: 'recall',
+                    query: `What do we know about ${menuNode.name}?`
+                  })
+                  setMenu(null)
+                }}
+              >
+                Ask Lore about them
+              </MenuItem>
+            </div>
+          </>
+        )}
+
         {!empty && hasCampaign && (
           <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 font-mono text-[10px] text-muted-foreground/70">
-            drag to pan · scroll to zoom · drag a node to move it · click to open
+            click a node to focus · shift-click two to compare · right-click for actions · drag to
+            pan · scroll to zoom
           </p>
         )}
       </div>
@@ -361,39 +835,53 @@ export function WebView() {
 function GraphNodeGlyph({
   node,
   isMain,
-  onPointerDown
+  inPair,
+  match,
+  onPointerDown,
+  onContextMenu
 }: {
   node: SimNode
   isMain: boolean
+  inPair: boolean
+  match: boolean | null // search: true = matches, false = doesn't, null = no active search
   onPointerDown: (e: React.PointerEvent) => void
+  onContextMenu: (e: React.MouseEvent) => void
 }) {
-  const dim = node.lifecycle === 'ended' || node.lifecycle === 'presumed_ended'
+  const r = node.r
+  const dim = node.faded || match === false
   const typeColor = ENTITY_TYPE_COLOR[node.type]
-  // Per-type outline; the MC keeps a brighter, thicker ember ring so the protagonist still stands apart.
-  const ring = isMain ? 'var(--ember-bright)' : typeColor
+  const ring = inPair
+    ? 'var(--ember-bright)'
+    : isMain
+      ? 'var(--ember-bright)'
+      : match
+        ? 'var(--bone)'
+        : typeColor
   const TypeIcon = ENTITY_TYPE_ICON[node.type]
   const clipId = `web-clip-${node.id}`
+  const strokeW = inPair ? 3.5 : isMain ? 3 : match ? 2.5 : 1.75
   return (
     <g
       transform={`translate(${node.x},${node.y})`}
       onPointerDown={onPointerDown}
-      style={{ cursor: 'pointer', opacity: dim ? 0.5 : 1 }}
+      onContextMenu={onContextMenu}
+      style={{ cursor: 'pointer', opacity: dim ? 0.45 : 1 }}
     >
       <title>
         {node.name} · {ENTITY_TYPE_LABELS[node.type]}
       </title>
-      <circle r={NODE_R} fill="var(--char-raised)" stroke={ring} strokeWidth={isMain ? 3 : 1.75} />
+      <circle r={r} fill="var(--char-raised)" stroke={ring} strokeWidth={strokeW} />
       {node.image ? (
         <>
           <clipPath id={clipId}>
-            <circle r={NODE_R - 2} />
+            <circle r={r - 2} />
           </clipPath>
           <image
             href={node.image}
-            x={-(NODE_R - 2)}
-            y={-(NODE_R - 2)}
-            width={(NODE_R - 2) * 2}
-            height={(NODE_R - 2) * 2}
+            x={-(r - 2)}
+            y={-(r - 2)}
+            width={(r - 2) * 2}
+            height={(r - 2) * 2}
             clipPath={`url(#${clipId})`}
             preserveAspectRatio="xMidYMid slice"
             style={dim ? { filter: 'grayscale(1)' } : undefined}
@@ -404,7 +892,7 @@ function GraphNodeGlyph({
           textAnchor="middle"
           dy="0.35em"
           className="font-display"
-          fontSize={13}
+          fontSize={Math.round(r * 0.6)}
           fontWeight={600}
           fill="var(--bone-dim)"
         >
@@ -412,12 +900,12 @@ function GraphNodeGlyph({
         </text>
       )}
       {/* Type badge (color + glyph) at the node's lower-right — type reads without hovering. */}
-      <g transform={`translate(${NODE_R * 0.72},${NODE_R * 0.72})`}>
+      <g transform={`translate(${r * 0.72},${r * 0.72})`}>
         <circle r={8.5} fill="var(--char)" stroke={typeColor} strokeWidth={1.5} />
         <TypeIcon x={-5.5} y={-5.5} width={11} height={11} color={typeColor} strokeWidth={2.25} />
       </g>
       <text
-        y={LABEL_GAP}
+        y={r + LABEL_GAP}
         textAnchor="middle"
         className="font-sans"
         fontSize={11}
@@ -427,6 +915,52 @@ function GraphNodeGlyph({
         {node.name.length > 22 ? `${node.name.slice(0, 21)}…` : node.name}
       </text>
     </g>
+  )
+}
+
+function ToggleChip({
+  on,
+  onClick,
+  children
+}: {
+  on: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-colors',
+        on
+          ? 'border-primary/40 bg-primary/15 text-primary'
+          : 'border-border/60 bg-card/80 text-muted-foreground hover:text-foreground'
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function MenuItem({
+  icon: Icon,
+  onClick,
+  children
+}: {
+  icon: typeof ExternalLink
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-foreground hover:bg-muted/60"
+    >
+      <Icon className="size-3.5 text-muted-foreground" />
+      {children}
+    </button>
   )
 }
 

@@ -63,6 +63,8 @@ export function ConverseView() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activePcId = useAppStore((s) => s.activePcId)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const pendingLens = useUiStore((s) => s.pendingLens)
+  const consumePendingLens = useUiStore((s) => s.consumePendingLens)
   const { status: onb } = useOnboarding()
   const converse = useConverse()
   const { entities } = useEntities(activeCampaignId)
@@ -91,6 +93,15 @@ export function ConverseView() {
       rememberedRef.current++
     }
   }, [converse.turns, asked, remember])
+
+  // Seeded from the Web graph (a node → "Prepare questions" for that character). Select the target; the
+  // player presses Prepare questions.
+  useEffect(() => {
+    if (pendingLens?.view === 'converse' && pendingLens.targetId) {
+      setTargetId(pendingLens.targetId)
+      consumePendingLens()
+    }
+  }, [pendingLens, consumePendingLens])
 
   if (!activeCampaignId) {
     return (

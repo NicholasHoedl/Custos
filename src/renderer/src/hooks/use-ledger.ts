@@ -146,7 +146,10 @@ export function useRelationships(entityId: string | null): {
 
 // The whole-campaign relationship graph for the "Web" view (P2-3). Refetches on any entity/tie mutation
 // (entitiesVersion) so the map stays live; the view also calls refresh() when it becomes active.
-export function useCampaignGraph(campaignId: string | null): {
+export function useCampaignGraph(
+  campaignId: string | null,
+  asOf?: number
+): {
   graph: CampaignGraph
   refresh: () => void
 } {
@@ -154,13 +157,19 @@ export function useCampaignGraph(campaignId: string | null): {
   const entitiesVersion = useUiStore((s) => s.entitiesVersion)
   const refresh = useCallback(() => {
     if (!campaignId) return setGraph({ nodes: [], edges: [] })
-    ledger.graph.campaign(campaignId).then(setGraph).catch(fetchFailed('the relationship map'))
-  }, [campaignId])
+    ledger.graph
+      .campaign(campaignId, asOf)
+      .then(setGraph)
+      .catch(fetchFailed('the relationship map'))
+  }, [campaignId, asOf])
   useEffect(() => refresh(), [refresh, entitiesVersion])
   return { graph, refresh }
 }
 
-export function useEvents(sessionId: string | null): { events: EventLogEntry[]; refresh: () => void } {
+export function useEvents(sessionId: string | null): {
+  events: EventLogEntry[]
+  refresh: () => void
+} {
   const [events, setEvents] = useState<EventLogEntry[]>([])
   const refresh = useCallback(() => {
     if (!sessionId) return setEvents([])

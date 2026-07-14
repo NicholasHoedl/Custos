@@ -205,7 +205,7 @@ export interface LedgerApi {
   graph: {
     context(entityId: string, depth?: number): Promise<EntityContext>
     hierarchy(entityId: string, kind: HierarchyKind): Promise<HierarchyView>
-    campaign(campaignId: string): Promise<CampaignGraph>
+    campaign(campaignId: string, asOf?: number): Promise<CampaignGraph>
   }
   search: {
     text(query: string, campaignId: string): Promise<EntitySearchResult[]>
