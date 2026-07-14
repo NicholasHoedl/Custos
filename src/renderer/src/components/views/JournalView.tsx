@@ -1,7 +1,6 @@
 import { useSessions } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
-import { OnboardingChecklist } from '@renderer/components/OnboardingChecklist'
-import { LoopExplainer } from '@renderer/components/onboarding/LoopExplainer'
+import { NoCampaign } from '@renderer/components/NoCampaign'
 import { EventFeed } from '@renderer/components/capture/EventFeed'
 
 // The Journal is the primary at-the-table view: a running log of plain entries (no per-entry AI —
@@ -15,22 +14,12 @@ export function JournalView() {
   const { loading: sessionsLoading } = useSessions(activeCampaignId)
   const restoringSession = sessionsLoading && activeSessionId === null
 
-  if (!activeCampaignId) {
-    // No campaign yet: the welcome IS the empty state (it carries the create-campaign step).
-    return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="w-full max-w-lg">
-          <OnboardingChecklist />
-        </div>
-      </div>
-    )
-  }
+  if (!activeCampaignId) return <NoCampaign />
 
-  // The one-time loop explainer (P1-3) rides above the feed; it self-hides once dismissed. Key EventFeed
-  // by campaign so per-campaign UI state (open dialogs, composer text) never survives a campaign switch.
+  // Key EventFeed by campaign so per-campaign UI state (open dialogs, composer text) never survives a
+  // campaign switch.
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <LoopExplainer />
       <div className="min-h-0 flex-1">
         <EventFeed key={activeCampaignId} sessionId={activeSessionId} restoring={restoringSession} />
       </div>

@@ -49,7 +49,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   const unclosed = sessionId ? (unclosedCounts[sessionId] ?? 0) : 0
 
   // Start the first/next session right here — Chronicle is the default view, so a campaign with no
-  // session must not dead-end on it (ADR-032). Mirrors OnboardingChecklist.startSession.
+  // session must not dead-end on it (ADR-032).
   async function startSession(): Promise<void> {
     if (!activeCampaignId || starting) return
     setStarting(true)

@@ -18,7 +18,7 @@ import {
 
 // The always-available Quickstart guide (ADR-045) — a reference to Custos's core loop, every tool, and how
 // to get set up. Opened from an out-of-the-way button at the bottom of the Sidebar. All copy comes from
-// `lib/guide-content.tsx`, shared with the first-run tutorial's tour + the Chronicle LoopExplainer, so the
+// `lib/guide-content.tsx`, shared with the first-run tutorial's tour, so the
 // three surfaces never drift. It backstops the loop teaching that the trimmed tutorial no longer runs.
 
 const GROUP_ORDER = ['tour-capture', 'tour-world', 'tour-ask'] as const

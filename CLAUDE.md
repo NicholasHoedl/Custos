@@ -214,8 +214,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   (entry add/edit/delete and `use-import.apply` all fire it). **Chronicle entries are editable** now
   (`event.service` gained `updateEvent`/`deleteEvent`; nothing FKs to `event_log`): EventFeed rows have
   hover/focus edit (inline textarea) + delete (`DeleteEventDialog`), allowed ALWAYS — editing post-close-out
-  does NOT change already-extracted notes (they're independent records; a `title` hint says so). The
-  **LoopExplainer** (localStorage `ledger.loopExplainerDismissed`) names the ritual once atop JournalView.
+  does NOT change already-extracted notes (they're independent records; a `title` hint says so).
 - **Lens polish + merge (docs/ROADMAP.md P1-1/5/6):** the three AI lenses share a `LensResultBar`
   (Copy · **Inscribe** → a campaign-lore note via `ledger.note.create` entityIds:[] · **Recent** popover
   of the last ~5) fed by `useLensHistory` + prose serializers in `lib/lens-prose.ts`; each view snapshots
@@ -314,13 +313,15 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   listCampaigns(ctx).length > 0` — the last clause treats any existing-data user as already-onboarded). It
   creates a real campaign+MC+session and **hard-requires + live-validates** an Anthropic key (`apikey.set` +
   `apikey.validate`; the step shows numbered "how to get a key" instructions), tours the tools, then writes
-  `tutorialCompleted` + dismisses the legacy `OnboardingChecklist`/`LoopExplainer`. Flow is **setup-only** —
+  `tutorialCompleted`. (The legacy `OnboardingChecklist` + `LoopExplainer` cards it used to dismiss were
+  REMOVED — the no-campaign empty state is now the minimal `components/NoCampaign.tsx`, and the loop/tool
+  copy lives only in the Quickstart guide.) Flow is **setup-only** —
   welcome → campaign → character → session → apikey → tour ×3 → done (9 steps). **ADR-045 removed the
   chronicle-entry + close-out/Illuminate steps**; the capture→close-out loop is now taught by the
   **always-available Quickstart guide** (`components/onboarding/QuickstartGuide.tsx`) opened from a
   `HelpCircle` **"Guide"** button at the **bottom of the Sidebar** (below the flex-1 nav; sits under the
   z-40 overlay, so it's post-onboarding only). Tool blurbs · tour groups · loop steps · get-a-key steps
-  live in ONE shared **`lib/guide-content.tsx`** (consumed by the tour, the guide, `LoopExplainer`, and the
+  live in ONE shared **`lib/guide-content.tsx`** (consumed by the tour, the guide, and the
   key step, so they never drift). AppShell disables Ctrl+K/F while active + renders a blank canvas until the
   status loads (no flash). **Navbar** (`NAV_ITEMS`): **Chronicle · Sessions · Character · Codex · Web · Lore
   · Counsel · Converse · Settings** (revises ADR-030's Character-first). **e2e:** `launchApp` sets

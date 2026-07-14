@@ -2,10 +2,10 @@ import { BookCheck, Library, NotebookPen, Wand2, type LucideIcon } from 'lucide-
 import type { ViewKey } from '@renderer/store/ui-store'
 
 // Shared teaching content — the single source for the first-run tutorial's tool tour
-// (`onboarding/TutorialOverlay.tsx`), the always-available Quickstart guide (`onboarding/QuickstartGuide.tsx`),
-// and the Chronicle loop card (`onboarding/LoopExplainer.tsx`). Keeping the copy here (mirrors how
-// `lib/nav-items.tsx` is the single source for the Sidebar + command palette) means the three surfaces
-// never drift on wording. Data only — no JSX; each surface owns its own presentation.
+// (`onboarding/TutorialOverlay.tsx`) and the always-available Quickstart guide
+// (`onboarding/QuickstartGuide.tsx`). Keeping the copy here (mirrors how `lib/nav-items.tsx` is the
+// single source for the Sidebar + command palette) means the two surfaces never drift on wording.
+// Data only — no JSX; each surface owns its own presentation.
 
 /** One-line "what it's for" per nav view, keyed by `NAV_ITEMS.key`. Used by the tour + the guide. */
 export const TOOL_BLURBS: Record<string, string> = {
@@ -101,7 +101,7 @@ export interface LoopStep {
 }
 
 // The core ritual. Icons match the real buttons: BookCheck = the "Close out session" button; the rest
-// read as their step. Rendered by LoopExplainer (Chronicle card) and the Quickstart guide.
+// read as their step. Rendered by the Quickstart guide.
 export const LOOP_STEPS: LoopStep[] = [
   {
     icon: NotebookPen,

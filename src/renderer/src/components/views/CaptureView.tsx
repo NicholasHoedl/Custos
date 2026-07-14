@@ -4,7 +4,7 @@ import { Button } from '@renderer/components/ui/button'
 import { useCampaigns, useEntities } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { OnboardingChecklist } from '@renderer/components/OnboardingChecklist'
+import { NoCampaign } from '@renderer/components/NoCampaign'
 import {
   EntityBrowser,
   type CapturePanel,
@@ -41,24 +41,10 @@ export function CaptureView() {
     setCapturePanel('add')
   }, [quickAddNonce, setSelectedEntity])
 
-  if (!activeCampaignId) {
-    // No campaign yet: the welcome IS the empty state (it carries the create-campaign step).
-    return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="w-full max-w-lg">
-          <OnboardingChecklist />
-        </div>
-      </div>
-    )
-  }
+  if (!activeCampaignId) return <NoCampaign />
 
   return (
     <div className="flex h-full flex-col">
-      {/* OnboardingChecklist returns null once setup is done — `empty:hidden` drops the bar entirely. */}
-      <div className="border-b border-border p-3 empty:hidden">
-        <OnboardingChecklist />
-      </div>
-
       <div className="flex min-h-0 flex-1">
         <div className="w-72 shrink-0 border-r border-border">
           <EntityBrowser

@@ -118,9 +118,6 @@ export function TutorialOverlay({ onDone }: { onDone: () => void }) {
 
   async function finish(): Promise<void> {
     await update({ userName: name.trim(), tutorialCompleted: true })
-    // The forced tutorial supersedes the legacy optional cards — retire them so they don't re-nag.
-    localStorage.setItem('ledger.onboardingDismissed', '1')
-    localStorage.setItem('ledger.loopExplainerDismissed', '1')
     setActiveView('journal')
     onDone()
   }
