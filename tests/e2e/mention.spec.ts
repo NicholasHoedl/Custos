@@ -47,3 +47,18 @@ test('mention: /npc offers an entity and inserts its name', async () => {
   await expect(composer).not.toHaveValue(/\/npc/)
   await expect(option).toHaveCount(0) // menu closed after the pick
 })
+
+test('mention: free-text /<name> fuzzy-searches all types (multi-word, no category code)', async () => {
+  // Reuses the campaign + "Aldric Vane" seeded by the first test (shared app via beforeAll).
+  const composer = page.getByPlaceholder(/What happened/)
+  await composer.fill('') // clear what the previous test inserted
+  await composer.click()
+  await composer.pressSequentially('/aldric van') // multi-word, no type code → fuzzy name search
+
+  const option = page.getByRole('option', { name: /Aldric Vane/ })
+  await expect(option).toBeVisible()
+  await option.click() // mouse-select this time
+
+  await expect(composer).toHaveValue(/Aldric Vane\s/)
+  await expect(composer).not.toHaveValue(/\/aldric/)
+})

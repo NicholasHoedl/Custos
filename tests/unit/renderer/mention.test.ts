@@ -84,10 +84,11 @@ describe('parseMentionToken', () => {
     expect(parseMentionToken('/npc\nfoo', 8)).toBeNull()
   })
 
-  it('treats a bare or unknown slash as an all-types filter, but abandons prose', () => {
+  it('treats a bare or unknown slash as an all-types free-text filter (multi-word allowed)', () => {
     expect(end('/')).toEqual({ type: null, filter: '', start: 0, end: 1 })
     expect(end('/zzz')).toEqual({ type: null, filter: 'zzz', start: 0, end: 4 })
-    expect(end('/zzz foo')).toBeNull() // an unknown word followed by a space is prose
+    expect(end('/zzz foo')).toEqual({ type: null, filter: 'zzz foo', start: 0, end: 8 }) // multi-word search
+    expect(end('/glass staff')).toEqual({ type: null, filter: 'glass staff', start: 0, end: 12 })
     expect(end('hello world')).toBeNull() // no slash at all
   })
 })
@@ -113,7 +114,24 @@ describe('rankEntities', () => {
 
   it('caps the result list', () => {
     const list = ['a', 'b', 'c', 'd', 'e'].map((n) => ent(n))
-    const out = rankEntities(list, { type: 'npc', filter: '', start: 0, end: 4 }, 2)
+    const out = rankEntities(list, { type: 'npc', filter: '', start: 0, end: 4 }, { cap: 2 })
     expect(out).toHaveLength(2)
+  })
+
+  it('free-text (no type) searches across all types by name', () => {
+    const list = [
+      ent('Aldric Vane'),
+      ent('Vanguard Keep', { type: 'location' }),
+      ent('Bandits', { type: 'faction' })
+    ]
+    const out = rankEntities(list, { type: null, filter: 'van', start: 0, end: 4 })
+    expect(out.map((e) => e.name)).toEqual(['Vanguard Keep', 'Aldric Vane']) // prefix "Van" outranks mid-name
+  })
+
+  it('honors an injected scorer (best score first)', () => {
+    const list = [ent('Alpha'), ent('Zeta')]
+    const score = (name: string): number => (name === 'Zeta' ? 5 : 1) // Zeta wins despite alpha order
+    const out = rankEntities(list, { type: null, filter: 'x', start: 0, end: 2 }, { score })
+    expect(out.map((e) => e.name)).toEqual(['Zeta', 'Alpha'])
   })
 })

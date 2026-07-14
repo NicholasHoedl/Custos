@@ -67,29 +67,50 @@ export function parseMentionToken(value: string, caret: number): MentionToken | 
         end: caret
       }
     }
-    if (/\s/.test(rest)) return null // an unknown word already followed by a space → prose
+    // Not a category code → an all-types free-text search token; spaces allowed so multi-word names
+    // (`/sildar hal`) match. A stray '/' in prose only opens the menu if it actually matches an entity.
     return { type: null, filter: rest, start: i, end: caret }
   }
   return null
 }
 
+/** Scores how well a query matches an entity name (0 = no match, higher = better). Injected so this
+ *  module stays dependency-free + node-testable — the app passes cmdk's fuzzy `defaultFilter`. */
+export type MentionScorer = (name: string, query: string) => number
+
+// Default matcher: prefix > contains > none. Self-contained fallback; the real app injects cmdk's fuzzy
+// scorer (subsequence/typo tolerant, consistent with the command palette) — see MentionTextarea.
+const substringScore: MentionScorer = (name, query) => {
+  const n = name.toLowerCase()
+  const q = query.toLowerCase()
+  return n.startsWith(q) ? 2 : n.includes(q) ? 1 : 0
+}
+
 /**
- * Rank campaign entities for a mention token: keep those matching the token's type (if any) and a
- * case-insensitive name substring, ranking name-prefix matches above mid-name matches and sinking
- * ended/presumed-ended threads (without dropping them). Caps the list so the menu stays short. Mirrors
- * CommandPalette's client-side filter — no per-keystroke IPC.
+ * Rank campaign entities for a mention token: keep those of the token's type (if any) whose name scores
+ * against the filter, best score first, sinking ended/presumed-ended threads (without dropping them) and
+ * breaking ties alphabetically. Caps the list so the menu stays short; an empty filter (bare `/`) lists all.
+ * `opts.score` defaults to a substring matcher — the app injects cmdk fuzzy for the real menu.
  */
-export function rankEntities(entities: Entity[], token: MentionToken, cap = 8): Entity[] {
-  const f = token.filter.trim().toLowerCase()
-  let pool = token.type ? entities.filter((e) => e.type === token.type) : entities
-  if (f) pool = pool.filter((e) => e.name.toLowerCase().includes(f))
-  const prefixRank = (e: Entity): number => (f && e.name.toLowerCase().startsWith(f) ? 0 : 1)
+export function rankEntities(
+  entities: Entity[],
+  token: MentionToken,
+  opts: { cap?: number; score?: MentionScorer } = {}
+): Entity[] {
+  const { cap = 8, score = substringScore } = opts
+  const typed = token.type ? entities.filter((e) => e.type === token.type) : entities
   const endedRank = (e: Entity): number =>
     e.lifecycle === 'ended' || e.lifecycle === 'presumed_ended' ? 1 : 0
-  return [...pool]
-    .sort(
-      (a, b) =>
-        prefixRank(a) - prefixRank(b) || endedRank(a) - endedRank(b) || a.name.localeCompare(b.name)
-    )
+  const f = token.filter.trim()
+  if (!f) {
+    return [...typed]
+      .sort((a, b) => endedRank(a) - endedRank(b) || a.name.localeCompare(b.name))
+      .slice(0, cap)
+  }
+  return typed
+    .map((e) => ({ e, s: score(e.name, f) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s || endedRank(a.e) - endedRank(b.e) || a.e.name.localeCompare(b.e.name))
     .slice(0, cap)
+    .map((x) => x.e)
 }

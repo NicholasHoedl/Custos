@@ -119,8 +119,10 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   onboarding. Shared failure copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes
   `bad_key` from `no_key`); the Character page's derive tool is user-labeled **"Draft from backstory"**.
 - **Entity quick-write (slash mentions):** in the *writing + ask* textareas, typing `/npc` (or `/loc`, `/que`,
-  `/fac`, `/item`, `/pc`, `/eve`, `/cre` — three-letter code OR full type name; a bare/unknown `/word` searches
-  all types) opens a filtered menu of that type; Enter/Tab/click drops the entity's **plain name** over the
+  `/fac`, `/item`, `/pc`, `/eve`, `/cre` — three-letter code OR full type name; a bare/unknown `/word`, spaces
+  allowed, **FUZZY**-searches all types by name — cmdk's `defaultFilter` **injected** from `MentionTextarea` so
+  `lib/mention.ts` stays pure, same matcher as the command palette [`rankEntities` takes an `opts.score`;
+  substring default]) opens a filtered menu of that type; Enter/Tab/click drops the entity's **plain name** over the
   token (boxes are plain-text — extraction resolves names→entities later; no rich-mention model, no migration).
   Reusable **`entities/MentionTextarea.tsx`** is a drop-in for `<Textarea>` — swap
   `onChange={e=>setX(e.target.value)}` → `onValueChange={setX}`, keep every other prop — over the pure

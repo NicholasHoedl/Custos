@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, ComponentPropsWithRef, FocusEvent, KeyboardEvent, SyntheticEvent } from 'react'
+import { defaultFilter } from 'cmdk'
 import { ENTITY_TYPE_LABELS, type Entity, type EntityType } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
 import { useAppStore } from '@renderer/store/app-store'
@@ -65,7 +66,9 @@ export function MentionTextarea({
   const results = useMemo(() => {
     if (!token) return []
     const pool = types ? source.filter((e) => types.includes(e.type)) : source
-    return rankEntities(pool, token)
+    // cmdk's fuzzy matcher — the same scoring as the command palette / entity pickers (subsequence,
+    // prefix/word-boundary weighted). Injected here so lib/mention.ts stays pure + node-testable.
+    return rankEntities(pool, token, { score: (name, q) => defaultFilter?.(name, q) ?? 0 })
   }, [token, source, types])
 
   const open = token != null && results.length > 0 && !manualClose
