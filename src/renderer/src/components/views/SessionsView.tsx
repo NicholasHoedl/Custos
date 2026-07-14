@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, Check, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { BookCheck, CalendarClock, Check, FileInput, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -11,6 +11,8 @@ import { Button } from '@renderer/components/ui/button'
 import { EmptyState } from '@renderer/components/chrome'
 import { SessionRecap } from '@renderer/components/sessions/SessionRecap'
 import { EnrichDialog } from '@renderer/components/sessions/EnrichDialog'
+import { ExtractDialog } from '@renderer/components/capture/ExtractDialog'
+import { TranscribeDialog } from '@renderer/components/capture/TranscribeDialog'
 import {
   DeleteSessionDialog,
   EditSessionDialog
@@ -39,6 +41,8 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [enrichOpen, setEnrichOpen] = useState(false)
+  const [extractOpen, setExtractOpen] = useState(false)
+  const [transcribeOpen, setTranscribeOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const ordered = [...sessions].sort((a, b) => b.number - a.number)
@@ -101,7 +105,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                   {(unclosed[s.id] ?? 0) > 0 && (
                     <span
                       className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
-                      title={`${unclosed[s.id]} ${unclosed[s.id] === 1 ? 'entry' : 'entries'} to close out`}
+                      title={`${unclosed[s.id]} ${unclosed[s.id] === 1 ? 'entry' : 'entries'} to extract`}
                     >
                       {unclosed[s.id]}
                     </span>
@@ -132,10 +136,26 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                 </h2>
                 {selected.date && <p className="text-sm text-muted-foreground">{selected.date}</p>}
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setExtractOpen(true)}>
+                  <BookCheck className="size-3.5" />
+                  Extract
+                  {(unclosed[selected.id] ?? 0) > 0 && (
+                    <span
+                      className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
+                      title={`${unclosed[selected.id]} ${unclosed[selected.id] === 1 ? 'entry' : 'entries'} to extract`}
+                    >
+                      {unclosed[selected.id]}
+                    </span>
+                  )}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setEnrichOpen(true)}>
                   <Sparkles className="size-3.5" />
                   Illuminate
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setTranscribeOpen(true)}>
+                  <FileInput className="size-3.5" />
+                  Transcribe
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="size-3.5" />
@@ -157,7 +177,13 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
 
             <ChronicleEntries sessionId={selected.id} />
 
+            <ExtractDialog session={selected} open={extractOpen} onOpenChange={setExtractOpen} />
             <EnrichDialog session={selected} open={enrichOpen} onOpenChange={setEnrichOpen} />
+            <TranscribeDialog
+              session={selected}
+              open={transcribeOpen}
+              onOpenChange={setTranscribeOpen}
+            />
             <EditSessionDialog
               session={selected}
               open={editOpen}

@@ -20,6 +20,8 @@ vi.mock('../../../src/main/services/settings.service', () => ({
     suggestEffort: 'high',
     extractionModel: 'claude-sonnet-4-6',
     extractionEffort: 'medium',
+    illuminateModel: 'claude-haiku-4-5',
+    illuminateEffort: 'medium',
     hotkey: ''
   })
 }))
@@ -233,14 +235,14 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
     expect(res.fieldChanges).toEqual([])
   })
 
-  it('runs on the EXTRACTION model/effort knobs, not Counsel’s (ADR-035 cost tuning)', async () => {
+  it('runs on the ILLUMINATE model/effort knobs, decoupled from extraction (ADR-051)', async () => {
     const { ctx, campaignId, session, subject } = setup()
     enrichFn.mockResolvedValue({ relationshipChanges: [], fieldChanges: [] })
 
     await enrichEntity(ctx, { campaignId, sessionId: session.id, entityId: subject.id }, sig())
     const call = enrichFn.mock.calls[0][0] as { model: string; effort: string }
-    expect(call.model).toBe('claude-sonnet-4-6') // extractionModel, NOT suggestModel (opus)
-    expect(call.effort).toBe('medium') // extractionEffort, NOT suggestEffort (high)
+    expect(call.model).toBe('claude-haiku-4-5') // illuminateModel — NOT extraction (sonnet) or suggest (opus)
+    expect(call.effort).toBe('medium') // illuminateEffort
   })
 
   it('slims the roster to note-mentioned entities + live tie endpoints (ADR-035 cost tuning)', async () => {

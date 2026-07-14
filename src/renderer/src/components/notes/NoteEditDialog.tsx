@@ -8,7 +8,7 @@ import {
 } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
 import { Button } from '@renderer/components/ui/button'
-import { Textarea } from '@renderer/components/ui/textarea'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { Label } from '@renderer/components/ui/label'
 import {
   Dialog,
@@ -74,7 +74,7 @@ export function NoteEditDialog({
           <DialogDescription>Fix the text or adjust how certain it is.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={5} autoFocus />
+          <MentionTextarea value={content} onValueChange={setContent} rows={5} autoFocus />
           <div className="space-y-1.5">
             <Label>Confidence</Label>
             <Select value={confidence} onValueChange={(v) => setConfidence(v as NoteConfidence)}>

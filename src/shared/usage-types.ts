@@ -17,7 +17,7 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   lore: 'Lore',
   counsel: 'Counsel',
   converse: 'Converse',
-  extraction: 'Extraction (close-out & Transcribe)',
+  extraction: 'Extract, Transcribe & Draft',
   illuminate: 'Illuminate',
   recap: 'Recaps',
   persona: 'Personas',

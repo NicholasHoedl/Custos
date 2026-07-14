@@ -115,8 +115,9 @@ export async function enrichEntity(
       )
       .slice(0, ENRICH_ROSTER_CAP)
 
-    // Enrichment shares the extraction knobs (ADR-035 cost tuning) — structured, validated, review-gated.
-    const { extractionModel, extractionEffort } = getSettings()
+    // Illuminate has its OWN model/effort (ADR-051 — decoupled from extraction; defaults to Haiku·medium):
+    // structured, validated, review-gated, and the cost driver since it runs one call per entity.
+    const { illuminateModel, illuminateEffort } = getSettings()
     let cost: AiRunCost | undefined // per-entity cost — the renderer sums the sweep (P0-4)
     // e2e fake-AI seam (P2-6): canned enrichment anchored to the REAL subject id (in scope here — which is
     // why the seam lives at the call site, not inside claude.service). Guards above already ran.
@@ -139,8 +140,8 @@ export async function enrichEntity(
           tieLines,
           existing: roster.map((e) => ({ id: e.id, name: e.name, type: e.type })),
           omittedNotes: omitted,
-          model: extractionModel,
-          effort: extractionEffort,
+          model: illuminateModel,
+          effort: illuminateEffort,
           onUsage: (c) => (cost = c),
           signal
         })

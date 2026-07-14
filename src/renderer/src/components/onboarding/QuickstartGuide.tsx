@@ -36,8 +36,8 @@ export function QuickstartGuide({
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Quickstart guide</DialogTitle>
           <DialogDescription>
-            How Custos works, and what each tool is for. Open this any time from the button at the bottom of
-            the sidebar.
+            How Custos works and what each tool is for. Open it any time from the button at the
+            bottom of the sidebar.
           </DialogDescription>
         </DialogHeader>
 
@@ -93,12 +93,16 @@ export function QuickstartGuide({
 
           {/* Getting started — including where to get an Anthropic key (mirrors the tutorial's key step). */}
           <section className="space-y-2">
-            <h3 className="font-display text-base font-semibold text-foreground">Getting started</h3>
+            <h3 className="font-display text-base font-semibold text-foreground">
+              Getting started
+            </h3>
             <p className="text-sm text-muted-foreground">
-              Capture works right away. The Keeper's features — <span className="text-foreground">Lore</span>
-              , <span className="text-foreground">Counsel</span>, and{' '}
-              <span className="text-foreground">Converse</span> — need an Anthropic API key (add it in
-              Settings). Lore also needs the search model, a one-time ~30&nbsp;MB download in Settings.
+              Capture works right away. The Keeper’s AI features —{' '}
+              <span className="text-foreground">Lore</span>,{' '}
+              <span className="text-foreground">Counsel</span>, and{' '}
+              <span className="text-foreground">Converse</span> — need an Anthropic API key, which
+              you add in Settings. Lore and Counsel also use the local search model, a one-time
+              download of about 25&nbsp;MB, also in Settings.
             </p>
             <p className="text-sm font-medium text-foreground">To get an API key:</p>
             <ol className="list-decimal space-y-1.5 rounded-md border border-border bg-background/50 py-2 pl-7 pr-3 text-sm text-muted-foreground">

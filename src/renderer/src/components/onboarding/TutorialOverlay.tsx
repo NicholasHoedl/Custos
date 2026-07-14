@@ -274,7 +274,7 @@ function StepBody(props: {
       return (
         <Field
           title="A session is one night at the table."
-          hint="We've started your first — everything you record lands in it until you close it out."
+          hint="We've started your first — everything you record lands in it until you extract it on the Sessions page."
         >
           <p className="text-sm text-foreground">
             {props.session ? (

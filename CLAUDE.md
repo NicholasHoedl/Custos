@@ -50,20 +50,19 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   requires ≥1 entity per note** (an untagged extracted note is noise); don't "relax" the extraction
   prompt to allow untagged notes.
 - **Two-tier extraction (ADR-035): `ExtractionMode = 'capture' | 'full'`** replaced the old `withChanges`
-  boolean. **'capture'** (the Chronicle **close-out wizard** + the Transcribe dialog) proposes entities +
+  boolean. **'capture'** (the session **Extract** tool + the Transcribe dialog) proposes entities +
   notes + **statusChanges ONLY** — the schema *omits* the tie/field arrays (closed schema; the model
   can't emit them) and the roster context carries no current fields. Status stays in tier 1 because it
   drives as-of chronology (ADR-017). **Chronicle entries save as PLAIN log lines — no per-entry AI**:
-  extraction runs when the user clicks **"Close out session"** (`capture/CloseOutDialog.tsx`), a LOCKED
-  wizard (Esc/overlay/X inert; exit only via Approve/Reject-with-confirm, or Close on hard failure) that
-  joins the session's entries oldest-first, runs ONE tier-1 extraction, applies it stamped at the
-  session, then **chains into Illuminate** (scan runs post-apply so it sees the fresh notes). Its review
-  is the shared `ChangesetReview` with opt-in volume props (`bulk` tri-state per-section toggles +
-  `density="compact"`); other callers pass neither and are unchanged. **'full'** (all five arrays) has exactly ONE caller: backstory step 2 (`DeriveReview`, with
+  extraction runs from the **Extract** button on the Sessions page (`capture/ExtractDialog.tsx`, ADR-051),
+  a PLAIN closeable dialog that joins the selected session's entries oldest-first, runs ONE tier-1
+  extraction, and applies it stamped at that session. NO auto-chain into Illuminate — they're separate
+  tools now. Its review is the shared `ChangesetReview` with opt-in volume props (`bulk` tri-state
+  per-section toggles + `density="compact"`); other callers pass neither and are unchanged. **'full'** (all five arrays) has exactly ONE caller: backstory step 2 (`DeriveReview`, with
   `backstorySubjectId` so standing ties anchor to the MC — ADR-030 v3). Ties + field changes otherwise
   come from **"Illuminate"** (code name `enrich`) — the manual per-session tier-2 pass on the Sessions
-  view: checklist of the session's touched entities (from `listNotesForSession` entityIds; the close-out
-  wizard default-UNCHECKS entities tier 1 just created) → ONE focused
+  view: checklist of the session's touched entities (from `listNotesForSession` entityIds, all checked by
+  default now that nothing auto-chains) → ONE focused
   call per entity (`enrich.service` → `enrichChangeset`; grounding = full note history capped 30 +
   current profile + id-bearing live-tie lines + a SLIM roster of tie endpoints + note-mentioned entities
   capped 25) proposing ONLY relationship/field changes with
@@ -109,15 +108,32 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   filter chips + list badges (as do `EntityBadge`, `EntityDetail`, the command palette).
   **Transcribe is NOT in the nav** (ADR-036): it's a dialog off the Chronicle header
   (`capture/TranscribeDialog.tsx`; `views/ImportView.tsx` is deleted, `'import'` left `ViewKey`). The
-  Chronicle header hosts THREE controls: the **active-session selector** (`sessions/SessionControl.tsx`,
-  extracted from the Sidebar; its auto-select-latest effect still runs app-wide because MainPanel keeps
-  views mounted) · **Transcribe** · **"Close out session"** (`capture/CloseOutDialog.tsx`, the ADR-035
-  ritual). **"Illuminate"** (`sessions/EnrichDialog.tsx`; row pieces shared via `sessions/enrich-rows.tsx`)
-  is ALSO a standalone per-session button in the SessionsView detail header (the surgical re-run). Codex is Inscribe + Annals only; Annals shows a read-only "Filing
+  Chronicle header hosts ONLY the **active-session selector** (`sessions/SessionControl.tsx`, extracted
+  from the Sidebar; its auto-select-latest effect still runs app-wide because MainPanel keeps views
+  mounted) — ADR-051 moved the AI tools OFF the header. The SessionsView detail header hosts the three
+  per-session tools: **Extract** (`capture/ExtractDialog.tsx` — tier-1, formerly the close-out wizard's
+  step 1), **Illuminate** (`sessions/EnrichDialog.tsx`; rows shared via `sessions/enrich-rows.tsx`), and
+  **Transcribe** (`capture/TranscribeDialog.tsx`, now a `session`-prop targeting the selected session). Codex is Inscribe + Annals only; Annals shows a read-only "Filing
   under Session N" hint (it stamps `note.sessionId = activeSessionId`). Previously…/recap lives in the
   Sessions view. The assistant is **"the Keeper"** in-app; "Claude"/Anthropic only in Settings +
   onboarding. Shared failure copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes
   `bad_key` from `no_key`); the Character page's derive tool is user-labeled **"Draft from backstory"**.
+- **Entity quick-write (slash mentions):** in the *writing + ask* textareas, typing `/npc` (or `/loc`, `/que`,
+  `/fac`, `/item`, `/pc`, `/eve`, `/cre` — three-letter code OR full type name; a bare/unknown `/word` searches
+  all types) opens a filtered menu of that type; Enter/Tab/click drops the entity's **plain name** over the
+  token (boxes are plain-text — extraction resolves names→entities later; no rich-mention model, no migration).
+  Reusable **`entities/MentionTextarea.tsx`** is a drop-in for `<Textarea>` — swap
+  `onChange={e=>setX(e.target.value)}` → `onValueChange={setX}`, keep every other prop — over the pure
+  **`lib/mention.ts`** (`SLASH_TYPES` · `parseMentionToken` · `rankEntities`). The menu is a `PopoverAnchor`
+  floating list driven from the textarea's OWN keys so focus never leaves it (`onOpenAutoFocus`/row
+  `onMouseDown` `preventDefault`); it's `role="combobox"` ONLY while open (else it collides with real combobox
+  role-queries), Ctrl/Cmd+Enter still submits the composer, and Escape `stopPropagation`s so it dismisses the
+  menu, not a parent Dialog. A pick restores the caret past the inserted name via a `useLayoutEffect` +
+  `pendingCaret` ref. Wired into the Chronicle composer + entry-edit, Annals composer + `NoteEditDialog`,
+  entity Description, and the Lore/Counsel/Converse query boxes. NOT the Character `InlineText` (blur-autosave)
+  or Transcribe/import rows — deferred, convert via the same `onValueChange` (+ an optional shared `entities`
+  prop to avoid N fetches). e2e `tests/e2e/mention.spec.ts` (pure UI); parser unit `tests/unit/renderer/
+  mention.test.ts`.
 - **Three AI lenses, two shapes.** Recall (**Lore**) *streams* prose with citations; Suggest (**Counsel**)
   and Converse (ADR-025 → **ADR-034** → **ADR-049**) are *single-shot structured* — `structuredArrayCall` → a
   discriminated-union result, no stream, no citations. Converse now emits **questions ONLY** (no briefing): a
@@ -145,9 +161,15 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   once in `converse.service`). **Voice restored for Converse** (its questions are dialogue in the PC's voice)
   via `suggestSystemBlocks(ctx, instructions, includeVoice)` — `buildConverseSystem` passes `true`; Counsel/
   Directions stay voice-free (ADR-048). Converse grounds by **direct fetch** (`getEntityContext` +
-  `listForEntity(asOf)` + persona), NOT retrieval, so it needs no embedding model — and `getEntityContext`/
+  `listForEntity(asOf)` + persona + the target's `description`/traits/goals/flaws) — and `getEntityContext`/
   `listNotesForEntity` now take an **`asOf`** that clamps the target's notes to session ≤ N (null-session =
-  pre-tracking baseline, always kept), closing an as-of leak. Add a structured lens by mirroring Suggest, not Recall.
+  pre-tracking baseline, always kept), closing an as-of leak. **Plus an OPTIONAL focus-scoped "world context"**
+  (only when a thread/`focus` is set): `converse.service.gatherWorldContext` reuses Suggest's hybrid retrieval
+  (`embed`+`store.search` dense **only when `isModelReady()`**, `fuzzyEntityChunks` always — model-graceful, so
+  Converse still has NO `no_model` failure and runs before the model is downloaded), drops the target's own
+  chunks + dedups + caps at 6, and `buildConverseUserContent` renders it as a plain-text "what the party knows
+  about that thread" block. The store is now threaded into `registerConverseHandlers`/`converse()` (was
+  Suggest-only). Add a structured lens by mirroring Suggest, not Recall.
 - **Counsel "in the moment" (ADR-026 → reshaped by ADR-048):** the attitudes spread is now **FOUR**
   narrative options, each `MomentSuggestion = { primaryTag, secondaryTags, title, explanation }` — a bold
   action-verb **title** + a concise **plain-English explanation** (what + why) + category tags. **No D&D
@@ -208,12 +230,12 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   a still-existing campaign id, reindexes after) — the export is no longer a one-way street. Window
   bounds persist via `window-state.json`; "Back up now"/data-folder/version live in Settings "Your data".
 - **Session integrity (docs/ROADMAP.md P1-2/4, ADR-037):** a session is "unclosed" when its newest
-  `event_log.timestamp` > its newest `note.createdAt` (close-out stamps notes at the session) — DERIVED,
+  `event_log.timestamp` > its newest `note.createdAt` (the Extract tool stamps notes at the session) — DERIVED,
   no `lastClosedOut` column. `session.service.unclosedCounts` → `session:unclosed` IPC → `useUnclosedSessions`
-  badges the **Close out session** button + Sessions rows; freshness rides the sessions version bump
+  badges the Sessions-page **Extract** button + Sessions rows; freshness rides the sessions version bump
   (entry add/edit/delete and `use-import.apply` all fire it). **Chronicle entries are editable** now
   (`event.service` gained `updateEvent`/`deleteEvent`; nothing FKs to `event_log`): EventFeed rows have
-  hover/focus edit (inline textarea) + delete (`DeleteEventDialog`), allowed ALWAYS — editing post-close-out
+  hover/focus edit (inline textarea) + delete (`DeleteEventDialog`), allowed ALWAYS — editing after an extract
   does NOT change already-extracted notes (they're independent records; a `title` hint says so).
 - **Lens polish + merge (docs/ROADMAP.md P1-1/5/6):** the three AI lenses share a `LensResultBar`
   (Copy · **Inscribe** → a campaign-lore note via `ledger.note.create` entityIds:[] · **Recent** popover
@@ -292,8 +314,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   on `isModelReady()` — `ipc/onboarding.ts` reports `modelReady || fakeAiEnabled()` (button enables) and the
   services skip `embed`/dense but KEEP the model-free `fuzzyEntityChunks` (real grounding). Streaming lenses
   (Recall/Recap) emit canned prose via the existing `onText`. Test helpers `createCampaign` /
-  `plantKeyAndReload` (`helpers.ts`); one spec per lens (`suggest`/`converse`/`recall`/`recap`/`transcribe`/
-  `draft`/`close-out`). **17 e2e specs currently green** (17 tests across 13 spec files).
+  `plantKeyAndReload` (`helpers.ts`); specs per flow (`suggest`/`converse`/`recall`/`recap`/`transcribe`/
+  `draft`/`extract` — the last replaces `close-out`, ADR-051). **e2e green** (18 tests across 13 spec files).
 - **Distribution + auto-update (docs/ROADMAP.md P2-1, ADR-042):** `npm run dist` builds the NSIS installer
   (`Custos Setup X.Y.Z.exe`) via `electron-builder.yml`; the `publish: github` block makes it also emit
   `latest.yml` (the electron-updater feed). **Auto-update is PACKAGED-ONLY** — `services/updater.service.ts`
@@ -317,7 +339,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   REMOVED — the no-campaign empty state is now the minimal `components/NoCampaign.tsx`, and the loop/tool
   copy lives only in the Quickstart guide.) Flow is **setup-only** —
   welcome → campaign → character → session → apikey → tour ×3 → done (9 steps). **ADR-045 removed the
-  chronicle-entry + close-out/Illuminate steps**; the capture→close-out loop is now taught by the
+  chronicle-entry + close-out/Illuminate steps**; the capture→extract→illuminate loop is now taught by the
   **always-available Quickstart guide** (`components/onboarding/QuickstartGuide.tsx`) opened from a
   `HelpCircle` **"Guide"** button at the **bottom of the Sidebar** (below the flex-1 nav; sits under the
   z-40 overlay, so it's post-onboarding only). Tool blurbs · tour groups · loop steps · get-a-key steps

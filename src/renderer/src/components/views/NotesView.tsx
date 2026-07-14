@@ -18,7 +18,7 @@ import { useUiStore } from '@renderer/store/ui-store'
 import { formatTimestamp } from '@renderer/lib/format'
 import { EmptyState, PaneBody, PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
-import { Textarea } from '@renderer/components/ui/textarea'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { Badge } from '@renderer/components/ui/badge'
 import {
   Select,
@@ -126,9 +126,9 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
       <PaneHeader icon={StickyNote} title="Annals" />
       <PaneBody size="reading">
         <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
-          <Textarea
+          <MentionTextarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onValueChange={setContent}
             rows={3}
             placeholder="What happened? Who said what?…  (Ctrl+Enter to save)"
             onKeyDown={(e) => {

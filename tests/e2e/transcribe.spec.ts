@@ -15,15 +15,18 @@ test.afterEach(async () => {
   cleanup(userDataDir)
 })
 
-// Transcribe (ADR-035/036) via the fake-AI seam: paste text → the Keeper proposes a changeset → apply.
-// It reuses the same import.extract path as close-out, so `fakeExtraction` already covers it — this proves
-// the standalone dialog end to end.
+// Transcribe (ADR-036, relocated to the Sessions page by ADR-051) via the fake-AI seam: paste text → the
+// Keeper proposes a changeset → apply, stamped at the selected session. Reuses the same import.extract path
+// as Extract, so `fakeExtraction` already covers it — this proves the standalone dialog end to end.
 test('Transcribe: pasting notes proposes a changeset that applies', async () => {
   await createCampaign(page, 'Phandalin', 'Vargas')
   await plantKeyAndReload(page)
 
-  // The Transcribe dialog opens from the Chronicle header.
-  await page.getByRole('button', { name: 'Transcribe' }).click()
+  // Transcribe lives on the Sessions page now and targets the selected session — start one, then open it.
+  await page.getByRole('button', { name: 'New session' }).click()
+  await page.getByRole('button', { name: 'Sessions', exact: true }).click()
+  await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
+
   const dialog = page.getByRole('dialog')
   await dialog
     .getByPlaceholder('Paste session notes')

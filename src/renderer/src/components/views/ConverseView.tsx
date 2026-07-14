@@ -30,7 +30,7 @@ import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useLensHistory } from '@renderer/hooks/use-lens-history'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
-import { Textarea } from '@renderer/components/ui/textarea'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 import {
   Command,
@@ -183,9 +183,9 @@ export function ConverseView() {
         {/* Start a conversation: who, an optional thread, speed + as-of. */}
         <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
           <TargetPicker targets={targets} value={targetId} onChange={setTargetId} />
-          <Textarea
+          <MentionTextarea
             value={thread}
-            onChange={(e) => setThread(e.target.value)}
+            onValueChange={setThread}
             rows={2}
             placeholder="Optional — a thread to dig into: a person, a topic, a rumor. Leave blank to draw them out generally."
             onKeyDown={(e) => {
@@ -335,9 +335,9 @@ function FollowUpBox({
           change
         </button>
       </div>
-      <Textarea
+      <MentionTextarea
         value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
+        onValueChange={setAnswer}
         rows={2}
         autoFocus
         placeholder="What did they say back? Paraphrase it — the follow-ups build on it. e.g. He admits he owes the Zhentarim, but swears he's done with them."

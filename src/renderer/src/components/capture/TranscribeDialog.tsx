@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, FileText, KeyRound, Sparkles, WifiOff } from 'lucide-react'
 import type { Session } from '@shared/entity-types'
 import type { ExtractFailureReason } from '@shared/import-types'
@@ -40,9 +40,12 @@ const SESSION_NONE = '__none__'
 // re-derivable, so an accidental Esc mid-review must not discard it; only Discard/apply/"Transcribe
 // more" reset.
 export function TranscribeDialog({
+  session,
   open,
   onOpenChange
 }: {
+  /** When set (opened from the Sessions page), the target-session picker defaults to this session. */
+  session?: Session
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -53,7 +56,13 @@ export function TranscribeDialog({
   const { sessions } = useSessions(activeCampaignId)
   const imp = useImport({ mode: 'capture' })
   const [text, setText] = useState('')
-  const [sessionChoice, setSessionChoice] = useState<string>('active')
+  const [sessionChoice, setSessionChoice] = useState<string>(session?.id ?? 'active')
+
+  // Opened from the Sessions page for a specific session → default the target to it (re-applied each open,
+  // so reopening for a different selected session re-targets). The pasted text still survives close/reopen.
+  useEffect(() => {
+    if (open && session) setSessionChoice(session.id)
+  }, [open, session])
 
   const reviewing = imp.status === 'review' || imp.status === 'applying'
   const extracting = imp.status === 'extracting'

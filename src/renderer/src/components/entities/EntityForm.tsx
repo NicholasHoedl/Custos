@@ -23,6 +23,7 @@ import {
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { Label } from '@renderer/components/ui/label'
 import { Portrait } from './Portrait'
 import {
@@ -370,10 +371,10 @@ export function EntityForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="ef-desc">Description</Label>
-        <Textarea
+        <MentionTextarea
           id="ef-desc"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onValueChange={setDescription}
           rows={3}
           placeholder="Who or what is this?"
         />

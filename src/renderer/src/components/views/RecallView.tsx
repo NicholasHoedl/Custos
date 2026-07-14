@@ -18,7 +18,7 @@ import { useEntities, useSessions } from '@renderer/hooks/use-ledger'
 import { useLensHistory } from '@renderer/hooks/use-lens-history'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
-import { Textarea } from '@renderer/components/ui/textarea'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { PromptStarters } from '@renderer/components/recall/PromptStarters'
 import { useLensSave } from '@renderer/components/lens/LensResultBar'
@@ -151,9 +151,9 @@ export function RecallView() {
         ) : null}
 
         <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3">
-          <Textarea
+          <MentionTextarea
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onValueChange={setQuery}
             rows={2}
             placeholder={
               hasThread

@@ -203,8 +203,8 @@ export function SettingsView() {
             <h2 className="font-display text-lg font-medium text-foreground">Anthropic API key</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Stored encrypted on this device — it never leaves your machine except to call Anthropic.
-            Get one at console.anthropic.com.
+            Stored encrypted on this device, your key never leaves your machine except to call
+            Anthropic. Don’t have one? Create a key at console.anthropic.com.
           </p>
           {keyExists && (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -250,8 +250,8 @@ export function SettingsView() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">Lore model</h2>
           <p className="text-sm text-muted-foreground">
-            Answers Lore questions and writes personas. Sonnet is faster and cheaper; Opus is the
-            highest quality.
+            Powers Lore’s answers and generates character personas. Sonnet is faster and cheaper;
+            Opus is the highest quality.
           </p>
           <Select
             value={settings?.recallModel ?? 'claude-sonnet-4-6'}
@@ -273,7 +273,7 @@ export function SettingsView() {
           <h2 className="font-display text-lg font-medium text-foreground">Counsel model</h2>
           <p className="text-sm text-muted-foreground">
             The model and reasoning depth behind Counsel and Converse. Opus reasons best; higher
-            effort is richer but slower at the table.
+            effort gives richer results but is slower at the table.
           </p>
           <div className="flex flex-wrap gap-4">
             <div className="space-y-1.5">
@@ -314,9 +314,9 @@ export function SettingsView() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">Extraction model</h2>
           <p className="text-sm text-muted-foreground">
-            Reads your chronicle at close-out, Transcribe, and Illuminate, proposing entities,
-            notes, and changes for review. Structured work with a safety net — a cheaper model at
-            medium effort keeps close-outs inexpensive with little quality loss.
+            Reads a session’s chronicle (the Extract tool), pasted notes (Transcribe), and a backstory
+            (Draft) to propose entities, notes, and changes for your review. Because you review every
+            suggestion before it’s saved, a cheaper model at medium effort loses little.
           </p>
           <div className="flex flex-wrap gap-4">
             <div className="space-y-1.5">
@@ -360,10 +360,58 @@ export function SettingsView() {
         <Separator />
 
         <section className="space-y-3">
+          <h2 className="font-display text-lg font-medium text-foreground">Illuminate model</h2>
+          <p className="text-sm text-muted-foreground">
+            Powers Illuminate, which enriches an entity with relationships and profile details. It makes
+            one call per entity, so it’s the priciest tool — and because you review every proposal, a
+            cheaper model keeps costs down without risking bad data. Haiku is the default.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <div className="space-y-1.5">
+              <span className="block text-xs text-muted-foreground">Model</span>
+              <Select
+                value={settings?.illuminateModel ?? 'claude-haiku-4-5'}
+                onValueChange={(v) =>
+                  update({ illuminateModel: v as AppSettings['illuminateModel'] })
+                }
+              >
+                <SelectTrigger className="w-72">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5 (default, cheapest)</SelectItem>
+                  <SelectItem value="claude-sonnet-4-6">Claude Sonnet 4.6 (balanced)</SelectItem>
+                  <SelectItem value="claude-opus-4-8">Claude Opus 4.8 (highest quality)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <span className="block text-xs text-muted-foreground">Effort</span>
+              <Select
+                value={settings?.illuminateEffort ?? 'medium'}
+                onValueChange={(v) =>
+                  update({ illuminateEffort: v as AppSettings['illuminateEffort'] })
+                }
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="medium">Medium (default)</SelectItem>
+                  <SelectItem value="high">High (richer)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </section>
+
+        <Separator />
+
+        <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">Local search model</h2>
           <p className="text-sm text-muted-foreground">
-            A small embedding model (~30 MB) powers semantic search. It runs entirely on your
-            device.
+            Powers semantic search over your notes, used by Lore and Counsel. This small model
+            (about 25 MB) runs entirely on your device — nothing it reads ever leaves your machine.
           </p>
           {onb.modelReady ? (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -386,7 +434,7 @@ export function SettingsView() {
               {modelError && <p className="text-xs text-destructive">{modelError}</p>}
               <Button size="sm" variant="outline" onClick={download}>
                 <Download className="size-4" />
-                {modelError ? 'Retry download' : 'Download model (~30 MB)'}
+                {modelError ? 'Retry download' : 'Download model (~25 MB)'}
               </Button>
             </div>
           )}
@@ -398,8 +446,8 @@ export function SettingsView() {
           <h2 className="font-display text-lg font-medium text-foreground">Export &amp; import</h2>
           <p className="text-sm text-muted-foreground">
             Save the active campaign to a JSON file — a portable backup of every entity, note, link,
-            session, and event — or restore one to move a campaign between machines. (Search
-            embeddings rebuild automatically after import.)
+            session, and event — or import one to move a campaign between machines. Search
+            re-indexes automatically after an import.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -431,9 +479,9 @@ export function SettingsView() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">Your data</h2>
           <p className="text-sm text-muted-foreground">
-            Everything lives on this device. Custos snapshots the database on every launch (the five
-            newest are kept in the backups folder) — take one on demand before anything you might
-            regret.
+            Everything lives on this device. Custos backs up your database at every launch and keeps
+            the five most recent snapshots. You can also back up on demand — a good idea before
+            anything risky.
           </p>
           {appInfo && (
             <p className="break-all font-mono text-xs text-muted-foreground">{appInfo.dataDir}</p>
@@ -496,8 +544,9 @@ export function SettingsView() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-medium text-foreground">AI usage</h2>
           <p className="text-sm text-muted-foreground">
-            Estimated spend on your Anthropic key, tracked locally per call. The API bills the truth
-            — this exists so a close-out is never a surprise.
+            An estimate of what you’ve spent on your Anthropic key, tracked locally for each call.
+            Anthropic’s bill is the final word — this is here so an Extract or Illuminate run is never a
+            surprise.
           </p>
           {usage ? (
             <div className="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">

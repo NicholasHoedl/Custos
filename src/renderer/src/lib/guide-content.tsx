@@ -10,20 +10,20 @@ import type { ViewKey } from '@renderer/store/ui-store'
 /** One-line "what it's for" per nav view, keyed by `NAV_ITEMS.key`. Used by the tour + the guide. */
 export const TOOL_BLURBS: Record<string, string> = {
   journal:
-    "Jot what happens as you play — one plain line at a time. You'll spend most of your time here.",
+    'Note what happens as you play, one plain line at a time. This is the view you’ll live in during a session.',
   sessions:
-    'Each game night is a session. Review it, get a "previously on…" recap, and run Illuminate to enrich your world from its notes.',
+    'Every game night is a session. Review what happened, get a “previously on…” recap, and turn its log into your world — Extract, Illuminate, and Transcribe all live here.',
   character:
-    "Your main character's home — their profile, backstory, persona, and voice (the voice the Keeper speaks in).",
+    'Your main character’s home: their profile, backstory, and the persona and voice the Keeper speaks in.',
   capture:
-    'Your world library: every person, place, faction, quest, and item. Browse, edit, and inscribe new entries.',
-  web: "A living map of how everyone and everything connects — a force-directed graph of your campaign's relationships.",
+    'Your world library — every person, place, faction, quest, and item you meet. Browse, edit, and inscribe new entries.',
+  web: 'A living map of your campaign’s relationships — an interactive graph you can filter, focus, and rewind through past sessions.',
   recall:
-    'Ask a question in plain language; get a cited answer drawn from your own notes. (Needs the search model — download it in Settings.)',
+    'Ask a question in plain language and get an answer drawn from your own notes, with its sources cited. Needs the free search model (download it in Settings).',
   suggest:
-    'Stuck in the moment? Get in-character ideas for what your character might do — tagged and grounded in the scene.',
+    'Not sure what to do? Get four in-character options for the moment, grounded in your character and the scene.',
   converse:
-    'About to talk to someone? Get a spread of in-character questions to draw them out, from safe openers to pointed probes.'
+    'About to talk to someone? Get four in-character questions to draw them out, from safe openers to pointed probes.'
 }
 
 /** The three AI lenses, the ones whose output is only as good as the prompt. */
@@ -43,43 +43,43 @@ export const LENS_PROMPT_TIPS: Record<
 > = {
   recall: {
     name: 'Lore',
-    does: "Searches your notes and answers in your character's voice, citing what it drew on.",
+    does: 'Searches your notes and answers in your character’s voice, citing the entries it drew from.',
     using: [
-      'One question at a time — follow-ups remember the thread, so build on the last answer.',
-      'Use “as of” to answer as of an earlier session, without spoilers from later ones.'
+      'Ask one question at a time. Follow-ups remember the thread, so you can build on the last answer.',
+      'Use “as of” to answer from an earlier session’s point of view, with no spoilers from later ones.'
     ],
     query: [
-      'Name the person, place, or thing — it matches your words against note text and entity names, so “Glasstaff” finds far more than “the wizard,” and a bare “him” finds nothing.',
-      'Ask about what you’ve actually recorded — it answers only from your notes, and keeps a rumor a rumor rather than inventing.',
-      'Ask one concrete thing, not a broad “what’s going on?” — a pointed question gets a pointed, right-sized answer instead of a shallow tour.'
+      'Name the person, place, or thing. Lore matches your words against your notes and entity names, so “Glasstaff” finds far more than “the wizard” — and a bare “him” finds nothing.',
+      'Ask about what you’ve actually recorded. Lore answers only from your notes, and it keeps a rumor a rumor rather than inventing details.',
+      'Ask one concrete question rather than a broad “what’s going on?” A focused question gets a focused, right-sized answer instead of a shallow tour.'
     ]
   },
   suggest: {
     name: 'Counsel',
-    does: 'Reads your character and the campaign and offers four ways to play the moment — or, with no situation, story directions from your open threads.',
+    does: 'Reads your character and the campaign, then offers four ways to play the moment — or, with no situation given, story directions drawn from your open threads.',
     using: [
-      'Set the scene — especially the mode (Combat / Social / Stealth / Downtime…) — so the moves fit the kind of moment.',
-      'Add a goal to point all four options toward it; leave it off for a wider spread.',
-      'Not quite right? Refine re-rolls the same moment bolder or calmer.'
+      'Set the scene — especially the mode (Combat, Social, Stealth, Downtime…) — so the options fit the moment.',
+      'Add a goal to aim all four options at it, or leave it blank for a wider spread.',
+      'Not quite right? Refine re-rolls the same moment — bolder, more cautious, or from a fresh angle.'
     ],
     query: [
-      'Describe the exact moment — who just did or said what, and the choice you’re now facing. “The mayor just admitted he pays the Redbrands, and he’s waiting on our answer” beats “we’re in trouble.”',
-      'Name who’s involved and what’s at stake — the four options anchor to those characters’ real ties to you.',
-      'Vague in, generic out: given only “we’re in trouble,” it guesses at what you mean and hands back safe, middle-of-the-road moves.'
+      'Describe the exact moment — who just did or said what, and the choice you now face. “The mayor just admitted he pays the Redbrands, and he’s waiting on our answer” works far better than “we’re in trouble.”',
+      'Name who’s involved and what’s at stake. The four options anchor to those characters’ real ties to you.',
+      'Vague in, generic out: given only “we’re in trouble,” Counsel has to guess what you mean and falls back on safe, middle-of-the-road moves.'
     ]
   },
   converse: {
     name: 'Converse',
-    does: 'Gives four in-character questions to ask someone — from safe openers to pointed probes.',
+    does: 'Suggests four in-character questions to ask someone, from safe openers to pointed probes.',
     using: [
-      'Pick who you’re talking WITH — an NPC or another player’s character.',
-      'To follow up, pick the question you actually asked, then paraphrase their answer — the next four build on it.',
+      'Pick who you’re talking with — an NPC or another player’s character.',
+      'To follow up, choose the question you actually asked and paraphrase their answer. The next four build on what they said.',
       'Use “as of” to ask only what your character knew at an earlier session.'
     ],
     query: [
-      'Name the specific thing you want to crack — “Does he know who hired the bandits?” aims most of the four questions there, and reaches specifics a blank thread won’t.',
-      'It only knows what you’ve recorded about them — their goals, flaws, and how you two stand. Flesh a thin character out first, or the questions stay thin.',
-      'In a follow-up, include HOW they answered — a dodge, a flinch, a boast — so the next questions push on the tell, not just the words.'
+      'Add a thread — the specific thing you want to crack. “Does he know who hired the bandits?” aims most of the four questions there and reaches details a blank thread won’t.',
+      'The questions draw on what you’ve recorded about that character — their description, traits, goals, flaws, your notes on them, and how the two of you stand. Flesh out a thin character first, or the questions stay thin. With a thread set, Converse also pulls in related people and places from your notes.',
+      'In a follow-up, include how they answered — a dodge, a flinch, a boast — so the next questions push on the tell, not just the words.'
     ]
   }
 }
@@ -100,17 +100,21 @@ export interface LoopStep {
   gloss: string
 }
 
-// The core ritual. Icons match the real buttons: BookCheck = the "Close out session" button; the rest
+// The core loop. Icons match the real buttons: BookCheck = the Sessions page's "Extract" button; the rest
 // read as their step. Rendered by the Quickstart guide.
 export const LOOP_STEPS: LoopStep[] = [
   {
     icon: NotebookPen,
     label: 'Chronicle',
-    gloss: 'Jot what happens at the table, in plain lines.'
+    gloss: 'Jot down what happens at the table, in plain lines.'
   },
-  { icon: BookCheck, label: 'Close out', gloss: 'Turn the session’s log into entities & notes.' },
-  { icon: Wand2, label: 'Illuminate', gloss: 'Fill in ties & profiles from those notes.' },
-  { icon: Library, label: 'Ask', gloss: 'Lore, Counsel & Converse draw on it all.' }
+  { icon: BookCheck, label: 'Extract', gloss: 'Turn the session’s log into entities and notes.' },
+  {
+    icon: Wand2,
+    label: 'Illuminate',
+    gloss: 'Fill in relationships and profiles from those notes.'
+  },
+  { icon: Library, label: 'Ask', gloss: 'Lore, Counsel, and Converse draw on it all.' }
 ]
 
 /** Where to get an Anthropic API key — the console link + the numbered "how to" steps. Shared by the
@@ -119,8 +123,8 @@ export const ANTHROPIC_CONSOLE_URL = 'https://console.anthropic.com/settings/key
 export const ANTHROPIC_CONSOLE_LABEL = 'console.anthropic.com'
 
 export const API_KEY_STEPS: string[] = [
-  'Open the Anthropic Console at console.anthropic.com and sign in — or create a free account.',
-  'Add a little billing credit — API usage is pay-as-you-go, and a few dollars is plenty to try Custos.',
-  'Go to API keys → Create Key, then copy the key (it starts with “sk-ant-”).',
-  "Paste it into Custos and verify — it's stored encrypted on this device and only ever used to call Anthropic."
+  'Go to the Anthropic Console at console.anthropic.com and sign in, or create a free account.',
+  'Add a little billing credit. API usage is pay-as-you-go, and a few dollars is plenty to try Custos.',
+  'Under API Keys, choose Create Key, then copy it — keys start with “sk-ant-”.',
+  'Paste it into Custos to save and verify it. Your key is stored encrypted on this device and used only to call Anthropic.'
 ]

@@ -36,7 +36,7 @@ import { useLensHistory } from '@renderer/hooks/use-lens-history'
 import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
-import { Textarea } from '@renderer/components/ui/textarea'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { AsOfSelect } from '@renderer/components/AsOfSelect'
 import { SceneControls } from '@renderer/components/scene/SceneControls'
 import { LensResultBar } from '@renderer/components/lens/LensResultBar'
@@ -243,9 +243,9 @@ export function SuggestView() {
               }}
             />
           )}
-          <Textarea
+          <MentionTextarea
             value={situation}
-            onChange={(e) => setSituation(e.target.value)}
+            onValueChange={setSituation}
             rows={3}
             placeholder={
               mode === 'attitudes'

@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookCheck, FileInput, NotebookPen, Pencil, Trash2 } from 'lucide-react'
+import { NotebookPen, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { EventLogEntry } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
-import { useEvents, useSessions, useUnclosedSessions } from '@renderer/hooks/use-ledger'
+import { useEvents } from '@renderer/hooks/use-ledger'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { formatTime } from '@renderer/lib/format'
 import { PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
-import { Textarea } from '@renderer/components/ui/textarea'
-import { TranscribeDialog } from '@renderer/components/capture/TranscribeDialog'
-import { CloseOutDialog } from '@renderer/components/capture/CloseOutDialog'
+import { MentionTextarea } from '@renderer/components/entities/MentionTextarea'
 import { DeleteEventDialog } from '@renderer/components/capture/DeleteEventDialog'
 import { SessionControl } from '@renderer/components/sessions/SessionControl'
 
@@ -23,30 +21,20 @@ interface EventFeedProps {
 }
 
 // The Journal — the primary at-the-table capture surface. You jot a plain sentence or two of what
-// happened; entries save AS-IS to the session log (no per-entry AI, ADR-035 as-built). Extraction is
-// the deliberate **Close out session** ritual on the header: one locked wizard runs tier 1 (capture
-// extraction over the whole log) then tier 2 (Illuminate) with a bulk-review surface. The header also
-// hosts the ACTIVE-session switcher and the Transcribe dialog (ADR-036). Internals still ride the
-// event_log table (createEvent); "journal" is the user-facing name (Chronicle). Manual entity/note
-// editing lives in Codex.
+// happened; entries save AS-IS to the session log (no per-entry AI, ADR-035 as-built). Turning a
+// session's log into entities/notes (Extract), enriching them (Illuminate), and importing outside notes
+// (Transcribe) all live on the Sessions page now (ADR-051); the Chronicle header holds ONLY the
+// active-session switcher. Internals still ride the event_log table (createEvent); "journal" is the
+// user-facing name (Chronicle). Manual entity/note editing lives in Codex.
 export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
   const { events, refresh } = useEvents(sessionId)
-  const { sessions } = useSessions(activeCampaignId)
-  const { counts: unclosedCounts } = useUnclosedSessions(activeCampaignId)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [starting, setStarting] = useState(false)
-  const [transcribeOpen, setTranscribeOpen] = useState(false)
-  const [closeOutOpen, setCloseOutOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState<EventLogEntry | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  // The wizard needs the full Session object (number for copy, id for stamping).
-  const activeSession = sessions.find((s) => s.id === sessionId) ?? null
-  // Entries added since this session's last close-out (P1-2) — badges the Close-out button.
-  const unclosed = sessionId ? (unclosedCounts[sessionId] ?? 0) : 0
 
   // Start the first/next session right here — Chronicle is the default view, so a campaign with no
   // session must not dead-end on it (ADR-032).
@@ -116,35 +104,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
         icon={NotebookPen}
         title="Chronicle"
         action={
-          <>
-            {activeCampaignId && <SessionControl campaignId={activeCampaignId} className="w-64" />}
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => setTranscribeOpen(true)}
-            >
-              <FileInput className="size-3.5" />
-              Transcribe
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!activeSession}
-              onClick={() => setCloseOutOpen(true)}
-            >
-              <BookCheck className="size-3.5" />
-              Close out session
-              {unclosed > 0 && (
-                <span
-                  className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
-                  title={`${unclosed} ${unclosed === 1 ? 'entry' : 'entries'} to close out`}
-                >
-                  {unclosed}
-                </span>
-              )}
-            </Button>
-          </>
+          activeCampaignId ? <SessionControl campaignId={activeCampaignId} className="w-64" /> : null
         }
       />
 
@@ -177,9 +137,9 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
 
       {sessionId && (
         <div className="border-t border-border p-3">
-          <Textarea
+          <MentionTextarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onValueChange={setText}
             rows={2}
             placeholder="What happened? A sentence or two…  (Ctrl+Enter)"
             onKeyDown={(e) => {
@@ -197,14 +157,6 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
         </div>
       )}
 
-      <TranscribeDialog open={transcribeOpen} onOpenChange={setTranscribeOpen} />
-      {activeSession && (
-        <CloseOutDialog
-          session={activeSession}
-          open={closeOutOpen}
-          onOpenChange={setCloseOutOpen}
-        />
-      )}
       <DeleteEventDialog
         event={confirmingDelete}
         onOpenChange={(o) => {
@@ -251,9 +203,9 @@ function EntryRow({
           {formatTime(event.timestamp)}
         </span>
         <div className="flex-1 space-y-1.5">
-          <Textarea
+          <MentionTextarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onValueChange={setDraft}
             rows={2}
             autoFocus
             onKeyDown={(e) => {

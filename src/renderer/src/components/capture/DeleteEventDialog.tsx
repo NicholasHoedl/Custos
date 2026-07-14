@@ -32,7 +32,7 @@ export function DeleteEventDialog({
           <AlertDialogTitle className="font-display">Delete this entry?</AlertDialogTitle>
           <AlertDialogDescription>
             “{snippet}” will be removed from the log. This can’t be undone. Notes already extracted from
-            it in a close-out are kept.
+            it are kept.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

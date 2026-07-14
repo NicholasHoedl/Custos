@@ -1,0 +1,49 @@
+import { test, expect } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
+import { cleanup, createCampaign, launchApp } from './helpers'
+
+let app: ElectronApplication
+let page: Page
+let userDataDir: string
+
+test.beforeAll(async () => {
+  ;({ app, page, userDataDir } = await launchApp())
+})
+
+test.afterAll(async () => {
+  await app?.close()
+  cleanup(userDataDir)
+})
+
+// Entity quick-write: typing "/npc" in the Chronicle composer opens a filtered menu of NPCs; picking one
+// drops the entity's plain name in place of the token. Pure UI — no AI, no fake-AI seam (the menu reads
+// the local entity list). Proves the reusable MentionTextarea end to end on its primary call site.
+test('mention: /npc offers an entity and inserts its name', async () => {
+  await createCampaign(page, 'Phandalin', 'Vargas')
+
+  // Seed an NPC to mention (Codex → Inscribe form, defaults to NPC).
+  await page.getByRole('button', { name: 'Codex' }).click()
+  await page.getByRole('button', { name: 'Inscribe' }).click()
+  await page.getByLabel('Name').fill('Aldric Vane')
+  await page.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()
+
+  // Back to Chronicle and start a session so the capture composer renders.
+  await page.getByRole('button', { name: 'Chronicle' }).click()
+  await page.getByRole('button', { name: 'New session' }).click()
+
+  const composer = page.getByPlaceholder(/What happened/)
+  await composer.click()
+  await composer.pressSequentially('/npc')
+
+  // The autocomplete menu offers the seeded NPC (role=option, portaled from the Popover).
+  const option = page.getByRole('option', { name: /Aldric Vane/ })
+  await expect(option).toBeVisible()
+
+  // Keyboard-select it — the "/npc" token is replaced by the plain entity name (+ a trailing space).
+  await composer.press('ArrowDown')
+  await composer.press('Enter')
+  await expect(composer).toHaveValue(/Aldric Vane\s/)
+  await expect(composer).not.toHaveValue(/\/npc/)
+  await expect(option).toHaveCount(0) // menu closed after the pick
+})

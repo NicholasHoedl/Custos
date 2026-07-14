@@ -155,11 +155,15 @@ export interface AppSettings {
   recallModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestEffort: 'medium' | 'high'
-  /** The extraction tiers' knobs (ADR-035 cost tuning): close-out/Transcribe/backstory extraction +
-   *  Illuminate enrichment. Structured work behind a validation net + review gate — a cheaper model at
-   *  medium effort loses little; Counsel/Converse keep their own settings. */
+  /** Extraction knobs (ADR-035 cost tuning): Transcribe + the session Extract tool + backstory derive.
+   *  Structured work behind a validation net + review gate — a cheaper model at medium effort loses
+   *  little; Counsel/Converse keep their own settings. */
   extractionModel: 'claude-sonnet-4-6' | 'claude-opus-4-8' | 'claude-haiku-4-5'
   extractionEffort: 'medium' | 'high'
+  /** Illuminate (enrichment) knobs — DECOUPLED from extraction (ADR-051). Illuminate fires one call per
+   *  touched entity, so it's the cost driver; it's review-gated, so it defaults to the cheapest tier. */
+  illuminateModel: 'claude-sonnet-4-6' | 'claude-opus-4-8' | 'claude-haiku-4-5'
+  illuminateEffort: 'medium' | 'high'
   hotkey: string
   /** First-run tutorial (ADR-044): the player's name (used for the Keeper's greeting) and whether the
    *  forced onboarding wizard has been completed. Both optional so old settings.json files stay valid. */
