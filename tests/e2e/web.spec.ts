@@ -41,4 +41,20 @@ test('web: renders the relationship graph with a node per entity', async () => {
   await expect(svg.locator('text', { hasText: 'Vargas' })).toBeVisible()
   await expect(svg.locator('text', { hasText: 'Sister Garaele' })).toBeVisible()
   await expect(page.getByText('2 entities · 0 ties')).toBeVisible()
+
+  // The legibility controls (relationship-graph decluttering pass) are present.
+  await expect(page.getByRole('button', { name: 'Hide minor' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Hide rumored' })).toBeVisible()
+
+  // Hide-minor prunes the isolated node (Sister Garaele has no ties) but never the main character; the
+  // header reports the reduction. This exercises the effectiveGraph reduce path end-to-end.
+  await page.getByRole('button', { name: 'Hide minor' }).click()
+  await expect(svg.locator('text', { hasText: 'Sister Garaele' })).toHaveCount(0)
+  await expect(svg.locator('text', { hasText: 'Vargas' })).toBeVisible()
+  await expect(page.getByText('2 entities · 0 ties · 1 hidden')).toBeVisible()
+
+  // Toggling it back restores the full cast + the plain counter.
+  await page.getByRole('button', { name: 'Hide minor' }).click()
+  await expect(svg.locator('text', { hasText: 'Sister Garaele' })).toBeVisible()
+  await expect(page.getByText('2 entities · 0 ties', { exact: true })).toBeVisible()
 })

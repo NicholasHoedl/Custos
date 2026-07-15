@@ -10,6 +10,7 @@ import {
 } from 'd3-force'
 import {
   BookOpen,
+  Boxes,
   Camera,
   ExternalLink,
   EyeOff,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react'
 import { ENTITY_TYPE_LABELS, type EntityType, type NoteConfidence } from '@shared/entity-types'
 import type { CampaignGraph, GraphEdge, GraphNode } from '@shared/graph-types'
+import { collapsibleParents, descendantsOf, parentOf, reduceGraph } from '@renderer/lib/graph-reduce'
 import { ENTITY_TYPE_COLOR, ENTITY_TYPE_ICON } from '@renderer/lib/entity-visuals'
 import { PaneHeader } from '@renderer/components/chrome'
 import { Button } from '@renderer/components/ui/button'
@@ -41,6 +43,14 @@ import { useCampaigns, useCampaignGraph, useSessions } from '@renderer/hooks/use
 // this view is active.
 
 const LABEL_GAP = 8 // extra gap below the node edge for the name label
+
+// Label level-of-detail (#1) — a growing cast overlaps its labels into mush, so labels are rationed:
+// always shown on a small graph, once zoomed in, for important/hovered/focused nodes, and edge labels
+// only when zoomed or hovered. These thresholds are the knobs.
+const SMALL_GRAPH = 30 // ≤ this many (reduced) nodes → show every label (also keeps the 2-node e2e green)
+const LABEL_ZOOM = 1.4 // zoom past this → reveal all node labels
+const EDGE_LABEL_ZOOM = 1.6 // zoom past this → reveal edge labels
+const IMPORTANT_DEGREE = 3 // a node with ≥ this many ties is a hub → always labelled
 
 // Legend / filter order — the living (pc/npc/creature) before the structural (faction/location) and the
 // inert (item/quest/event). Every EntityType appears; the entity-visuals maps keep this exhaustive.
@@ -118,6 +128,7 @@ interface SimLink {
   label: string
   directed: boolean
   tone: EdgeTone
+  confidence: NoteConfidence // raw certainty, so the "hide rumoured" filter can read it
   dash: string | undefined
   title: string
   severed: boolean
@@ -140,16 +151,6 @@ function graphSignature(g: CampaignGraph): string {
     '|' +
     g.edges.map((e) => `${e.id}:${e.severed ? 's' : e.justFormed ? 'f' : 'l'}`).join(',')
   )
-}
-
-// Cluster = a node's location (`located_in`) or faction (`member_of`) parent, derived from the live edges —
-// no extra query. Used only when the grouping force is toggled on.
-function clusterOf(nodeId: string, edges: GraphEdge[]): string | null {
-  const loc = edges.find((e) => e.from === nodeId && e.relation === 'located_in')
-  if (loc) return loc.to
-  const fac = edges.find((e) => e.from === nodeId && e.relation === 'member_of')
-  if (fac) return fac.to
-  return null
 }
 
 // A gentle grouping force (opt-in): each tick, nudge every node toward the centroid of its cluster
@@ -213,6 +214,10 @@ export function WebView() {
   const [pair, setPair] = useState<string[]>([]) // up to 2 nodes, for "what's between them"
   const [search, setSearch] = useState('')
   const [cluster, setCluster] = useState(false)
+  const [hideMinor, setHideMinor] = useState(false) // #2: drop the isolated / single-tie long tail
+  const [hideWeak, setHideWeak] = useState(false) // #4: hide rumoured / suspected ties
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()) // #3: folded-away parent ids
+  const [hoveredId, setHoveredId] = useState<string | null>(null) // #1: label LOD on hover
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [playing, setPlaying] = useState(false)
 
@@ -225,50 +230,72 @@ export function WebView() {
     moved: boolean
   }>({ mode: null, node: null, startX: 0, startY: 0, startView: view, moved: false })
 
-  const signature = useMemo(() => graphSignature(graph) + (cluster ? '|C' : ''), [graph, cluster])
+  // Reduce the live graph for legibility (#2 hide-minor, #3 collapse) — this is what the sim BUILDS from
+  // and what we render, so hiding / collapsing actually tightens the layout instead of just masking
+  // output. Type / fallen / focus filters stay render-only (visibleIds) so toggling them never
+  // reshuffles the map.
+  const effective = useMemo(
+    () => reduceGraph(graph, { collapsed, hideMinor, mainCharacterId }),
+    [graph, collapsed, hideMinor, mainCharacterId]
+  )
+  // Parents the user CAN collapse — read from the RAW (pre-collapse) edges, since collapsing removes a
+  // group's internal membership edges (a collapsed super-node would otherwise stop looking collapsible).
+  const collapsible = useMemo(() => collapsibleParents(graph.edges), [graph.edges])
+  // #3: how many entities sit under each collapsible parent — feeds the count badge + toggle affordance.
+  const descendantCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const id of collapsible) m.set(id, descendantsOf(id, graph.edges).size)
+    return m
+  }, [collapsible, graph.edges])
+
+  const signature = useMemo(
+    () => graphSignature(effective) + (cluster ? '|C' : ''),
+    [effective, cluster]
+  )
   const sessionNumbers = useMemo(
     () => sessions.map((s) => s.number).sort((a, b) => a - b),
     [sessions]
   )
 
-  // Degree (how many live ties touch each node) → node size.
+  // Degree (how many live ties touch each node) → node size. Over the REDUCED edges, so a super-node's
+  // size reflects its rerouted external ties and pruned nodes fall away.
   const degree = useMemo(() => {
     const d = new Map<string, number>()
-    for (const e of graph.edges) {
+    for (const e of effective.edges) {
       d.set(e.from, (d.get(e.from) ?? 0) + 1)
       d.set(e.to, (d.get(e.to) ?? 0) + 1)
     }
     return d
-  }, [graph.edges])
+  }, [effective.edges])
 
   // Neighbours of the focused node (1 hop) — for the isolate/dim treatment.
   const neighborhood = useMemo(() => {
     if (!focusId) return null
     const set = new Set<string>([focusId])
-    for (const e of graph.edges) {
+    for (const e of effective.edges) {
       if (e.from === focusId) set.add(e.to)
       if (e.to === focusId) set.add(e.from)
     }
     return set
-  }, [focusId, graph.edges])
+  }, [focusId, effective.edges])
 
-  // Which node ids are visible after the type / fallen / focus filters.
+  // Which node ids are visible after the type / fallen / focus filters (render-only, over the reduced set).
   const visibleIds = useMemo(() => {
     const set = new Set<string>()
-    for (const n of graph.nodes) {
+    for (const n of effective.nodes) {
       if (hidden.has(n.type)) continue
       if (hideFallen && n.faded) continue
       if (neighborhood && !neighborhood.has(n.id)) continue
       set.add(n.id)
     }
     return set
-  }, [graph.nodes, hidden, hideFallen, neighborhood])
+  }, [effective.nodes, hidden, hideFallen, neighborhood])
 
   const searchMatches = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return null
-    return new Set(graph.nodes.filter((n) => n.name.toLowerCase().includes(q)).map((n) => n.id))
-  }, [search, graph.nodes])
+    return new Set(effective.nodes.filter((n) => n.name.toLowerCase().includes(q)).map((n) => n.id))
+  }, [search, effective.nodes])
 
   useEffect(() => {
     if (isActive) refresh()
@@ -311,23 +338,23 @@ export function WebView() {
   // Build (or rebuild) the force simulation. Positions carry over via posRef so a rebuild (re-tie, rename,
   // time-slider move) settles from where things already are rather than scrambling.
   useEffect(() => {
-    if (!isActive || graph.nodes.length === 0) {
+    if (!isActive || effective.nodes.length === 0) {
       simRef.current?.stop()
       simRef.current = null
       return
     }
-    const simNodes: SimNode[] = graph.nodes.map((n) => {
+    const simNodes: SimNode[] = effective.nodes.map((n) => {
       const prev = posRef.current.get(n.id)
       return {
         ...n,
         x: prev?.x,
         y: prev?.y,
         r: radiusFor(degree.get(n.id) ?? 0),
-        cluster: cluster ? clusterOf(n.id, graph.edges) : null
+        cluster: cluster ? parentOf(n.id, effective.edges) : null
       }
     })
     const byId = new Map(simNodes.map((n) => [n.id, n]))
-    const simLinks: SimLink[] = graph.edges
+    const simLinks: SimLink[] = effective.edges
       .filter((e) => byId.has(e.from) && byId.has(e.to))
       .map((e) => ({
         source: e.from,
@@ -338,6 +365,7 @@ export function WebView() {
         label: e.label,
         directed: e.directed,
         tone: edgeTone(e),
+        confidence: e.confidence,
         dash: CONFIDENCE_DASH[e.confidence],
         title: edgeTitle(e),
         severed: e.severed,
@@ -477,6 +505,17 @@ export function WebView() {
     })
   }
 
+  // #3: fold a location/faction (and everything under it) into one super-node, or expand it back.
+  function toggleCollapse(id: string): void {
+    setCollapsed((cur) => {
+      const next = new Set(cur)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setMenu(null)
+  }
+
   // Centre the viewport on a node's cached position (jump-to, from search).
   function centerOn(id: string): void {
     const p = posRef.current.get(id)
@@ -510,7 +549,7 @@ export function WebView() {
     img.src = `data:image/svg+xml;base64,${svg64}`
   }
 
-  const nodeById = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes])
+  const nodeById = useMemo(() => new Map(effective.nodes.map((n) => [n.id, n])), [effective.nodes])
   const pairNames = pair.map((id) => nodeById.get(id)?.name).filter(Boolean) as string[]
 
   function askBetween(): void {
@@ -528,6 +567,10 @@ export function WebView() {
   const hasCampaign = Boolean(activeCampaignId)
   const empty = hasCampaign && graph.nodes.length === 0
   const asOfLabel = asOf === null ? 'Now' : `Session ${asOf}`
+  // #1: a small map never needs decluttering — show every label (also keeps the 2-node e2e green).
+  const smallGraph = effective.nodes.length <= SMALL_GRAPH
+  // #130: how many entities the reductions (#2/#3) fold out of view, for the header's "· N hidden".
+  const hiddenCount = graph.nodes.length - effective.nodes.length
 
   return (
     <div className="flex h-full flex-col">
@@ -554,6 +597,7 @@ export function WebView() {
               <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
                 {graph.nodes.length} {graph.nodes.length === 1 ? 'entity' : 'entities'} ·{' '}
                 {graph.edges.length} {graph.edges.length === 1 ? 'tie' : 'ties'}
+                {hiddenCount > 0 && ` · ${hiddenCount} hidden`}
               </span>
               <Button
                 variant="ghost"
@@ -615,8 +659,16 @@ export function WebView() {
                   !neighborhood || (neighborhood.has(l.from) && neighborhood.has(l.to))
                 const visible = visibleIds.has(l.from) && visibleIds.has(l.to)
                 if (!visible) return null
+                if (hideWeak && l.confidence !== 'confirmed') return null // #4
                 const color = TONE_COLOR[l.tone]
                 const faded = l.severed || !inFocus
+                // #1: edge labels are the worst clutter — show only when zoomed in, an endpoint is
+                // hovered, or the edge sits inside the focused subgraph. Colour + arrow carry the rest.
+                const showEdgeLabel =
+                  view.k >= EDGE_LABEL_ZOOM ||
+                  hoveredId === l.from ||
+                  hoveredId === l.to ||
+                  (!!focusId && inFocus)
                 return (
                   <g key={l.id} style={{ opacity: faded ? 0.28 : 1 }}>
                     {/* Invisible wide hit-line so the thin edge is hoverable. */}
@@ -633,17 +685,19 @@ export function WebView() {
                       strokeDasharray={l.severed ? '1 4' : l.dash}
                       markerEnd={l.directed ? `url(#web-arrow-${l.tone})` : undefined}
                     />
-                    <text
-                      x={mx}
-                      y={my}
-                      textAnchor="middle"
-                      dy="-0.2em"
-                      className="pointer-events-none font-mono"
-                      fontSize={8}
-                      fill="var(--ash)"
-                    >
-                      {l.label}
-                    </text>
+                    {showEdgeLabel && (
+                      <text
+                        x={mx}
+                        y={my}
+                        textAnchor="middle"
+                        dy="-0.2em"
+                        className="pointer-events-none font-mono"
+                        fontSize={8}
+                        fill="var(--ash)"
+                      >
+                        {l.label}
+                      </text>
+                    )}
                   </g>
                 )
               })}
@@ -651,6 +705,16 @@ export function WebView() {
               {nodes.map((n) => {
                 if (n.x == null || n.y == null) return null
                 if (!visibleIds.has(n.id)) return null
+                // #1: ration labels — always on a small map or when zoomed, else only hubs / the MC /
+                // a collapsed group / the hovered node / the focused neighbourhood get one.
+                const showLabel =
+                  smallGraph ||
+                  view.k >= LABEL_ZOOM ||
+                  n.id === mainCharacterId ||
+                  collapsed.has(n.id) ||
+                  (degree.get(n.id) ?? 0) >= IMPORTANT_DEGREE ||
+                  hoveredId === n.id ||
+                  (!!neighborhood && neighborhood.has(n.id))
                 return (
                   <GraphNodeGlyph
                     key={n.id}
@@ -658,6 +722,11 @@ export function WebView() {
                     isMain={n.id === mainCharacterId}
                     inPair={pair.includes(n.id)}
                     match={searchMatches ? searchMatches.has(n.id) : null}
+                    showLabel={showLabel}
+                    groupSize={collapsible.has(n.id) ? (descendantCounts.get(n.id) ?? 0) : null}
+                    collapsed={collapsed.has(n.id)}
+                    onHoverChange={(h) => setHoveredId(h ? n.id : (cur) => (cur === n.id ? null : cur))}
+                    onToggleCollapse={() => toggleCollapse(n.id)}
                     onPointerDown={(e) => onNodePointerDown(e, n)}
                     onContextMenu={(e) => {
                       e.preventDefault()
@@ -733,11 +802,22 @@ export function WebView() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               <ToggleChip on={hideFallen} onClick={() => setHideFallen((v) => !v)}>
-                Hide fallen
+                Hide gone
+              </ToggleChip>
+              <ToggleChip on={hideMinor} onClick={() => setHideMinor((v) => !v)}>
+                Hide minor
+              </ToggleChip>
+              <ToggleChip on={hideWeak} onClick={() => setHideWeak((v) => !v)}>
+                Hide rumored
               </ToggleChip>
               <ToggleChip on={cluster} onClick={() => setCluster((v) => !v)}>
                 Cluster
               </ToggleChip>
+              {collapsed.size > 0 && (
+                <ToggleChip on onClick={() => setCollapsed(new Set())}>
+                  <X className="size-3" /> Expand all
+                </ToggleChip>
+              )}
               {focusId && (
                 <ToggleChip on onClick={() => setFocusId(null)}>
                   <X className="size-3" /> Focus
@@ -817,6 +897,13 @@ export function WebView() {
               >
                 Open
               </MenuItem>
+              {collapsible.has(menu.id) && (
+                <MenuItem icon={Boxes} onClick={() => toggleCollapse(menu.id)}>
+                  {collapsed.has(menu.id)
+                    ? `Expand group (${descendantCounts.get(menu.id) ?? 0})`
+                    : `Collapse group (${descendantCounts.get(menu.id) ?? 0})`}
+                </MenuItem>
+              )}
               {(menuNode.type === 'npc' || menuNode.type === 'pc') &&
                 menu.id !== mainCharacterId && (
                   <MenuItem
@@ -861,6 +948,11 @@ function GraphNodeGlyph({
   isMain,
   inPair,
   match,
+  showLabel,
+  groupSize,
+  collapsed,
+  onHoverChange,
+  onToggleCollapse,
   onPointerDown,
   onContextMenu
 }: {
@@ -868,6 +960,11 @@ function GraphNodeGlyph({
   isMain: boolean
   inPair: boolean
   match: boolean | null // search: true = matches, false = doesn't, null = no active search
+  showLabel: boolean // #1: label rationing
+  groupSize: number | null // #3: descendant count if a collapsible parent, else null
+  collapsed: boolean // #3: currently folded into a super-node
+  onHoverChange: (hovering: boolean) => void
+  onToggleCollapse: () => void
   onPointerDown: (e: React.PointerEvent) => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
@@ -883,17 +980,30 @@ function GraphNodeGlyph({
         : typeColor
   const TypeIcon = ENTITY_TYPE_ICON[node.type]
   const clipId = `web-clip-${node.id}`
-  const strokeW = inPair ? 3.5 : isMain ? 3 : match ? 2.5 : 1.75
+  const strokeW = inPair ? 3.5 : isMain ? 3 : collapsed ? 3 : match ? 2.5 : 1.75
   return (
     <g
       transform={`translate(${node.x},${node.y})`}
       onPointerDown={onPointerDown}
       onContextMenu={onContextMenu}
+      onPointerEnter={() => onHoverChange(true)}
+      onPointerLeave={() => onHoverChange(false)}
       style={{ cursor: 'pointer', opacity: dim ? 0.45 : 1 }}
     >
       <title>
         {node.name} · {ENTITY_TYPE_LABELS[node.type]}
       </title>
+      {/* #3: a dashed outer halo marks a collapsed super-node as "contains a group". */}
+      {collapsed && (
+        <circle
+          r={r + 4}
+          fill="none"
+          stroke="var(--ember)"
+          strokeWidth={1.5}
+          strokeDasharray="3 3"
+          opacity={0.7}
+        />
+      )}
       <circle r={r} fill="var(--char-raised)" stroke={ring} strokeWidth={strokeW} />
       {node.image ? (
         <>
@@ -928,16 +1038,50 @@ function GraphNodeGlyph({
         <circle r={8.5} fill="var(--char)" stroke={typeColor} strokeWidth={1.5} />
         <TypeIcon x={-5.5} y={-5.5} width={11} height={11} color={typeColor} strokeWidth={2.25} />
       </g>
-      <text
-        y={r + LABEL_GAP}
-        textAnchor="middle"
-        className="font-sans"
-        fontSize={11}
-        fill="var(--bone)"
-        style={{ paintOrder: 'stroke', stroke: 'var(--char)', strokeWidth: 3 }}
-      >
-        {node.name.length > 22 ? `${node.name.slice(0, 21)}…` : node.name}
-      </text>
+      {/* #3: collapse / expand control at the top-right — a clickable count on any parent with children.
+          Filled ember when folded (click to expand), muted outline when open (click to fold N in). */}
+      {groupSize != null && groupSize > 0 && (
+        <g
+          transform={`translate(${r * 0.72},${-r * 0.72})`}
+          onPointerDown={(e) => {
+            e.stopPropagation() // don't start a node drag / focus toggle
+            onToggleCollapse()
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          <title>
+            {collapsed ? `Expand — ${groupSize} hidden inside` : `Collapse ${groupSize} into this`}
+          </title>
+          <circle
+            r={9}
+            fill={collapsed ? 'var(--ember-bright)' : 'var(--char)'}
+            stroke={collapsed ? 'var(--ember-bright)' : 'var(--iron)'}
+            strokeWidth={1.5}
+          />
+          <text
+            textAnchor="middle"
+            dy="0.32em"
+            className="font-mono"
+            fontSize={9}
+            fontWeight={700}
+            fill={collapsed ? 'var(--char)' : 'var(--bone)'}
+          >
+            {groupSize}
+          </text>
+        </g>
+      )}
+      {showLabel && (
+        <text
+          y={r + LABEL_GAP}
+          textAnchor="middle"
+          className="font-sans"
+          fontSize={11}
+          fill="var(--bone)"
+          style={{ paintOrder: 'stroke', stroke: 'var(--char)', strokeWidth: 3 }}
+        >
+          {node.name.length > 22 ? `${node.name.slice(0, 21)}…` : node.name}
+        </text>
+      )}
     </g>
   )
 }
