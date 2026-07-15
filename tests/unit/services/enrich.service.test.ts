@@ -190,20 +190,22 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
     expect(res.fieldChanges).toHaveLength(0)
   })
 
-  it('field rules: description alter kept, no-ops dropped, oldValue mismatch dropped, off-whitelist dropped', async () => {
+  it('field rules: description DROPPED (Illuminate can not touch it), no-ops dropped, mismatch dropped, off-whitelist dropped', async () => {
     const { ctx, campaignId, session, subject } = setup()
     enrichFn.mockResolvedValue({
       relationshipChanges: [],
       fieldChanges: [
-        // Description is a REAL scalar (ADR-035 F1): altering it to something new is kept.
+        // Description is OFF the enrich whitelist now — Illuminate no longer edits the prose summary, so
+        // this alter is DROPPED (the per-session sweep churned it with transient details).
         { entityRef: subject.id, field: 'description', op: 'alter', value: 'Iarno in disguise.', oldValue: '' },
-        // No-op description (same value) → dropped.
+        // A no-op description would drop anyway; now it drops off-whitelist too.
         { entityRef: subject.id, field: 'description', op: 'add', value: 'A wizard.', oldValue: '' },
         // List add is kept…
         { entityRef: subject.id, field: 'traits', op: 'add', value: 'Duplicitous', oldValue: '' },
         // …but altering a list item that does not exist verbatim is dropped.
         { entityRef: subject.id, field: 'traits', op: 'alter', value: 'X', oldValue: 'Not A Real Trait' },
-        // A field outside description/traits/goals/flaws + the npc profile keys → whitelist-dropped (F2).
+        // A field outside traits/goals/flaws + the npc profile keys (description is off-whitelist too now)
+        // → whitelist-dropped (F2).
         { entityRef: subject.id, field: 'mood', op: 'add', value: 'grumpy', oldValue: '' }
       ]
     })
@@ -215,10 +217,7 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
     )
     expect(res.ok).toBe(true)
     if (!res.ok) return
-    expect(res.fieldChanges.map((f) => `${f.field}:${f.op}`)).toEqual([
-      'description:alter',
-      'traits:add'
-    ])
+    expect(res.fieldChanges.map((f) => `${f.field}:${f.op}`)).toEqual(['traits:add'])
   })
 
   it('an empty model result is ok:true with empty arrays — the sweep steady-state', async () => {

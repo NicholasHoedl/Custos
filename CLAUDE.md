@@ -86,9 +86,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   tie dedup via `inverseKey`, `use-enrich`) → shared `ChangesetReview` → ONE `import.apply` stamped at
   the enriched session (ties open intervals at N). Field changes stay existing-only + un-versioned
   (ADR-028): plain `updateEntity` in the batch txn, re-read per change so intra-batch edits compound;
-  **`description` is now a legal field-change target writing the REAL column** (it used to misroute into
-  `attributes` — fixed). Enrich post-filters: subject-only + field whitelist (`description|traits|goals|
-  flaws` ∪ `profileKeys(type)`). The tie/field validators are FACTORED (`validateRelationshipChanges` /
+  **`description` writes the REAL column** (it used to misroute into `attributes` — fixed) for the full/
+  backstory path, **but Illuminate is NOT allowed to change `description`** — the per-session sweep churned the
+  stable prose summary with transient details, so it stays set by hand + the backstory tool only (the enrich
+  prompt forbids it AND `enrichEntity`'s whitelist drops it). Enrich post-filters: subject-only + field
+  whitelist (`traits|goals|flaws` ∪ `profileKeys(type)`). The tie/field validators are FACTORED (`validateRelationshipChanges` /
   `validateFieldChanges` over `ChangeValidationCtx`) and shared by both paths — **Dedup (ADR-031)** rules
   ride along: verbatim-dupe notes dropped, near-dupes flagged (`possibleDuplicate` → seeded OFF), live
   `form` ties dropped (`findOpenLink`) + direction-equivalent intra-batch dupes (`canonicalRelKey`),

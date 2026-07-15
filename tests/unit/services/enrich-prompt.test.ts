@@ -28,13 +28,13 @@ const SUBJECT = {
 }
 
 describe('enrich prompt (Illuminate, ADR-035)', () => {
-  it('system demands real ids, forbids #index and creating entities/notes/status, and names description', () => {
+  it('system demands real ids, forbids #index and creating entities/notes/status, and forbids description changes', () => {
     const sys = buildEnrichSystem()[0].text
     expect(sys).toMatch(/REAL entity ids only/i)
     expect(sys).toMatch(/never "#index"/)
     expect(sys).toMatch(/Never propose new entities, notes, or status changes/)
     expect(sys).toMatch(/never change a name or type/)
-    expect(sys).toMatch(/"description"/) // the scalar column is an allowed field here
+    expect(sys).toMatch(/NEVER change "description"/) // Illuminate must NOT touch the prose summary
     expect(sys).toMatch(/related_to \(FAMILY/) // the shared relation vocabulary gloss
     expect(sys).toMatch(/fromDisposition/) // ADR-033 enrichment fields
     expect(sys).toMatch(/NEVER re-propose a tie already in the live relationships list/)

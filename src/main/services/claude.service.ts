@@ -1201,7 +1201,7 @@ RELATIONSHIP CHANGES {fromRef, toRef, relation, action}: "form" for a standing o
 
 ${RELATION_VOCAB_GLOSS}
 
-FIELD CHANGES {entityRef, field, op, value, oldValue}: field is "traits", "goals", or "flaws", one of this entity type's attribute keys, or "description" (the entity's short prose summary — use "alter" when the history has outgrown it). op: "add" a new value; "cut" one the notes contradict; "alter" to reword or replace one. For a LIST field, when cutting or altering copy the EXACT existing item into oldValue — verbatim from the profile shown. Leave value or oldValue as "" when not applicable.
+FIELD CHANGES {entityRef, field, op, value, oldValue}: field is "traits", "goals", or "flaws", or one of this entity type's attribute keys. NEVER change "description" — the short prose summary is maintained by hand and by the backstory tool, not this per-session sweep, so it must not churn with transient details. op: "add" a new value; "cut" one the notes contradict; "alter" to reword or replace one. For a LIST field, when cutting or altering copy the EXACT existing item into oldValue — verbatim from the profile shown. Leave value or oldValue as "" when not applicable.
 
 REFERENCES. Use REAL entity ids only, exactly as shown in the profile, relationships, and roster — never "#index". Never propose new entities, notes, or status changes; never change a name or type. Every fieldChanges item's entityRef is the subject entity's id; every relationshipChanges item must include the subject as one endpoint.`
 

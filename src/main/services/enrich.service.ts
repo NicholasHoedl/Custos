@@ -193,13 +193,10 @@ export async function enrichEntity(
         (rc.fromRef.kind === 'existing' && rc.fromRef.entityId === subject.id) ||
         (rc.toRef.kind === 'existing' && rc.toRef.entityId === subject.id)
     )
-    const allowedFields = new Set<string>([
-      'description',
-      'traits',
-      'goals',
-      'flaws',
-      ...profileKeys(subject.type)
-    ])
+    // Illuminate MAY NOT change `description`: the per-session sweep churned the stable prose summary with
+    // transient details. Description stays set by hand + the backstory tool only — `validateFieldChanges`
+    // still permits it for the full/backstory path; this enrich-only whitelist is what excludes it here.
+    const allowedFields = new Set<string>(['traits', 'goals', 'flaws', ...profileKeys(subject.type)])
     const fieldChanges = validateFieldChanges(raw.fieldChanges, v).filter(
       (fc) =>
         fc.entityRef.kind === 'existing' &&
