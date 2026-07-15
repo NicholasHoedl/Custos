@@ -102,7 +102,8 @@ export function deleteSession(ctx: DbContext, id: string): void {
  * Per-session count of chronicle entries added SINCE the session was last closed out (ROADMAP P1-2).
  * There is no `lastClosedOut` stamp — it's derived: close-out writes its notes stamped at the session
  * (`createNote` with `sessionId`, `createdAt = now()`), so an entry is "unclosed" when its
- * `event_log.timestamp` is newer than that session's newest `note.createdAt`. Illuminate proposes no
+ * `event_log.updatedAt` (C1: bumped on EDIT too, so an entry edited AFTER its session was extracted
+ * re-flags the session) is newer than that session's newest `note.createdAt`. Illuminate proposes no
  * notes, so it never moves the mark; undated batches stamp a null session and don't count. Returns a
  * sparse map (only sessions with ≥1 unclosed entry) — a session with zero entries is never flagged.
  */
@@ -121,13 +122,20 @@ export function unclosedCounts(ctx: DbContext, campaignId: string): Record<strin
   // Count each session's entries newer than its newest note (in-memory combine — event volume per
   // campaign is small; mirrors enrich.service.listTouchedEntities' style).
   const events = ctx.drizzle
-    .select({ sessionId: schema.eventLog.sessionId, timestamp: schema.eventLog.timestamp })
+    .select({
+      sessionId: schema.eventLog.sessionId,
+      timestamp: schema.eventLog.timestamp,
+      updatedAt: schema.eventLog.updatedAt
+    })
     .from(schema.eventLog)
     .where(eq(schema.eventLog.campaignId, campaignId))
     .all()
   const counts: Record<string, number> = {}
   for (const e of events) {
-    if (e.timestamp > (newestNote.get(e.sessionId) ?? 0)) {
+    // C1: compare the EDIT time (updatedAt), not just creation — an entry edited after its session was
+    // extracted re-flags the session (its extracted note still reflects the OLD text). Legacy rows have a
+    // null updatedAt → fall back to timestamp (unchanged add-only behavior).
+    if ((e.updatedAt ?? e.timestamp) > (newestNote.get(e.sessionId) ?? 0)) {
       counts[e.sessionId] = (counts[e.sessionId] ?? 0) + 1
     }
   }

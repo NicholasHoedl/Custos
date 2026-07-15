@@ -20,6 +20,7 @@ import {
 import { ChangesetReview } from '@renderer/components/capture/ChangesetReview'
 import { reasonCopy } from '@renderer/lib/ai-copy'
 import { Banner, SetupCard } from '@renderer/components/chrome'
+import { estimateTokens, EXTRACT_ADVISORY_TOKENS } from '@shared/tokens'
 
 // Extract (ADR-051) — the standalone tier-1 pass, formerly step 1 of the "Close out" wizard. Reads ONE
 // session's chronicle log oldest-first, runs one capture-mode extraction, and reviews the proposed
@@ -41,6 +42,7 @@ export function ExtractDialog({
   const { entities: campaignEntities } = useEntities(activeCampaignId)
   const imp = useImport({ mode: 'capture' })
   const [noEntries, setNoEntries] = useState(false)
+  const [estTokens, setEstTokens] = useState(0) // D1: joined-chronicle size, for the long-session advisory
   const { extract: impExtract, reset: impReset } = imp
 
   // On open: join the session's chronicle oldest-first and extract. An empty log has nothing to extract.
@@ -49,6 +51,7 @@ export function ExtractDialog({
     if (!open) {
       impReset()
       setNoEntries(false)
+      setEstTokens(0)
       return
     }
     if (!onb.keyReady) return
@@ -60,6 +63,7 @@ export function ExtractDialog({
         .sort((a, b) => a.timestamp - b.timestamp)
         .map((e) => e.content)
         .join('\n')
+      setEstTokens(estimateTokens(text))
       if (!text.trim()) setNoEntries(true)
       else impExtract(text)
     })()
@@ -85,6 +89,13 @@ export function ExtractDialog({
             changes it implies — applied to this session for your review.
           </DialogDescription>
         </DialogHeader>
+
+        {estTokens > EXTRACT_ADVISORY_TOKENS && (
+          <Banner icon={<AlertTriangle className="size-4" />}>
+            This is a long session (~{estTokens.toLocaleString()} tokens). If the extraction comes back
+            truncated, split it — extract the earliest entries, then re-open to catch the rest.
+          </Banner>
+        )}
 
         {!onb.keyReady ? (
           <SetupCard

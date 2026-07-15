@@ -186,7 +186,11 @@ export const eventLog = sqliteTable(
       .references(() => campaign.id, { onDelete: 'cascade' }),
     content: text('content').notNull(),
     entityId: text('entity_id').references(() => entity.id, { onDelete: 'set null' }),
-    timestamp: integer('timestamp').notNull()
+    timestamp: integer('timestamp').notNull(),
+    // C1 (ADR follow-up): bumped on create AND edit — unlike `timestamp`, which is frozen so the entry
+    // keeps its position in the oldest-first log. Lets the "unclosed" derivation flag an entry EDITED
+    // after its session was extracted (migration 0013 backfills existing rows to their timestamp).
+    updatedAt: integer('updated_at')
   },
   (t) => [index('event_session_idx').on(t.sessionId)]
 )

@@ -72,6 +72,30 @@ describe('enrich prompt (Illuminate, ADR-035)', () => {
     expect(all).toMatch(/relationship changes and field changes for Glasstaff/)
   })
 
+  it('adds the PC-perspective POV framing when a main character is passed (guard #2)', () => {
+    const content = buildEnrichUserContent(
+      SUBJECT,
+      [{ content: 'The party spoke with Glasstaff.', confidence: 'confirmed' }],
+      null,
+      [{ id: 'e-pc', name: 'Alaeric Gray', type: 'pc' }],
+      0,
+      { id: 'e-pc', name: 'Alaeric Gray' }
+    )
+    const all = textOf(content as unknown[])
+    expect(all).toMatch(/Point of view/)
+    expect(all).toMatch(/Alaeric Gray \(id e-pc\) is the player character/)
+    expect(all).toMatch(/"the party" INCLUDE Alaeric Gray/)
+    expect(all).toMatch(/propose it to e-pc/) // the concrete tie target, so a PC↔NPC "knows" can form
+  })
+
+  it('skips the POV framing when the subject IS the main character (no self-tie nudge)', () => {
+    const content = buildEnrichUserContent(SUBJECT, [], null, [], 0, {
+      id: SUBJECT.id,
+      name: SUBJECT.name
+    })
+    expect(textOf(content as unknown[])).not.toMatch(/Point of view/)
+  })
+
   it('omits the tie and cap lines when there is nothing to show', () => {
     const content = buildEnrichUserContent(SUBJECT, [], null, [])
     const all = textOf(content as unknown[])

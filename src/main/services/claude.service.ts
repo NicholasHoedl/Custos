@@ -1246,7 +1246,8 @@ export function buildEnrichUserContent(
   notes: { content: string; confidence: NoteConfidence }[],
   tieLines: string | null,
   existing: { id: string; name: string; type: string }[],
-  omittedNotes = 0
+  omittedNotes = 0,
+  mainCharacter?: { id: string; name: string }
 ): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = []
 
@@ -1293,6 +1294,16 @@ export function buildEnrichUserContent(
     })
   }
 
+  // POV framing (guard #2): the chronicle is written from the party's / player character's view, so an NPC
+  // the party merely met is rarely NAMED alongside the PC — tell the model who the PC is and that "we"/"the
+  // party" includes them, so a PC↔subject "knows" tie can form. Skipped when the subject IS the PC.
+  if (mainCharacter && mainCharacter.id !== subject.id) {
+    content.push({
+      type: 'text',
+      text: `Point of view: these notes are recorded from the party's perspective, and ${mainCharacter.name} (id ${mainCharacter.id}) is the player character. "We", "I", "us", and "the party" INCLUDE ${mainCharacter.name}. So when the history shows ${subject.name} met, spoke with, aided, or opposed the party, that IS a relationship with ${mainCharacter.name} — propose it to ${mainCharacter.id} (an "acquaintance"/knows tie for a simple meeting; a warmer or colder one when the notes show it), with the right direction and disposition, unless it is already in the live relationships above.`
+    })
+  }
+
   if (notes.length) {
     const omitted = omittedNotes > 0 ? `(+${omittedNotes} earlier notes omitted)\n` : ''
     const lines = notes.map((n) => `- ${n.content}${confidenceTag(n.confidence)}`).join('\n')
@@ -1314,6 +1325,9 @@ export interface EnrichCallParams {
   notes: { content: string; confidence: NoteConfidence }[]
   tieLines: string | null
   existing: { id: string; name: string; type: string }[]
+  /** The campaign's main character (id + name), when it isn't the subject — powers the PC-perspective POV
+   *  framing so a PC↔NPC "knows" tie can form from first-person chronicle. Undefined when enriching the PC. */
+  mainCharacter?: { id: string; name: string }
   omittedNotes?: number
   model: string
   effort: 'medium' | 'high'
@@ -1335,7 +1349,8 @@ export async function enrichChangeset(params: EnrichCallParams): Promise<RawEnri
       params.notes,
       params.tieLines,
       params.existing,
-      params.omittedNotes ?? 0
+      params.omittedNotes ?? 0,
+      params.mainCharacter
     ),
     signal: params.signal
   })

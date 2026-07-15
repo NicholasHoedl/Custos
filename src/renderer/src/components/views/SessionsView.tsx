@@ -105,7 +105,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                   {(unclosed[s.id] ?? 0) > 0 && (
                     <span
                       className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
-                      title={`${unclosed[s.id]} ${unclosed[s.id] === 1 ? 'entry' : 'entries'} to extract`}
+                      title={`${unclosed[s.id]} ${unclosed[s.id] === 1 ? 'entry' : 'entries'} added or changed since last extract`}
                     >
                       {unclosed[s.id]}
                     </span>
@@ -143,7 +143,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                   {(unclosed[selected.id] ?? 0) > 0 && (
                     <span
                       className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
-                      title={`${unclosed[selected.id]} ${unclosed[selected.id] === 1 ? 'entry' : 'entries'} to extract`}
+                      title={`${unclosed[selected.id]} ${unclosed[selected.id] === 1 ? 'entry' : 'entries'} added or changed since last extract`}
                     >
                       {unclosed[selected.id]}
                     </span>

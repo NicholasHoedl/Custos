@@ -34,11 +34,12 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   SELECT` → `DROP` → `RENAME` → recreate indexes); see `drizzle/0004` and `0006`. `migrate()` is wrapped
   in `foreign_keys=OFF` (ADR-004, `src/main/db/index.ts`), so a `PRAGMA foreign_keys` inside a migration
   is a no-op within the txn. Flow: edit `schema.ts` → `npm run db:generate` → hand-fix the generated
-  `.sql`, keep `_journal.json` + the snapshot. Currently **13 migrations (0000–0012)** — 0011 (entity
+  `.sql`, keep `_journal.json` + the snapshot. Currently **14 migrations (0000–0013)** — 0011 (entity
   portrait `image`, ADR-039) is the nullable-ADD case: a clean 1-line `ALTER`, NOT the table-rebuild; **0012
   (ADR-052) is a DATA-only migration** — `DELETE FROM note_embedding/entity_embedding` (no schema change;
   its snapshot is hand-re-chained from 0011), purging old 384-dim vectors after the embedder swap so backfill
-  re-embeds at 768.
+  re-embeds at 768; **0013 (C1) adds nullable `event_log.updated_at`** (clean 1-line `ALTER` + a backfill
+  `UPDATE … = timestamp`) — bumped on edit so an entry edited after its session was extracted re-flags it.
 - **`lifecycleHeuristic` (`src/shared/lifecycle.ts`) MUST mirror migration 0005's SQL `CASE`** — an
   invariant asserted by `chronology.service.test.ts`. Never change one without the other.
 - **`entity.type` and `entity.lifecycle` are free-text TEXT** (no CHECK): a new entity type or lifecycle
@@ -75,7 +76,12 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   call per entity (`enrich.service` → `enrichChangeset`; grounding = full note history capped 30 +
   current profile + id-bearing live-tie lines + a SLIM roster of tie endpoints + note-mentioned entities
   capped 25 — the roster is the pure `selectEnrichRoster`, whose mention-scan reads ALL notes not just the
-  capped-30 prompt window (**B1**), so a tie to an entity named only in an OLD note stays proposable) proposing ONLY relationship/field changes with
+  capped-30 prompt window (**B1**), so a tie to an entity named only in an OLD note stays proposable; the
+  campaign's **main character is PINNED into every enrich roster** (guard #1, `selectEnrichRoster` `pinnedIds`)
+  and the enrich user turn carries a **PC-perspective POV block** naming the MC (guard #2 — `enrichEntity`
+  passes `mainCharacter`, rendered by `buildEnrichUserContent`), so a PC↔NPC "knows"/acquaintance tie forms
+  even when the PC is only the implicit "we" of PC-narrated chronicle and is never named in the NPC's notes —
+  both skipped when the subject IS the MC) proposing ONLY relationship/field changes with
   **REAL-ID refs** (never `#index`; never new entities/notes/status/type) → renderer merges (cross-entity
   tie dedup via `inverseKey`, `use-enrich`) → shared `ChangesetReview` → ONE `import.apply` stamped at
   the enriched session (ties open intervals at N). Field changes stay existing-only + un-versioned
@@ -268,14 +274,22 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   cost lines. Campaign **import** now exists (`import-campaign.service`, one txn, ids preserved, rejects
   a still-existing campaign id, reindexes after) — the export is no longer a one-way street. Window
   bounds persist via `window-state.json`; "Back up now"/data-folder/version live in Settings "Your data".
-- **Session integrity (docs/ROADMAP.md P1-2/4, ADR-037):** a session is "unclosed" when its newest
-  `event_log.timestamp` > its newest `note.createdAt` (the Extract tool stamps notes at the session) — DERIVED,
-  no `lastClosedOut` column. `session.service.unclosedCounts` → `session:unclosed` IPC → `useUnclosedSessions`
-  badges the Sessions-page **Extract** button + Sessions rows; freshness rides the sessions version bump
-  (entry add/edit/delete and `use-import.apply` all fire it). **Chronicle entries are editable** now
-  (`event.service` gained `updateEvent`/`deleteEvent`; nothing FKs to `event_log`): EventFeed rows have
-  hover/focus edit (inline textarea) + delete (`DeleteEventDialog`), allowed ALWAYS — editing after an extract
-  does NOT change already-extracted notes (they're independent records; a `title` hint says so).
+- **Session integrity (docs/ROADMAP.md P1-2/4, ADR-037; audit follow-ups C1/D1/D2/E1-3):** a session is
+  "unclosed" when its newest `event_log.updatedAt` (**C1**: bumped on create AND edit — migration 0013;
+  legacy null rows fall back to `timestamp`) > its newest `note.createdAt` (the Extract tool stamps notes at
+  the session) — DERIVED, no `lastClosedOut` column. `session.service.unclosedCounts` → `session:unclosed` IPC
+  → `useUnclosedSessions` badges the Sessions-page **Extract** button + Sessions rows ("N added or changed
+  since last extract"); freshness rides the sessions version bump (entry add/edit/delete + `use-import.apply` —
+  **C1** wired the previously-missing `saveEntry` edit bump). **Chronicle entries are editable**
+  (`event.service` `updateEvent`/`deleteEvent`; nothing FKs to `event_log`): editing does NOT retroactively
+  change already-extracted notes (independent records), but **C1** now re-flags the session so you can
+  re-extract to sync (dedup-safe, so re-running is cheap). **D2:** `tests/integration/idempotency.test.ts`
+  locks the "re-running yields a near-empty changeset" guarantee (apply → re-`extract`/`enrichEntity` → empty).
+  **D1:** `extract` has a pre-flight `estimateTokens` guard (`@shared/tokens`; `> MAX_EXTRACT_INPUT_TOKENS` →
+  clean `too_long` before the call) + an ExtractDialog long-session advisory. **E3:** `listEvents` orders
+  `timestamp, rowid` so same-ms extraction order is deterministic. **E1/E2:** the Chronicle composer pins the
+  target session at submit (a mid-flight switch → a "saved to the session you wrote it in" toast) and persists
+  an unsent draft to `localStorage` keyed per session.
 - **Lens polish + merge (docs/ROADMAP.md P1-1/5/6):** the three AI lenses share a `LensResultBar`
   (Copy · **Inscribe** → a campaign-lore note via `ledger.note.create` entityIds:[] · **Recent** popover
   of the last ~5) fed by `useLensHistory` + prose serializers in `lib/lens-prose.ts`; each view snapshots

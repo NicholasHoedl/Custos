@@ -145,6 +145,9 @@ export interface EventLogEntry {
   content: string
   entityId: string | null
   timestamp: number
+  /** C1: bumped on edit (not just create), powering the edited-since-extract nudge. Null on legacy rows
+   *  from before migration 0013 (the derivation treats null as == timestamp). */
+  updatedAt: number | null
 }
 
 // The app is dark-only and has no font-size control; the former `theme`/`fontSize` settings were

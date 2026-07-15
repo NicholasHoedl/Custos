@@ -11,6 +11,7 @@ import type { RelationshipView } from '@shared/graph-types'
 import { profileKeys } from '@shared/entity-profiles'
 import type { DbContext } from './db-context'
 import { getEntity, listEntities } from './entity.service'
+import { getCampaign } from './campaign.service'
 import { listNotesForEntity, listNotesForSession } from './note.service'
 import { findOpenLink, listForEntity } from './link.service'
 import {
@@ -76,25 +77,26 @@ function fail(reason: ExtractFailureReason, message?: string): EnrichEntityResul
 }
 
 /**
- * The slim prompt roster (ADR-035 cost tuning): current tie endpoints first (a sever must reference them),
- * then entities NAMED anywhere in `notesForMention`, alphabetical, capped. **B1:** the caller passes the
- * entity's FULL note history here (not just the capped prompt window), so a tie to an entity mentioned only
- * in an older note stays proposable. Pure + unit-tested; the validator stays permissive over the full campaign.
+ * The slim prompt roster (ADR-035 cost tuning): `pinnedIds` first (always kept — the main character, so a
+ * PC↔NPC tie can form even when the PC is only the implicit narrator of "we spoke to X" notes), then current
+ * tie endpoints (a sever must reference them), then entities NAMED anywhere in `notesForMention`,
+ * alphabetical, capped. **B1:** the caller passes the entity's FULL note history here (not just the capped
+ * prompt window), so a tie to an entity named only in an older note stays proposable. Pure + unit-tested.
  */
 export function selectEnrichRoster<E extends { id: string; name: string }>(
   others: E[],
   notesForMention: { content: string }[],
   tieEndpointIds: Set<string>,
-  cap: number = ENRICH_ROSTER_CAP
+  cap: number = ENRICH_ROSTER_CAP,
+  pinnedIds: Set<string> = new Set()
 ): E[] {
   const haystack = notesForMention.map((n) => n.content.toLowerCase()).join('\n')
+  const rank = (e: E): number => (pinnedIds.has(e.id) ? 0 : tieEndpointIds.has(e.id) ? 1 : 2)
   return others
-    .filter((e) => tieEndpointIds.has(e.id) || haystack.includes(e.name.toLowerCase()))
-    .sort(
-      (a, b) =>
-        (tieEndpointIds.has(a.id) ? 0 : 1) - (tieEndpointIds.has(b.id) ? 0 : 1) ||
-        a.name.localeCompare(b.name)
+    .filter(
+      (e) => pinnedIds.has(e.id) || tieEndpointIds.has(e.id) || haystack.includes(e.name.toLowerCase())
     )
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
     .slice(0, cap)
 }
 
@@ -124,10 +126,21 @@ export async function enrichEntity(
     const views = listForEntity(ctx, req.entityId) // live ties
     const tieLines = tieLinesWithIds(subject.name, views)
     const others = listEntities(ctx, req.campaignId).filter((e) => e.id !== subject.id)
-    // Slim prompt roster: tie endpoints + note-mentioned entities, capped — scanning ALL notes (B1), so a
-    // tie to an entity named only in an older note stays proposable. Validator stays permissive (byId below).
+    // The campaign's main character is the implicit narrator of PC-perspective chronicle ("we spoke to X"),
+    // so it's rarely NAMED in an NPC's notes — pin it into the roster (unless it IS the subject) so a PC↔NPC
+    // tie can still form. Paired with the POV framing passed to the enrich prompt (mainCharacter, below).
+    const mcId = getCampaign(ctx, req.campaignId)?.mainCharacterId ?? null
+    const mainCharacter = mcId && mcId !== subject.id ? others.find((e) => e.id === mcId) : undefined
+    // Slim prompt roster: pinned MC + tie endpoints + note-mentioned entities, capped — scanning ALL notes
+    // (B1), so a tie to an entity named only in an older note stays proposable. Validator stays permissive.
     const tieEndpointIds = new Set(views.map((v) => v.other.id))
-    const roster = selectEnrichRoster(others, allNotes, tieEndpointIds)
+    const roster = selectEnrichRoster(
+      others,
+      allNotes,
+      tieEndpointIds,
+      ENRICH_ROSTER_CAP,
+      mainCharacter ? new Set([mainCharacter.id]) : new Set<string>()
+    )
 
     // Illuminate has its OWN model/effort (ADR-051 — decoupled from extraction; defaults to Haiku·medium):
     // structured, validated, review-gated, and the cost driver since it runs one call per entity.
@@ -153,6 +166,7 @@ export async function enrichEntity(
           notes: capped.map((n) => ({ content: n.content, confidence: n.confidence })),
           tieLines,
           existing: roster.map((e) => ({ id: e.id, name: e.name, type: e.type })),
+          mainCharacter: mainCharacter ? { id: mainCharacter.id, name: mainCharacter.name } : undefined,
           omittedNotes: omitted,
           model: illuminateModel,
           effort: illuminateEffort,

@@ -47,6 +47,20 @@ describe('session.service — unclosedCounts (P1-2)', () => {
     expect(unclosedCounts(ctx, campaignId)[session.id]).toBe(1)
   })
 
+  it('C1: an entry EDITED after extraction re-flags the session (updatedAt bump beats the note)', () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    const session = createSession(ctx, { campaignId })
+    const ev = createEvent(ctx, { sessionId: session.id, content: 'We entered the cave.' })
+    // Extract stamps a note at the session → nothing unclosed.
+    createNote(ctx, { campaignId, entityIds: [], content: 'Cave.', sessionId: session.id })
+    expect(unclosedCounts(ctx, campaignId)[session.id]).toBeUndefined()
+    // Editing the already-extracted entry bumps updatedAt past the note → the session re-flags (the
+    // extracted note now reflects the OLD text). The timestamp is untouched, so the OLD derivation missed this.
+    updateEvent(ctx, ev.id, { content: 'We crept in, torches low.' })
+    expect(unclosedCounts(ctx, campaignId)[session.id]).toBe(1)
+  })
+
   it('never flags a session with zero entries', () => {
     const ctx = makeTestDb()
     const campaignId = createCampaign(ctx, { name: 'C' }).id

@@ -327,6 +327,21 @@ describe('selectEnrichRoster (B1: roster scans the full note history)', () => {
     expect(ids).not.toContain('bystander') // neither → dropped
   })
 
+  it('pins the main character even when neither named nor a tie endpoint, ranked first (guard #1)', () => {
+    const pc = { id: 'pc', name: 'Alaeric Gray' } // the implicit narrator — never named in the note text
+    const ids = selectEnrichRoster(
+      [pc, spider, manor, bystander],
+      [{ content: 'We spoke to The Black Spider.' }], // names Spider, NOT Alaeric
+      new Set(['manor']),
+      100,
+      new Set(['pc'])
+    ).map((e) => e.id)
+    expect(ids[0]).toBe('pc') // pinned → ranked first, so it survives the cap and can be a tie endpoint
+    expect(ids).toContain('spider') // still kept (named)
+    expect(ids).toContain('manor') // still kept (tie endpoint)
+    expect(ids).not.toContain('bystander')
+  })
+
   it('respects the cap', () => {
     const many = Array.from({ length: 40 }, (_, i) => ({ id: `e${i}`, name: `Name${i}` }))
     const notes = many.map((e) => ({ content: e.name }))

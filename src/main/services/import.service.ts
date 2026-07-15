@@ -28,6 +28,7 @@ import { RELATIONS, isRelationAllowed, isRelationKey, type RelationKey } from '@
 import type { AiRunCost } from '@shared/usage-types'
 import { profileFor, type StatusPreset } from '@shared/entity-profiles'
 import type { UpdateEntityInput } from '@shared/ipc-types'
+import { estimateTokens, MAX_EXTRACT_INPUT_TOKENS } from '@shared/tokens'
 import type { DbContext } from './db-context'
 import type { VectorStore } from './vector-store.service'
 import { FUZZY_THRESHOLD, nameMatchScore } from './vector-store.service'
@@ -60,6 +61,10 @@ export async function extract(
     if (!text.trim()) return { ok: false, reason: 'empty' }
     if (!isAvailable()) return { ok: false, reason: 'no_key' }
     if (!(await isOnline())) return { ok: false, reason: 'offline' }
+    // D1: pre-flight size guard — a pathological session would otherwise overflow the model's context (a
+    // 400 that classifies to a confusing generic error) or truncate its output. Return a clean `too_long`
+    // BEFORE spending the call, so the user gets the existing "too long — split it" guidance.
+    if (estimateTokens(text) > MAX_EXTRACT_INPUT_TOKENS) return { ok: false, reason: 'too_long' }
 
     const existing = listEntities(ctx, campaignId)
     // Extraction runs on ITS OWN model/effort knobs (ADR-035 cost tuning) — decoupled from Counsel's.

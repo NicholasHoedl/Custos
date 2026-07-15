@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import type { EventLogEntry } from '@shared/entity-types'
 import type { CreateEventInput, UpdateEventInput } from '@shared/ipc-types'
 import * as schema from '../db/schema'
@@ -10,7 +10,9 @@ export function listEvents(ctx: DbContext, sessionId: string): EventLogEntry[] {
     .select()
     .from(schema.eventLog)
     .where(eq(schema.eventLog.sessionId, sessionId))
-    .orderBy(asc(schema.eventLog.timestamp))
+    // E3: rowid tiebreaks same-millisecond entries so the oldest-first order (and thus extraction order)
+    // is a bulletproof total order — a downstream stable sort then can't reshuffle a tie.
+    .orderBy(asc(schema.eventLog.timestamp), asc(sql`rowid`))
     .all()
     .map(rowToEvent)
 }
@@ -21,18 +23,19 @@ export function listEventsForCampaign(ctx: DbContext, campaignId: string): Event
     .select()
     .from(schema.eventLog)
     .where(eq(schema.eventLog.campaignId, campaignId))
-    .orderBy(asc(schema.eventLog.timestamp))
+    .orderBy(asc(schema.eventLog.timestamp), asc(sql`rowid`)) // E3: deterministic same-ms order
     .all()
     .map(rowToEvent)
 }
 
-/** Edit a chronicle entry's content in place (ROADMAP P1-4). The timestamp is left untouched so the
- *  entry keeps its position in the oldest-first log. Editing after close-out does NOT retroactively
- *  change already-extracted notes — they're independent records (see the EventFeed hint). */
+/** Edit a chronicle entry's content in place (ROADMAP P1-4). The `timestamp` is left untouched so the
+ *  entry keeps its position in the oldest-first log, but `updatedAt` IS bumped (C1) so the session re-flags
+ *  as "changed since last extract" — the extracted note still reflects the OLD text until re-extracted
+ *  (they're independent records; see the EventFeed hint). */
 export function updateEvent(ctx: DbContext, id: string, patch: UpdateEventInput): EventLogEntry {
   ctx.drizzle
     .update(schema.eventLog)
-    .set({ content: patch.content })
+    .set({ content: patch.content, updatedAt: now() })
     .where(eq(schema.eventLog.id, id))
     .run()
   const r = ctx.drizzle.select().from(schema.eventLog).where(eq(schema.eventLog.id, id)).get()
@@ -53,13 +56,15 @@ export function createEvent(ctx: DbContext, input: CreateEventInput): EventLogEn
     .where(eq(schema.session.id, input.sessionId))
     .get()
   if (!session) throw new Error(`Session ${input.sessionId} not found`)
+  const ts = now()
   const row = {
     id: newId(),
     sessionId: input.sessionId,
     campaignId: session.campaignId,
     content: input.content,
     entityId: input.entityId ?? null,
-    timestamp: now()
+    timestamp: ts,
+    updatedAt: ts // C1: equal to timestamp at creation; an edit bumps it (updateEvent)
   }
   ctx.drizzle.insert(schema.eventLog).values(row).run()
   return rowToEvent(row)

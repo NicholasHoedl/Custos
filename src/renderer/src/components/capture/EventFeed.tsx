@@ -37,6 +37,21 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
   const [confirmingDelete, setConfirmingDelete] = useState<EventLogEntry | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // E2: composer draft persistence — keyed per session so switching swaps drafts, and a reload/crash keeps
+  // an unsent entry. Load happens on session change; persistence rides the user's edits (below), never the
+  // programmatic loads, so one session's text can't leak into another.
+  const draftKey = sessionId ? `ledger.chronicleDraft:${sessionId}` : null
+  useEffect(() => {
+    setText(draftKey ? (localStorage.getItem(draftKey) ?? '') : '')
+  }, [draftKey])
+
+  function onComposerChange(v: string): void {
+    setText(v)
+    if (!draftKey) return
+    if (v) localStorage.setItem(draftKey, v)
+    else localStorage.removeItem(draftKey)
+  }
+
   // Start the first/next session right here — Chronicle is the default view, so a campaign with no
   // session must not dead-end on it (ADR-032).
   async function startSession(): Promise<void> {
@@ -56,11 +71,17 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
 
   async function submit(): Promise<void> {
     const content = text.trim()
-    if (!content || !sessionId || busy) return
+    // E1: pin the session at submit time — the entry lands in the session it was WRITTEN in even if the
+    // active session switches mid-create (the closure already captures `sessionId`; this makes it explicit
+    // and refactor-proof). No "you switched" toast: it would false-fire on a render-lag mismatch and its
+    // bottom-right position covers the composer's own Add button.
+    const target = sessionId
+    if (!content || !target || busy) return
     setBusy(true)
     try {
-      await ledger.event.create({ sessionId, content })
+      await ledger.event.create({ sessionId: target, content })
       setText('')
+      if (draftKey) localStorage.removeItem(draftKey) // E2: clear the saved draft on a successful add
       refresh()
       useUiStore.getState().bumpSessions() // a new entry makes the session unclosed (P1-2)
     } catch (err) {
@@ -74,6 +95,8 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
     try {
       await ledger.event.update(id, { content })
       refresh()
+      useUiStore.getState().bumpSessions() // C1: an edit re-flags the session (updatedAt bumped) so the
+      // "N to extract" badge refreshes — an edited-after-extract entry should nudge a re-extract.
     } catch (err) {
       toast.error('Could not save the edit', { description: String(err) })
     }
@@ -145,7 +168,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
         <div className="border-t border-border p-3">
           <MentionTextarea
             value={text}
-            onValueChange={setText}
+            onValueChange={onComposerChange}
             rows={2}
             placeholder="What happened? A sentence or two…  (Ctrl+Enter)"
             onKeyDown={(e) => {
