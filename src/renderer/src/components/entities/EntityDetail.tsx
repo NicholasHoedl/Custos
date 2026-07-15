@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { Combine, Pencil, Skull, Trash2 } from 'lucide-react'
+import { CircleSlash, Combine, Pencil, Skull, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entity-types'
+import { ENTITY_TYPE_LABELS, isDeathType, lifecycleLabel, type Entity } from '@shared/entity-types'
 import { cn } from '@renderer/lib/utils'
 import { profileFor, profileKeys, type ProfileField } from '@shared/entity-profiles'
 import type { HierarchyView } from '@shared/graph-types'
@@ -87,6 +87,14 @@ export function EntityDetail({
 
   const fallen = entity.lifecycle === 'ended'
   const presumed = entity.lifecycle === 'presumed_ended'
+  // Type-aware end state (ADR-054): the Skull + blood read right for the living cast (pc/npc/creature);
+  // a place / faction / quest / item / event gets a neutral mark and its own word ("Destroyed", …).
+  const death = isDeathType(entity.type)
+  const EndIcon = death ? Skull : CircleSlash
+  const endLabel = lifecycleLabel(entity.type, entity.lifecycle)
+  const markColor = death ? 'text-blood' : 'text-muted-foreground'
+  const markColorDim = death ? 'text-blood/60' : 'text-muted-foreground/60'
+  const strikeColor = death ? 'decoration-blood' : 'decoration-muted-foreground'
   const TypeIcon = ENTITY_TYPE_ICON[entity.type]
 
   return (
@@ -120,18 +128,16 @@ export function EntityDetail({
             <h2
               className={cn(
                 'mt-1 flex items-center gap-2 font-display text-2xl font-semibold text-foreground',
-                fallen && 'text-foreground/70 line-through decoration-blood decoration-2',
+                fallen && cn('text-foreground/70 line-through decoration-2', strikeColor),
                 presumed && 'italic text-foreground/60'
               )}
             >
               {entity.name}
-              {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
-              {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
+              {fallen && <EndIcon className={cn('size-5', markColor)} aria-label={endLabel} />}
+              {presumed && <EndIcon className={cn('size-4', markColorDim)} aria-label={endLabel} />}
             </h2>
             {(fallen || presumed) && (
-              <div className="inscribed mt-0.5 text-[11px] text-blood">
-                {LIFECYCLE_LABELS[entity.lifecycle]}
-              </div>
+              <div className={cn('inscribed mt-0.5 text-[11px]', markColor)}>{endLabel}</div>
             )}
             {hierarchy && hierarchy.ancestors.length > 0 && (
               <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
@@ -199,7 +205,7 @@ export function EntityDetail({
 
         <Separator />
 
-        <EntityHistory entityId={entity.id} />
+        <EntityHistory entityId={entity.id} type={entity.type} />
 
         <Separator />
 
@@ -208,7 +214,7 @@ export function EntityDetail({
           <NoteList notes={notes} onChanged={refreshNotes} />
         </div>
 
-        {fallen && (
+        {death && fallen && (
           <p className="border-t border-border/60 pt-3 font-display text-[13px] italic text-muted-foreground">
             “Another name for the Custos of the Fallen.” — the Keeper
           </p>

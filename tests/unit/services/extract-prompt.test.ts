@@ -81,7 +81,9 @@ describe('extraction prompt — field changes (ADR-028)', () => {
     const full = buildExtractionSystem('full')[0].text
     const capture = buildExtractionSystem('capture')[0].text
     expect(full).toMatch(/FIELD CHANGES/)
-    expect(full).toMatch(/add.*cut.*alter/) // the three ops are described
+    // ADR-055: a trait/goal/flaw is add/cut only; alter is scoped to an attribute key.
+    expect(full).toMatch(/NEVER "alter" a trait\/goal\/flaw/)
+    expect(full).toMatch(/Use "alter".*ONLY for an attribute key/)
     expect(capture).not.toMatch(/FIELD CHANGES/)
   })
 

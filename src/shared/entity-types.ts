@@ -51,6 +51,34 @@ export const LIFECYCLE_LABELS: Record<Lifecycle, string> = {
   unknown: 'Unknown'
 }
 
+// Per-type word for the ENDED lifecycle bucket (ADR-054): "Fallen" reads wrong for a place / quest / item
+// / faction / event, so each type gets an apt term. The word is generic to the whole `ended` bucket (a
+// quest that Completed OR Failed is "Closed"); the other lifecycles keep the neutral LIFECYCLE_LABELS.
+export const ENDED_LABELS: Record<EntityType, string> = {
+  pc: 'Fallen',
+  npc: 'Fallen',
+  creature: 'Defeated',
+  location: 'Destroyed',
+  faction: 'Disbanded',
+  quest: 'Closed',
+  item: 'Destroyed',
+  event: 'Concluded'
+}
+
+/** The lifecycle's display label, made type-appropriate: the `ended` bucket becomes "Fallen" / "Destroyed"
+ *  / "Disbanded" / … per type; every other lifecycle falls back to the neutral LIFECYCLE_LABELS. */
+export function lifecycleLabel(type: EntityType, lifecycle: Lifecycle): string {
+  return lifecycle === 'ended' ? ENDED_LABELS[type] : LIFECYCLE_LABELS[lifecycle]
+}
+
+/** Types where a death (Skull) mark on the `ended` state reads correctly — the living cast. A location /
+ *  faction / quest / item / event that ends is "destroyed" / "disbanded" / …, not "slain", so it gets a
+ *  neutral mark instead. */
+const DEATH_TYPES: readonly EntityType[] = ['pc', 'npc', 'creature']
+export function isDeathType(type: EntityType): boolean {
+  return DEATH_TYPES.includes(type)
+}
+
 /** Epistemic weight of a note (ADR-021): `confirmed` = observed/known; `rumored` = heard secondhand;
  *  `suspected` = the party's own hypothesis. The AI is told this so it hedges rather than asserting. */
 export type NoteConfidence = 'confirmed' | 'rumored' | 'suspected'

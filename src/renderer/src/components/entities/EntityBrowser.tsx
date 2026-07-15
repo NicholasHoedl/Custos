@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Plus, Search, Skull, Star, StickyNote } from 'lucide-react'
+import { CircleSlash, Plus, Search, Skull, Star, StickyNote } from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
+  isDeathType,
+  lifecycleLabel,
   type Entity,
   type EntityType
 } from '@shared/entity-types'
@@ -164,6 +166,10 @@ function EntityCard({
 }) {
   const fallen = entity.lifecycle === 'ended'
   const presumed = entity.lifecycle === 'presumed_ended'
+  // Type-aware end mark (ADR-054): Skull/blood for the living cast, a neutral mark + word otherwise.
+  const death = isDeathType(entity.type)
+  const EndIcon = death ? Skull : CircleSlash
+  const endLabel = lifecycleLabel(entity.type, entity.lifecycle)
   const TypeIcon = ENTITY_TYPE_ICON[entity.type]
   return (
     <button
@@ -181,7 +187,9 @@ function EntityCard({
           <span
             className={cn(
               'truncate text-sm font-medium',
-              fallen ? 'text-foreground/60 line-through decoration-blood/70' : 'text-foreground'
+              fallen
+                ? cn('text-foreground/60 line-through', death ? 'decoration-blood/70' : 'decoration-muted-foreground/70')
+                : 'text-foreground'
             )}
           >
             {entity.name}
@@ -192,9 +200,17 @@ function EntityCard({
               aria-label="Main character"
             />
           )}
-          {fallen && <Skull className="size-3 shrink-0 text-blood" aria-label="Fallen" />}
+          {fallen && (
+            <EndIcon
+              className={cn('size-3 shrink-0', death ? 'text-blood' : 'text-muted-foreground')}
+              aria-label={endLabel}
+            />
+          )}
           {presumed && (
-            <Skull className="size-3 shrink-0 text-blood/50" aria-label="Presumed lost" />
+            <EndIcon
+              className={cn('size-3 shrink-0', death ? 'text-blood/50' : 'text-muted-foreground/50')}
+              aria-label={endLabel}
+            />
           )}
           <span
             className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-wider"

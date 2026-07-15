@@ -43,8 +43,9 @@ export interface RawExtraction {
   }[]
   notes: { content: string; entityRefs: string[]; tags?: string[]; confidence?: string }[]
   /** Both modes: state changes the text narrates, e.g. a death or a completion (ADR-035 keeps status in
-   *  tier 1 — it drives as-of chronology). */
-  statusChanges?: { entityRef: string; lifecycle?: string; status?: string }[]
+   *  tier 1 — it drives as-of chronology). Status ONLY (ADR-054): the model never proposes a lifecycle;
+   *  the validator snaps the status to the type's preset and derives the lifecycle from it. */
+  statusChanges?: { entityRef: string; status?: string }[]
   /** 'full' mode only: relationships that formed or ended during the described events. */
   relationshipChanges?: {
     fromRef: string

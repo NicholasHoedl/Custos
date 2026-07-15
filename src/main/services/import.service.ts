@@ -1,9 +1,7 @@
 import {
   ENTITY_TYPES,
-  LIFECYCLES,
   type Entity,
   type EntityType,
-  type Lifecycle,
   type Note,
   type NoteConfidence
 } from '@shared/entity-types'
@@ -32,7 +30,6 @@ import { estimateTokens, MAX_EXTRACT_INPUT_TOKENS } from '@shared/tokens'
 import type { DbContext } from './db-context'
 import type { VectorStore } from './vector-store.service'
 import { FUZZY_THRESHOLD, nameMatchScore } from './vector-store.service'
-import { lifecycleHeuristic } from './chronology.service'
 import { createEntity, getEntity, listEntities, updateEntity } from './entity.service'
 import { createLink, findOpenLink, severLink } from './link.service'
 import { createNote, listAllNotes } from './note.service'
@@ -162,7 +159,9 @@ function validateExtraction(
         }
       }
     }
-    // Snap a preset-matching status to its canonical casing ("alive" → "Alive", ADR-031 as-built).
+    // Extraction status is ENUM-ONLY (ADR-054): keep a proposed baseline status only when it snaps to one
+    // of the type's presets (canonical casing, "alive" → "Alive"); drop non-preset free text so the AI
+    // can't set a status — or, via the heuristic, a "fallen" lifecycle — outside the curated vocabulary.
     const rawStatus = strOrUndef(e.status)
     const statusPreset = presetStatusFor(e.type as EntityType, rawStatus ?? null)
     valids.push({
@@ -170,7 +169,7 @@ function validateExtraction(
       type: e.type as EntityType,
       name,
       description: strOrUndef(e.description),
-      status: statusPreset ? statusPreset.label : rawStatus,
+      status: statusPreset ? statusPreset.label : undefined,
       attributes: Object.keys(attributes).length ? attributes : undefined
     })
   })
@@ -283,33 +282,27 @@ function validateExtraction(
       ? (kept.find((v) => v.index === r.index)?.type ?? null)
       : (existing.find((e) => e.id === r.entityId)?.type ?? null)
 
-  // 6) Status changes: resolve the ref; take a valid lifecycle or derive it from the status text
-  //    (same heuristic as capture/backfill — chronology.service); drop entries with neither.
+  // 6) Status changes are ENUM-ONLY (ADR-054): snap the proposed status to the entity type's curated
+  //    preset and take BOTH the canonical label AND its EXPLICIT lifecycle from that preset. A status that
+  //    isn't a preset is DROPPED — the model never proposes a lifecycle, so it can only make an entity
+  //    "fallen"/ended by naming a preset whose lifecycle ends it (no free text, no keyword heuristic).
   const statusChanges: ProposedStatusChange[] = []
   const seenStatus = new Set<string>()
   for (const sc of raw.statusChanges ?? []) {
     if (!sc || typeof sc.entityRef !== 'string') continue
     const ref = resolveRef(sc.entityRef)
     if (!ref) continue
-    const validLifecycle =
-      typeof sc.lifecycle === 'string' && (LIFECYCLES as readonly string[]).includes(sc.lifecycle)
-        ? (sc.lifecycle as Lifecycle)
-        : null
-    const rawStatus = strOrUndef(sc.status) ?? null
-    if (!validLifecycle && rawStatus === null) continue
-    // Snap a preset match to its canonical label + EXPLICIT lifecycle (ADR-031 as-built) — the same
-    // mapping the form's status combobox applies. The preset wins over a contradictory model lifecycle,
-    // and it's the only path to `presumed_ended` (the heuristic never derives it, ADR-021).
-    const preset = presetStatusFor(typeOfRef(ref), rawStatus)
-    const status = preset ? preset.label : rawStatus
-    const lifecycle = preset ? preset.lifecycle : (validLifecycle ?? lifecycleHeuristic(status))
+    const preset = presetStatusFor(typeOfRef(ref), strOrUndef(sc.status) ?? null)
+    if (!preset) continue // non-preset status → drop
+    const status = preset.label
+    const lifecycle = preset.lifecycle
     // ADR-031: proposing an existing entity's CURRENT state is a guaranteed no-op (updateEntity only
     // appends history when something changed) — drop it instead of surfacing review noise.
     if (ref.kind === 'existing') {
       const ent = existing.find((e) => e.id === ref.entityId)
       if (ent && ent.lifecycle === lifecycle && (ent.status ?? null) === status) continue
     }
-    const key = `${refKey(ref)}:${lifecycle}:${status ?? ''}`
+    const key = `${refKey(ref)}:${lifecycle}:${status}`
     if (seenStatus.has(key)) continue
     seenStatus.add(key)
     statusChanges.push({ entityRef: ref, lifecycle, status })
@@ -410,10 +403,12 @@ export function validateRelationshipChanges(
 }
 
 /**
- * Field changes: add/cut/alter a promoted list (traits/goals/flaws), the DESCRIPTION (a real scalar
- * column — ADR-035; previously it silently misrouted into the attributes bag), or a type attribute on
- * an EXISTING entity. A #index (proposed) ref is dropped — a new entity carries its fields already.
- * For a LIST cut/alter, oldValue must match a CURRENT item (no silent no-ops); "" coerces to null.
+ * Field changes on an EXISTING entity: a promoted list (traits/goals/flaws), the DESCRIPTION (a real
+ * scalar column — ADR-035; previously it silently misrouted into the attributes bag), or a type attribute.
+ * A #index (proposed) ref is dropped — a new entity carries its fields already.
+ * **ADR-055:** a promoted list is **add/cut only** — `alter` (edit-in-place) is dropped for traits/goals/
+ * flaws (they're a stable set, not a progress log; progress → notes/quests). `alter` stays valid for a
+ * DESCRIPTION or attribute. For a LIST cut, oldValue must match a CURRENT item; "" coerces to null.
  */
 export function validateFieldChanges(
   raw: RawExtraction['fieldChanges'],
@@ -462,6 +457,11 @@ export function validateFieldChanges(
       if (!isList && !scalarCurrent) continue // nothing to clear
     } else {
       // alter
+      // ADR-055: a promoted list field (traits/goals/flaws) is ADD/CUT only for AI passes — never
+      // edited in place. Those lists are a stable set of discrete items, not a progress log; how a goal
+      // advanced (a location learned, a step done) belongs in a note or a quest, not by rewording it.
+      // `alter` stays valid for attributes + description (facts/reveals, not progress).
+      if (isPromoted) continue
       if (!value) continue
       if (isList && !(oldValue && current.includes(oldValue))) continue // must reference a real item
       if (!isList && scalarCurrent === value) continue // no-op alter
@@ -572,9 +572,11 @@ export function applyChangeset(
         name: ce.name,
         description: ce.description,
         status: ce.status,
-        // A preset status carries an explicit lifecycle (creature "Defeated" → ended, which the heuristic
-        // would read as active) — adopt it, exactly like the form's combobox does (ADR-021).
-        lifecycle: presetStatusFor(ce.type, ce.status ?? null)?.lifecycle,
+        // Extraction is ENUM-ONLY (ADR-054): a preset status carries an explicit lifecycle (creature
+        // "Defeated" → ended) — adopt it, exactly like the form's combobox does (ADR-021). `ce.status` is
+        // already snapped to a preset label or dropped, so with no preset a newly-introduced entity
+        // defaults to `active` (never an AI-guessed "ended" from the free-text keyword heuristic).
+        lifecycle: presetStatusFor(ce.type, ce.status ?? null)?.lifecycle ?? 'active',
         attributes: ce.attributes,
         // Backfill (ADR-018): stamp the baseline at the entity's intro session, falling back to the
         // batch's session. A NULL batch session (undated import / backstory, ADR-030) flows through as an

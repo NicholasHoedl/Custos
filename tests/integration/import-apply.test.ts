@@ -383,7 +383,9 @@ describe('import.service — applyChangeset field changes (ADR-028)', () => {
           value: 'Wary',
           oldValue: 'Cautious',
           include: true
-        }, // compounds
+        }, // compounds — apply-layer check of applyListOp.alter; the ADR-055 "no list alter" rule lives in
+        // validateFieldChanges (which this direct applyChangeset test bypasses), and alter still applies to
+        // list-kind ATTRIBUTES, so the apply branch stays live.
         {
           entityRef: ex(glasstaff.id),
           field: 'flaws',

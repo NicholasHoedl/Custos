@@ -190,7 +190,7 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
     expect(res.fieldChanges).toHaveLength(0)
   })
 
-  it('field rules: description DROPPED (Illuminate can not touch it), no-ops dropped, mismatch dropped, off-whitelist dropped', async () => {
+  it('field rules: description DROPPED, list alter DROPPED (ADR-055), no-ops dropped, mismatch dropped, off-whitelist dropped', async () => {
     const { ctx, campaignId, session, subject } = setup()
     enrichFn.mockResolvedValue({
       relationshipChanges: [],
@@ -202,7 +202,10 @@ describe('enrich.service — enrichEntity (validation + post-filters)', () => {
         { entityRef: subject.id, field: 'description', op: 'add', value: 'A wizard.', oldValue: '' },
         // List add is kept…
         { entityRef: subject.id, field: 'traits', op: 'add', value: 'Duplicitous', oldValue: '' },
-        // …but altering a list item that does not exist verbatim is dropped.
+        // …but a list ALTER is dropped even when oldValue matches verbatim (ADR-055: traits/goals/flaws
+        // are add/cut only — Illuminate can't reword an item to track its progress)…
+        { entityRef: subject.id, field: 'traits', op: 'alter', value: 'Wary', oldValue: 'Cautious' },
+        // …and a non-verbatim list alter is dropped too.
         { entityRef: subject.id, field: 'traits', op: 'alter', value: 'X', oldValue: 'Not A Real Trait' },
         // A field outside traits/goals/flaws + the npc profile keys (description is off-whitelist too now)
         // → whitelist-dropped (F2).

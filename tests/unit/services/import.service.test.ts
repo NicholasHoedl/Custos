@@ -158,19 +158,21 @@ describe('import.service — extract (validate + dedup)', () => {
 })
 
 describe('import.service — changeset v2 (status + relationship changes, ADR-018)', () => {
-  it('resolves status-change refs, validates or derives lifecycles, and drops unusable entries', async () => {
+  it('keeps ONLY preset statuses (canonical label + preset lifecycle), dropping non-preset/dangling/status-less', async () => {
     const ctx = makeTestDb()
     const campaignId = createCampaign(ctx, { name: 'C' }).id
     const manor = createEntity(ctx, { campaignId, type: 'location', name: 'Tresendar Manor' })
     extractFn.mockResolvedValue({
       entities: [{ type: 'npc', name: 'Duke Halric' }],
       notes: [],
+      // ADR-054: the model proposes a status only (never a lifecycle); the validator snaps a listed status
+      // to its preset (case-insensitive) + the preset's explicit lifecycle, and drops anything else.
       statusChanges: [
-        { entityRef: '#0', lifecycle: 'ended', status: 'Slain' }, // valid, new ref
-        { entityRef: manor.id, status: 'Ruined by fire' }, // no lifecycle → derived 'ended'
-        { entityRef: '#0', lifecycle: 'bogus', status: 'Wounded' }, // bad lifecycle → derived 'active'
-        { entityRef: '#9', lifecycle: 'ended' }, // dangling ref → dropped
-        { entityRef: '#0' } // neither lifecycle nor status → dropped
+        { entityRef: '#0', status: 'dead' }, // npc preset (case-insensitive) → Dead / ended
+        { entityRef: manor.id, status: 'Destroyed' }, // location preset → Destroyed / ended
+        { entityRef: '#0', status: 'Slain' }, // NOT a preset → dropped (no free text)
+        { entityRef: '#9', status: 'Dead' }, // dangling ref → dropped
+        { entityRef: '#0' } // no status → dropped
       ],
       relationshipChanges: []
     })
@@ -179,13 +181,8 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.statusChanges).toEqual([
-      { entityRef: { kind: 'new', index: 0 }, lifecycle: 'ended', status: 'Slain' },
-      {
-        entityRef: { kind: 'existing', entityId: manor.id },
-        lifecycle: 'ended',
-        status: 'Ruined by fire'
-      },
-      { entityRef: { kind: 'new', index: 0 }, lifecycle: 'active', status: 'Wounded' }
+      { entityRef: { kind: 'new', index: 0 }, lifecycle: 'ended', status: 'Dead' },
+      { entityRef: { kind: 'existing', entityId: manor.id }, lifecycle: 'ended', status: 'Destroyed' }
     ])
   })
 
@@ -247,7 +244,7 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
         { type: 'npc', name: 'Iarno' } // duplicate → collapsed onto #0
       ],
       notes: [],
-      statusChanges: [{ entityRef: '#1', lifecycle: 'ended', status: 'Dead' }],
+      statusChanges: [{ entityRef: '#1', status: 'Dead' }],
       relationshipChanges: []
     })
     const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
@@ -263,7 +260,7 @@ describe('import.service — changeset v2 (status + relationship changes, ADR-01
     extractFn.mockResolvedValue({
       entities: [],
       notes: [],
-      statusChanges: [{ entityRef: npc.id, lifecycle: 'ended', status: 'Dead' }],
+      statusChanges: [{ entityRef: npc.id, status: 'Dead' }],
       relationshipChanges: []
     })
     const res = await extract(ctx, { campaignId, text: 't', mode: 'full' }, sig())
@@ -405,8 +402,8 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       entities: [],
       notes: [],
       statusChanges: [
-        { entityRef: npc.id, lifecycle: npc.lifecycle, status: 'Alive' }, // current state → dropped
-        { entityRef: npc.id, lifecycle: 'active', status: 'Wounded' } // real change → kept
+        { entityRef: npc.id, status: 'Alive' }, // current state → dropped
+        { entityRef: npc.id, status: 'Dead' } // real change (preset) → kept
       ],
       relationshipChanges: []
     })
@@ -415,10 +412,10 @@ describe('import.service — dedup hardening (ADR-031)', () => {
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.statusChanges).toHaveLength(1)
-    expect(res.proposal.statusChanges[0].status).toBe('Wounded')
+    expect(res.proposal.statusChanges[0].status).toBe('Dead')
   })
 
-  it('snaps statuses to the type’s canonical preset (label + explicit lifecycle) before the no-op drop', async () => {
+  it('snaps a listed status to its canonical preset (label + explicit lifecycle) and drops non-presets', async () => {
     const ctx = makeTestDb()
     const campaignId = createCampaign(ctx, { name: 'C' }).id
     const pc = createEntity(ctx, { campaignId, type: 'pc', name: 'Alaeric', status: 'Active' })
@@ -428,13 +425,13 @@ describe('import.service — dedup hardening (ADR-031)', () => {
       notes: [],
       statusChanges: [
         // Lowercase variant of the current preset → normalized "Active" → equals current → dropped.
-        { entityRef: pc.id, lifecycle: 'active', status: 'active' },
-        // Preset wins over a contradictory model lifecycle: "dead" → "Dead" + ended.
-        { entityRef: pc.id, lifecycle: 'active', status: 'dead' },
-        // A raw status snaps to its type's canonical preset — 'missing' → the npc "Missing" preset (active).
+        { entityRef: pc.id, status: 'active' },
+        // A listed status snaps to its canonical preset + EXPLICIT lifecycle: "dead" → "Dead" + ended.
+        { entityRef: pc.id, status: 'dead' },
+        // 'missing' → the npc "Missing" preset (active — a live thread, never presumed ended).
         { entityRef: npc.id, status: 'missing' },
-        // Genuinely novel status stays free text with the model's lifecycle.
-        { entityRef: npc.id, lifecycle: 'active', status: 'Wounded' }
+        // A non-preset status is DROPPED (ADR-054) — no free text, no keyword-heuristic lifecycle.
+        { entityRef: npc.id, status: 'Wounded' }
       ],
       relationshipChanges: []
     })
@@ -444,22 +441,25 @@ describe('import.service — dedup hardening (ADR-031)', () => {
     if (!res.ok) return
     expect(res.proposal.statusChanges).toEqual([
       { entityRef: { kind: 'existing', entityId: pc.id }, lifecycle: 'ended', status: 'Dead' },
-      { entityRef: { kind: 'existing', entityId: npc.id }, lifecycle: 'active', status: 'Missing' },
-      { entityRef: { kind: 'existing', entityId: npc.id }, lifecycle: 'active', status: 'Wounded' }
+      { entityRef: { kind: 'existing', entityId: npc.id }, lifecycle: 'active', status: 'Missing' }
     ])
   })
 
-  it('normalizes a proposed entity’s baseline status to the canonical preset casing', async () => {
+  it('normalizes a proposed entity’s baseline status to its preset, dropping non-preset free text', async () => {
     const ctx = makeTestDb()
     const campaignId = createCampaign(ctx, { name: 'C' }).id
     extractFn.mockResolvedValue({
-      entities: [{ type: 'npc', name: 'Sildar', status: 'alive' }],
+      entities: [
+        { type: 'npc', name: 'Sildar', status: 'alive' }, // preset (case-insensitive) → 'Alive'
+        { type: 'npc', name: 'Barnaby', status: 'Retired' } // non-preset → dropped (ADR-054)
+      ],
       notes: []
     })
     const res = await extract(ctx, { campaignId, text: 't' }, sig())
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.proposal.entities[0].status).toBe('Alive')
+    expect(res.proposal.entities[1].status).toBeUndefined()
   })
 
   it('drops scalar field no-ops: alter/add to the current value, cut of an empty key', async () => {
@@ -565,7 +565,7 @@ describe('import.service — tie enrichment (ADR-033)', () => {
 })
 
 describe('import.service — changeset v2 field changes (ADR-028)', () => {
-  it('validates field changes: add/cut/alter on lists + attributes; drops #index, off-profile, unmatched', async () => {
+  it('validates field changes: add/cut on lists, alter only on attributes (ADR-055); drops #index, off-profile, unmatched', async () => {
     const ctx = makeTestDb()
     const campaignId = createCampaign(ctx, { name: 'C' }).id
     const glasstaff = createEntity(ctx, {
@@ -594,11 +594,12 @@ describe('import.service — changeset v2 field changes (ADR-028)', () => {
           op: 'alter',
           value: 'Wary',
           oldValue: 'Cautious'
-        }, // keep
+        }, // DROP (ADR-055): a promoted list (traits/goals/flaws) is add/cut only — no in-place alter
+        { entityRef: glasstaff.id, field: 'traits', op: 'cut', value: '', oldValue: 'Cautious' }, // keep: cut a real item
         { entityRef: glasstaff.id, field: 'traits', op: 'cut', value: '', oldValue: 'Nonexistent' }, // drop: unmatched
         { entityRef: glasstaff.id, field: 'flaws', op: 'add', value: 'Greedy', oldValue: '' }, // keep: npc has flaws
         { entityRef: nothic.id, field: 'goals', op: 'add', value: 'Escape', oldValue: '' }, // drop: creature has no goals
-        { entityRef: nothic.id, field: 'weakness', op: 'alter', value: 'fire', oldValue: '' }, // keep: scalar set
+        { entityRef: nothic.id, field: 'weakness', op: 'alter', value: 'fire', oldValue: '' }, // keep: scalar attribute alter still valid
         {
           entityRef: nothic.id,
           field: 'abilities',
@@ -626,11 +627,12 @@ describe('import.service — changeset v2 field changes (ADR-028)', () => {
         value: 'Reckless',
         oldValue: null
       },
+      // The traits ALTER (Cautious→Wary) is gone — dropped by the ADR-055 gate; CUT of a real item survives.
       {
         entityRef: { kind: 'existing', entityId: glasstaff.id },
         field: 'traits',
-        op: 'alter',
-        value: 'Wary',
+        op: 'cut',
+        value: null,
         oldValue: 'Cautious'
       },
       {

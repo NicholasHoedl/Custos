@@ -10,7 +10,6 @@ import { CONVERSE_TAGS, type ConverseQuestion } from '@shared/converse-types'
 import type { RelationshipView } from '@shared/graph-types'
 import {
   ENTITY_TYPES,
-  LIFECYCLES,
   NOTE_CONFIDENCES,
   type Lifecycle,
   type NoteConfidence
@@ -892,7 +891,9 @@ export async function deriveProfileCall(
 // ---- Import extraction (paste-and-extract) ----
 
 // The curated status vocabulary per type, generated from the profiles so the prompt can never drift from
-// the pickers (ADR-031 as-built). Free text stays allowed — the validator snaps matches to canonical.
+// the pickers (ADR-031 as-built). Extraction is ENUM-ONLY (ADR-054): the validator snaps a match to its
+// canonical preset (label + the preset's EXPLICIT lifecycle) and DROPS anything that isn't a preset — the
+// model picks a status, never the lifecycle, so it can only make an entity "ended" via a preset that ends it.
 const STATUS_VOCAB = ENTITY_TYPES.map(
   (t) => `${t}: ${(ENTITY_PROFILES[t].status ?? []).map((s) => s.label).join(' | ')}`
 ).join('; ')
@@ -903,7 +904,7 @@ ONLY WHAT THE TEXT SUPPORTS. Extract only entities and facts the text states or 
 
 ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event, creature), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance; creature: abilities, tactics, weakness, habitat. Never invent an attribute value the text doesn't give.
 
-STATUSES. Per type, prefer EXACTLY one of these; use free text only when none fits: ${STATUS_VOCAB}.
+STATUSES. Per type, use EXACTLY one of these — pick the closest; if none fits, omit the status: ${STATUS_VOCAB}.
 
 An "event" entity is ONLY for a large-scale event that changes the WORLD — a city destroyed, a ruler assassinated, a war declared, a plague, a historically significant happening (usually independent of the party). What the party did, found, fought, or witnessed in a session is a NOTE, never an event entity — unless the outcome itself is world-changing (they killed the king).
 
@@ -916,13 +917,13 @@ REFERENCES. Reference a NEW entity (one you're proposing) by "#" plus its positi
 // Change instructions, split per array (ADR-035 two-tier): 'capture' mode gets STATUS only (time-
 // sensitive, feeds as-of chronology); 'full' mode (backstory step 2) gets all of them. The full-mode
 // text is unchanged from the pre-split CHANGES_INSTRUCTIONS so its behavior doesn't drift.
-const STATUS_CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, lifecycle, status}. lifecycle: "ended" when the entity is no longer in play, "active" when it is (or is again), "unknown" if unclear. status uses the same per-type STATUSES vocabulary above — prefer a listed value; free text only when none fits. Only emit CHANGES the text narrates — never a state merely described as ongoing.`
+const STATUS_CHANGES_INSTRUCTIONS = `STATUS CHANGES. When the text narrates that an entity's state CHANGED during these events — a death, a destruction or disbanding, a quest completed or failed, someone captured or freed — add a statusChanges item {entityRef, status}. status MUST be one of that type's listed STATUSES above — pick the closest; if none fits, OMIT the status change (never invent a status). Choose the status only — the app derives whether that means the entity is still in play or gone; you never set the lifecycle. Only emit CHANGES the text narrates — never a state merely described as ongoing.`
 
 const RELATIONSHIP_CHANGES_INSTRUCTIONS = `RELATIONSHIPS. Add a relationshipChanges item {fromRef, toRef, relation, action} BOTH when the text narrates a relationship forming ("form") or ending ("sever") — an alliance made or broken, membership joined or left, ownership gained or lost, moving to or leaving a place — AND when it establishes a STANDING relationship (action "form"): family, friendship or mentorship, membership in a group, ownership, or where someone lives or something sits. Use "sever" ONLY for a narrated ending. Capture ties the text asserts, not incidental mentions of strangers. In a personal backstory, nearly every named person, place, or group has a standing tie to its subject — capture each one. Keep the narrative note describing the relationship as well. For a "form" tie, also fill in, WHEN the text supports it: a short "description" (the why/when of the bond); "fromDisposition" and "toDisposition" — a few words on how each side FEELS about the other (fromDisposition = how the fromRef entity feels about the toRef entity; the two can differ, and either may be omitted); and "confidence" — "rumored" or "suspected" when the tie is only hearsay or inferred, otherwise "confirmed" (the default). Omit any of these the text doesn't support; "sever" items take none of them.`
 
 const RELATION_VOCAB_GLOSS = `Relation keys and their meanings — pick the closest, authored from the forward side (the inverse is derived): located_in (someone or something is in a place) · member_of (a person belongs to a faction or group) · owns (a person or faction owns an item) · quest_giver_of (an npc or faction gives a quest) · involves (a quest or event involves someone or something) · ally_of (friends, companions, allies) · enemy_of (rivals, foes) · knows (acquainted) · related_to (FAMILY or kin — a sibling, parent, spouse, cousin; or any close personal bond no other key fits).`
 
-const FIELD_CHANGES_INSTRUCTIONS = `FIELD CHANGES. When the text reveals that an EXISTING entity's nature or details CHANGED — a new trait, goal, or flaw; one that no longer holds; or an updated type-specific attribute (a creature's weakness learned, a faction's alignment revealed, a quest's reward set) — add a fieldChanges item {entityRef, field, op, value, oldValue}. entityRef is an EXISTING entity's id (NEVER a "#index" — a new entity already carries its fields). field is "traits", "goals", or "flaws", OR one of that type's attribute keys (the same keys listed under ENTITIES). op: "add" a new value; "cut" one that no longer holds; "alter" to reword or replace one. For a LIST field (traits/goals/flaws), when cutting or altering put the EXACT existing item in oldValue — copy it verbatim from the existing-entities list — and the new text in value. Leave value or oldValue as "" when not applicable. Only propose changes the text NARRATES; never change an entity's name.`
+const FIELD_CHANGES_INSTRUCTIONS = `FIELD CHANGES. When the text reveals that an EXISTING entity's nature or details CHANGED — a new trait, goal, or flaw; one that no longer holds; or an updated type-specific attribute (a creature's weakness learned, a faction's alignment revealed, a quest's reward set) — add a fieldChanges item {entityRef, field, op, value, oldValue}. entityRef is an EXISTING entity's id (NEVER a "#index" — a new entity already carries its fields). field is "traits", "goals", or "flaws", OR one of that type's attribute keys (the same keys listed under ENTITIES). For a LIST field (traits/goals/flaws) the op is ONLY "add" (a new one the text introduces) or "cut" (one that no longer holds — put the EXACT existing item, copied verbatim from the existing-entities list, in oldValue). NEVER "alter" a trait/goal/flaw: those lists are a stable set, not a progress log — a goal like "find the sword" stays as written, and how it advanced (a location learned, a step completed) belongs in a NOTE or a quest entity, not by rewording the goal. Use "alter" (reword or replace one, exact old in oldValue) ONLY for an attribute key. Leave value or oldValue as "" when not applicable. Only propose changes the text NARRATES; never change an entity's name.`
 
 const CHANGES_REFS_EPILOGUE = `These changes use the same references as notes ("#index" for proposed entities, ids for existing ones). If the text supports none, return empty arrays.`
 
@@ -949,10 +950,11 @@ const STATUS_CHANGE_ITEM = {
   additionalProperties: false,
   properties: {
     entityRef: { type: 'string' },
-    lifecycle: { type: 'string', enum: [...LIFECYCLES] },
+    // status only — the model never sets lifecycle; the validator derives it from the matched preset
+    // (ADR-054), snapping a listed status to canonical + its explicit lifecycle and dropping non-presets.
     status: { type: 'string' }
   },
-  required: ['entityRef', 'lifecycle']
+  required: ['entityRef', 'status']
 }
 
 const RELATIONSHIP_CHANGE_ITEM = {
@@ -1133,7 +1135,7 @@ export function buildExtractionUserContent(
       type: 'text',
       text:
         mode === 'full'
-          ? `Existing entities in this campaign — reference one by its id to LINK to it (instead of creating a duplicate) or to propose a FIELD CHANGE. Current traits/goals/flaws/attributes are shown so a cut/alter can copy the exact existing item:\n${list}`
+          ? `Existing entities in this campaign — reference one by its id to LINK to it (instead of creating a duplicate) or to propose a FIELD CHANGE. Current traits/goals/flaws/attributes are shown so a field change can copy the exact existing item verbatim:\n${list}`
           : `Existing entities in this campaign — reference one by its id to LINK to it instead of creating a duplicate:\n${list}`
     })
   }
@@ -1201,7 +1203,7 @@ RELATIONSHIP CHANGES {fromRef, toRef, relation, action}: "form" for a standing o
 
 ${RELATION_VOCAB_GLOSS}
 
-FIELD CHANGES {entityRef, field, op, value, oldValue}: field is "traits", "goals", or "flaws", or one of this entity type's attribute keys. NEVER change "description" — the short prose summary is maintained by hand and by the backstory tool, not this per-session sweep, so it must not churn with transient details. op: "add" a new value; "cut" one the notes contradict; "alter" to reword or replace one. For a LIST field, when cutting or altering copy the EXACT existing item into oldValue — verbatim from the profile shown. Leave value or oldValue as "" when not applicable.
+FIELD CHANGES {entityRef, field, op, value, oldValue}: field is "traits", "goals", or "flaws", or one of this entity type's attribute keys. NEVER change "description" — the short prose summary is maintained by hand and by the backstory tool, not this per-session sweep, so it must not churn with transient details. For a trait/goal/flaw the op is ONLY "add" (a new one the notes evidence) or "cut" (one the notes contradict — copy the EXACT existing item into oldValue, verbatim from the profile shown). NEVER "alter" a trait/goal/flaw: those lists are a stable set, not a progress log, so don't reword or extend one as it advances — a goal like "find the sword" stays as written; how it advanced belongs in a note or a quest, not in the goal itself. Use "alter" (reword or replace one, exact old in oldValue) ONLY for an attribute key. Leave value or oldValue as "" when not applicable.
 
 REFERENCES. Use REAL entity ids only, exactly as shown in the profile, relationships, and roster — never "#index". Never propose new entities, notes, or status changes; never change a name or type. Every fieldChanges item's entityRef is the subject entity's id; every relationshipChanges item must include the subject as one endpoint.`
 

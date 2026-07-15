@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, History } from 'lucide-react'
 import { toast } from 'sonner'
-import { LIFECYCLE_LABELS, type StatusHistoryEntry } from '@shared/entity-types'
+import { lifecycleLabel, type EntityType, type StatusHistoryEntry } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
 import { Button } from '@renderer/components/ui/button'
 
@@ -9,7 +9,7 @@ import { Button } from '@renderer/components/ui/button'
 // (chronology, ADR-017). Lets you verify the deterministic snapshot-on-edit capture, and see how the
 // entity's state evolved. Loads lazily on first expand. (No Collapsible primitive exists — a Button
 // toggle matches the existing UI conventions.)
-export function EntityHistory({ entityId }: { entityId: string }) {
+export function EntityHistory({ entityId, type }: { entityId: string; type: EntityType }) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<StatusHistoryEntry[] | null>(null)
 
@@ -51,7 +51,7 @@ export function EntityHistory({ entityId }: { entityId: string }) {
                   {r.sinceSessionNumber === null ? 'Before tracking' : `Session ${r.sinceSessionNumber}`}
                 </span>
                 <span className="text-foreground/90">
-                  {LIFECYCLE_LABELS[r.lifecycle]}
+                  {lifecycleLabel(type, r.lifecycle)}
                   {r.status ? ` — ${r.status}` : ''}
                 </span>
               </li>

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ImageIcon, Pencil, Skull, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { ENTITY_TYPE_LABELS, LIFECYCLE_LABELS, type Entity } from '@shared/entity-types'
+import { ENTITY_TYPE_LABELS, lifecycleLabel, type Entity } from '@shared/entity-types'
 import { profileFor } from '@shared/entity-profiles'
 import { lifecycleHeuristic } from '@shared/lifecycle'
 import type { UpdateEntityInput } from '@shared/ipc-types'
@@ -158,7 +158,7 @@ export function CharacterDashboard({
               )}
               {(fallen || presumed) && (
                 <span className="inscribed text-[11px] text-blood">
-                  {LIFECYCLE_LABELS[entity.lifecycle]}
+                  {lifecycleLabel(entity.type, entity.lifecycle)}
                 </span>
               )}
             </div>
@@ -170,8 +170,16 @@ export function CharacterDashboard({
               )}
             >
               {entity.name}
-              {fallen && <Skull className="size-5 text-blood" aria-label="Fallen" />}
-              {presumed && <Skull className="size-4 text-blood/60" aria-label="Presumed lost" />}
+              {/* The main character is always a pc — the Skull/blood death mark is apt here. */}
+              {fallen && (
+                <Skull className="size-5 text-blood" aria-label={lifecycleLabel(entity.type, 'ended')} />
+              )}
+              {presumed && (
+                <Skull
+                  className="size-4 text-blood/60"
+                  aria-label={lifecycleLabel(entity.type, 'presumed_ended')}
+                />
+              )}
             </h2>
           </div>
         </div>
@@ -279,7 +287,7 @@ export function CharacterDashboard({
               </p>
             </Card>
             <Card>
-              <EntityHistory entityId={mainCharacterId} />
+              <EntityHistory entityId={mainCharacterId} type={entity.type} />
             </Card>
           </div>
 

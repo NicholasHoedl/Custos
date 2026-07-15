@@ -48,7 +48,17 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
 - **Entity state is one control.** The entity form has a single **Status** combobox; `lifecycle` is
   derived, not user-picked — status presets carry an explicit lifecycle (`entity-profiles.StatusPreset`),
   free text runs through `lifecycleHeuristic`, and a "presumed" checkbox flips `ended ↔ presumed_ended`.
-  There is no separate Lifecycle dropdown.
+  There is no separate Lifecycle dropdown. (Extraction, unlike the manual form, is **enum-only** — it can't
+  use free text; see the two-tier extraction bullet + ADR-054.)
+- **Lifecycle terminology is TYPE-AWARE (ADR-054).** "Fallen" reads wrong for a place/quest/item/faction/
+  event, so the shared **`lifecycleLabel(type, lifecycle)`** (`@shared/entity-types`) maps the `ended` bucket
+  per type via `ENDED_LABELS` — pc/npc **Fallen**, creature **Defeated**, location/item **Destroyed**, faction
+  **Disbanded**, quest **Closed**, event **Concluded** — and falls back to the neutral `LIFECYCLE_LABELS`
+  (never call `LIFECYCLE_LABELS[lifecycle]` directly in the UI — use the helper). The Skull/blood death mark
+  is gated on **`isDeathType`** (pc/npc/creature); other types get a neutral `CircleSlash` + muted strike.
+  Consumers: EntityDetail, CharacterDashboard, EntityBrowser, EntityHistory (takes a `type` prop), the
+  extract-review `StatusChangeRow` (fed the entity's type via `ChangesetReview`'s `refType`); the Web view's
+  blanket toggle is **"Hide gone"** (not "Hide fallen").
 - **A note may tag zero entities** (campaign lore, ADR-021) via the manual NotesView — retrieval and the
   Recall "Sources" list handle null-entity chunks. But paste-and-extract **Import deliberately still
   requires ≥1 entity per note** (an untagged extracted note is noise); don't "relax" the extraction
@@ -89,8 +99,13 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   **`description` writes the REAL column** (it used to misroute into `attributes` — fixed) for the full/
   backstory path, **but Illuminate is NOT allowed to change `description`** — the per-session sweep churned the
   stable prose summary with transient details, so it stays set by hand + the backstory tool only (the enrich
-  prompt forbids it AND `enrichEntity`'s whitelist drops it). Enrich post-filters: subject-only + field
-  whitelist (`traits|goals|flaws` ∪ `profileKeys(type)`). The tie/field validators are FACTORED (`validateRelationshipChanges` /
+  prompt forbids it AND `enrichEntity`'s whitelist drops it). **A promoted list (traits/goals/flaws) is
+  ADD/CUT ONLY for AI passes (ADR-055):** `validateFieldChanges` drops an `alter` when `isPromoted` (the single
+  gate, shared by both the full/backstory path AND Illuminate), and BOTH field-change prompts
+  (`FIELD_CHANGES_INSTRUCTIONS` + the enrich FIELD CHANGES paragraph) forbid rewording a trait/goal/flaw — a
+  goal is a stable item, not a progress log, so how it advanced goes in a note/quest. `alter` stays valid for
+  a type ATTRIBUTE (+ `description` on the full path) and the manual form is unaffected. Enrich post-filters:
+  subject-only + field whitelist (`traits|goals|flaws` ∪ `profileKeys(type)`). The tie/field validators are FACTORED (`validateRelationshipChanges` /
   `validateFieldChanges` over `ChangeValidationCtx`) and shared by both paths — **Dedup (ADR-031)** rules
   ride along: verbatim-dupe notes dropped, near-dupes flagged (`possibleDuplicate` → seeded OFF), live
   `form` ties dropped (`findOpenLink`) + direction-equivalent intra-batch dupes (`canonicalRelKey`),
@@ -100,9 +115,13 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   per-entity error: `api`/`invalid`/`too_long`) from empty. The done/review branches render a destructive
   failure banner + the failed rows (via the pure `summarizeFailures`, `lib/enrich-progress.ts`) + a "Try
   again", so a sweep NEVER reads as "nothing new" when entities actually errored (the masking that hid the
-  Haiku 400). Global reasons (`no_key`/`bad_key`/`offline`) still abort to the error/review states. Extracted statuses SNAP to the type's curated presets (case-insensitive →
-  canonical label + the preset's EXPLICIT lifecycle, the only path to `presumed_ended`; `STATUS_VOCAB` is
-  generated from `ENTITY_PROFILES`; free text stays allowed). **No migration** (mode is TS-level).
+  Haiku 400). Global reasons (`no_key`/`bad_key`/`offline`) still abort to the error/review states. **Extraction status is ENUM-ONLY (ADR-054):**
+  the `statusChange` schema carries `status` ONLY (the `lifecycle` field is gone) and the model is told to use exactly one of the
+  type's listed statuses or omit it; `validateExtraction` SNAPS a proposed status (baseline + change) to the type's preset
+  (case-insensitive → canonical label + the preset's EXPLICIT lifecycle) and **DROPS anything that isn't a preset** — no free text,
+  no `lifecycleHeuristic` fallback, so the model can only make an entity `ended`/"fallen" by naming a preset that ends it (a
+  statusless new entity defaults to `active`). `STATUS_VOCAB` is generated from `ENTITY_PROFILES`; the manual "presumed" toggle
+  stays the only path to `presumed_ended`. **No migration** (mode is TS-level).
 - **Local search / retrieval (ADR-052):** embeddings run **`Alibaba-NLP/gte-base-en-v1.5`** (768-dim,
   long-context — full notes, not MiniLM's ~256-token cut) on **`@huggingface/transformers` v3**
   (`embedding.service.ts`; backend = onnxruntime-node **cpu**, `dtype:'q8'`, `device` OMITTED — `wasm` is
@@ -349,7 +368,22 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   grouping force by `located_in`/`member_of` parent, derived from the live edges), and **PNG export**. Plain
   node-open moved into the context menu (MC → `'character'`, else `setSelectedEntity` + `'capture'`).
   **Shortest-path + graph-side merge/set-portrait deferred; no new dep** (native range slider + hand-rolled
-  overlay menu, not shadcn/Radix).
+  overlay menu, not shadcn/Radix). **LEGIBILITY AT SCALE (ADR-053):** four decluttering controls, split by
+  whether they reshape the layout. The pure **`lib/graph-reduce.ts`** (`parentOf`/`descendantsOf`/
+  `collapsibleParents`/`reduceGraph`; unit-tested, mirrors `lib/mention.ts`) produces the node/edge set the
+  sim BOTH simulates and renders, so **`effective = reduceGraph(graph, {collapsed, hideMinor, mainCharacterId})`**
+  feeds `degree`/`visibleIds`/`neighborhood`/`nodeById`/the sim build + the rebuild `signature` — hence
+  **#2 Hide-minor** (drop < 2-tie nodes, never the MC/super-node) and **#3 Collapse** (fold a `located_in`/
+  `member_of` group TRANSITIVELY into the parent — the parent's own id IS the super-node id; descendants'
+  external edges reroute + dedupe, internals drop; a clickable **count badge** + right-click **Collapse/Expand
+  group** + **Expand all** chip; dashed halo when folded) actually TIGHTEN the layout. **#1 Label LOD** and
+  **#4 Hide-rumored** are render-only (labels rationed by small-graph ≤30 / zoom `k≥1.4` / hub degree≥3 / MC /
+  `hoveredId` / focus, edge labels only zoomed/hovered/focused; weak-edge skip needs raw `confidence` on
+  `SimLink`). Type/hide-fallen/focus stay render-only (`visibleIds`) so they don't reshuffle. `parentOf`
+  generalizes the old inline `clusterOf` to both authored directions (`PARENT_SIDE` over `HIERARCHY_RELATIONS`);
+  grouping derives from the as-of `graph.edges` (NOT `getHierarchy`, which is structural) so collapse is
+  as-of-correct under the slider. Header counter stays campaign totals + a conditional `· N hidden`. No
+  migration; renderer-only.
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.

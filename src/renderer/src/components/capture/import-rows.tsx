@@ -1,8 +1,19 @@
-import { ArrowRight, Check, CircleDashed, Link2, Minus, Plus, Skull, Unlink } from 'lucide-react'
+import {
+  ArrowRight,
+  Check,
+  CircleDashed,
+  CircleSlash,
+  Link2,
+  Minus,
+  Plus,
+  Skull,
+  Unlink
+} from 'lucide-react'
 import {
   ENTITY_TYPES,
   ENTITY_TYPE_LABELS,
-  LIFECYCLE_LABELS,
+  isDeathType,
+  lifecycleLabel,
   NOTE_CONFIDENCES,
   NOTE_CONFIDENCE_LABELS,
   type EntityType,
@@ -309,11 +320,13 @@ export function NoteRow({
   )
 }
 
-// A dated state change, shown as a before→after diff ("Active → Fallen — Slain"), stamped at the
-// batch's session on apply. Death (ended / presumed_ended) carries a blood skull.
+// A dated state change, shown as a before→after diff with a type-appropriate word ("Standing →
+// Destroyed", "Active → Fallen — Slain"), stamped at the batch's session on apply. An ended state carries
+// a Skull for the living cast (pc/npc/creature), a neutral mark otherwise (ADR-054).
 export function StatusChangeRow({
   change,
   fromLifecycle,
+  entityType,
   refName,
   onToggle,
   compact
@@ -321,11 +334,18 @@ export function StatusChangeRow({
   change: ConfirmedStatusChange
   /** The entity's current lifecycle (existing entities only) — drives the before→after diff. */
   fromLifecycle?: Lifecycle | null
+  /** The entity's type — for a type-appropriate lifecycle word + end mark (ADR-054). */
+  entityType?: EntityType | null
   refName: (r: EntityRef) => string
   onToggle: () => void
   compact?: boolean
 }) {
-  const isDeath = change.lifecycle === 'ended' || change.lifecycle === 'presumed_ended'
+  const type = entityType ?? 'npc'
+  // Only a KNOWN living type earns the Skull; an unresolved type falls back to the neutral mark — never
+  // assume "death" for an unknown entity (the unsafe direction).
+  const death = entityType != null && isDeathType(entityType)
+  const ended = change.lifecycle === 'ended' || change.lifecycle === 'presumed_ended'
+  const EndIcon = death ? Skull : CircleSlash
   return (
     <div className={rowCls(change.include, compact)}>
       <div className="flex items-start gap-3">
@@ -343,7 +363,7 @@ export function StatusChangeRow({
                     compact ? 'px-1.5 py-0.5' : 'px-2 py-1'
                   )}
                 >
-                  {LIFECYCLE_LABELS[fromLifecycle]}
+                  {lifecycleLabel(type, fromLifecycle)}
                 </span>
                 <ArrowRight className="size-4 text-muted-foreground" />
               </>
@@ -352,11 +372,15 @@ export function StatusChangeRow({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md text-xs font-medium',
                 compact ? 'px-1.5 py-0.5' : 'px-2 py-1',
-                isDeath ? 'bg-destructive/15 text-destructive' : 'bg-primary/15 text-primary'
+                ended
+                  ? death
+                    ? 'bg-destructive/15 text-destructive'
+                    : 'bg-muted text-muted-foreground'
+                  : 'bg-primary/15 text-primary'
               )}
             >
-              {isDeath && <Skull className="size-3.5" />}
-              {LIFECYCLE_LABELS[change.lifecycle]}
+              {ended && <EndIcon className="size-3.5" />}
+              {lifecycleLabel(type, change.lifecycle)}
             </span>
             {change.status && <span className="text-sm text-muted-foreground">{change.status}</span>}
           </div>

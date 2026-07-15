@@ -1,5 +1,5 @@
 import { useMemo, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import type { Entity, Lifecycle, Session } from '@shared/entity-types'
+import type { Entity, EntityType, Lifecycle, Session } from '@shared/entity-types'
 import type {
   ConfirmedEntity,
   ConfirmedFieldChange,
@@ -92,6 +92,12 @@ export function ChangesetReview({
     r.kind === 'existing'
       ? (campaignEntities.find((e) => e.id === r.entityId)?.lifecycle ?? null)
       : null
+  // The referenced entity's type — so a status change renders a type-appropriate lifecycle word
+  // ("Destroyed" for a location, not "Fallen"; ADR-054).
+  const refType = (r: EntityRef): EntityType | null =>
+    r.kind === 'existing'
+      ? (campaignEntities.find((e) => e.id === r.entityId)?.type ?? null)
+      : (imp.entities.find((e) => e.index === r.index)?.type ?? null)
 
   const creating = imp.entities.filter((e) => e.action === 'create').length
   const linking = imp.entities.filter((e) => e.action === 'link').length
@@ -182,6 +188,7 @@ export function ChangesetReview({
                 key={i}
                 change={c}
                 fromLifecycle={fromLifecycle(c.entityRef)}
+                entityType={refType(c.entityRef)}
                 refName={refName}
                 compact={compact}
                 onToggle={() =>
