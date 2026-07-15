@@ -12,6 +12,7 @@ import {
   BookOpen,
   Camera,
   ExternalLink,
+  EyeOff,
   MessagesSquare,
   Pause,
   Play,
@@ -675,37 +676,60 @@ export function WebView() {
           </svg>
         )}
 
-        {/* Legend + type filter — click a type to hide/show it. */}
+        {/* Legend doubles as the type filter — each row is a switch that shows/hides that type's nodes. */}
         {!empty && hasCampaign && (
           <div className="absolute bottom-3 left-3 flex flex-col gap-2">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-border/60 bg-card/80 px-2.5 py-2 backdrop-blur-sm">
-              {LEGEND_ORDER.map((t) => {
-                const Icon = ENTITY_TYPE_ICON[t]
-                const off = hidden.has(t)
-                return (
+            <div className="rounded-md border border-border/60 bg-card/80 px-2.5 py-2 backdrop-blur-sm">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  Show types
+                </span>
+                {hidden.size > 0 && (
                   <button
-                    key={t}
                     type="button"
-                    onClick={() =>
-                      setHidden((cur) => {
-                        const next = new Set(cur)
-                        if (next.has(t)) next.delete(t)
-                        else next.add(t)
-                        return next
-                      })
-                    }
-                    className={cn(
-                      'flex items-center gap-1.5 rounded px-1 text-left transition-opacity hover:bg-muted/40',
-                      off && 'opacity-35'
-                    )}
+                    onClick={() => setHidden(new Set())}
+                    className="text-[9px] text-primary hover:underline"
                   >
-                    <Icon className="size-3 shrink-0" style={{ color: ENTITY_TYPE_COLOR[t] }} />
-                    <span className="text-[10px] text-muted-foreground">
-                      {ENTITY_TYPE_LABELS[t]}
-                    </span>
+                    Show all
                   </button>
-                )
-              })}
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                {LEGEND_ORDER.map((t) => {
+                  const Icon = ENTITY_TYPE_ICON[t]
+                  const off = hidden.has(t)
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      role="switch"
+                      aria-checked={!off}
+                      title={off ? `Show ${ENTITY_TYPE_LABELS[t]}` : `Hide ${ENTITY_TYPE_LABELS[t]}`}
+                      onClick={() =>
+                        setHidden((cur) => {
+                          const next = new Set(cur)
+                          if (next.has(t)) next.delete(t)
+                          else next.add(t)
+                          return next
+                        })
+                      }
+                      className={cn(
+                        'flex items-center gap-1.5 rounded px-1 text-left transition-opacity hover:bg-muted/40',
+                        off && 'opacity-45'
+                      )}
+                    >
+                      {off ? (
+                        <EyeOff className="size-3 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <Icon className="size-3 shrink-0" style={{ color: ENTITY_TYPE_COLOR[t] }} />
+                      )}
+                      <span className={cn('text-[10px] text-muted-foreground', off && 'line-through')}>
+                        {ENTITY_TYPE_LABELS[t]}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
               <ToggleChip on={hideFallen} onClick={() => setHideFallen((v) => !v)}>
