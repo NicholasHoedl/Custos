@@ -279,11 +279,9 @@ export interface LedgerApi {
     backupNow(): Promise<BackupNowResult>
   }
   bugreport: {
-    /** Gather the diagnostics block (version/OS/AI-readiness/campaign counts/log tail) for review. */
+    /** Gather the diagnostics block (version/OS/AI-readiness/campaign counts/log tail). */
     diagnostics(campaignId: string | null, view: string): Promise<string>
-    /** Snap the sender's window as a PNG data URL — called BEFORE the dialog covers it; null on failure. */
-    capture(): Promise<string | null>
-    /** Write the report bundle, open the prefilled email draft, and reveal the bundle folder. */
+    /** Auto-send the report (or fall back to the bundle + prefilled email draft). */
     submit(req: BugReportRequest): Promise<BugReportResult>
   }
   update: {
@@ -391,7 +389,6 @@ export const IPC = {
   appOpenLogsFolder: 'app:open-logs-folder',
   appBackupNow: 'app:backup-now',
   bugreportDiagnostics: 'bugreport:diagnostics',
-  bugreportCapture: 'bugreport:capture',
   bugreportSubmit: 'bugreport:submit',
   usageSummary: 'usage:summary',
   updateCheck: 'update:check',

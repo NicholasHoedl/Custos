@@ -25,20 +25,19 @@ const MAX_SHOTS = 5
  *  behaves exactly like the two-step email flow, so an undeployed build changes nothing. */
 const AUTO_SEND = BUG_REPORT_ENDPOINT.length > 0
 
-// The in-app bug reporter (launched from the sidebar, under Settings). Collects name + optional reply
-// email + description + screenshots, and silently attaches diagnostics. With the intake worker deployed
-// (AUTO_SEND, ADR-058) Submit POSTs the report and it lands in the dev inbox as an email; otherwise —
-// or on any send failure — it falls back to ADR-057's two-step flow (bundle + prefilled mailto: draft +
-// revealed folder). The main process does the sending; the dialog just reports which path ran.
+// The in-app bug reporter (launched from the Settings page's "Report a bug" section, ADR-060). Collects
+// name + optional reply email + description + screenshots, and silently attaches diagnostics. With the
+// intake worker deployed (AUTO_SEND, ADR-058) Submit POSTs the report and it lands in the dev inbox as
+// an email; otherwise — or on any send failure — it falls back to ADR-057's two-step flow (bundle +
+// prefilled mailto: draft + revealed folder). The main process does the sending; the dialog just reports
+// which path ran. (The old sidebar launcher's window-snap-before-open was dropped with the move —
+// screenshots are attached by hand via paste/drag/picker.)
 export function BugReportDialog({
   open,
-  onOpenChange,
-  initialShot
+  onOpenChange
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** An app-window snap taken by the launcher BEFORE the dialog covered it; pre-attached, removable. */
-  initialShot?: string | null
 }) {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const activeView = useUiStore((s) => s.activeView)
@@ -53,13 +52,12 @@ export function BugReportDialog({
   /** The in-flight silent gather — awaited at submit so a fast submitter never loses the block. */
   const diagPromise = useRef<Promise<string> | null>(null)
 
-  // Re-seed each open: keep any previously typed name (else prefill from settings.userName), start
-  // from the launcher's auto-snap, and gather a fresh diagnostics block for review. The deps beyond
-  // `open` are stable while the modal is up (it blocks view/campaign switching).
+  // Re-seed each open: keep any previously typed name (else prefill from settings.userName) and gather
+  // a fresh diagnostics block. The deps beyond `open` are stable while the modal is up.
   useEffect(() => {
     if (!open) return
     setDescription('')
-    setScreenshots(initialShot ? [initialShot] : [])
+    setScreenshots([])
     setDone(null)
     ledger.settings
       .get()
@@ -72,7 +70,7 @@ export function BugReportDialog({
       .catch((err) => `(could not gather diagnostics: ${String(err)})`)
     diagPromise.current = gather
     void gather.then(setDiagnostics)
-  }, [open, initialShot, activeCampaignId, activeView])
+  }, [open, activeCampaignId, activeView])
 
   function addFiles(files: File[]): void {
     for (const f of files) {
@@ -280,8 +278,8 @@ export function BugReportDialog({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  A snap of the app is attached automatically when possible — remove anything you’d
-                  rather not send. Paste (Ctrl+V) or drag images in to add more.
+                  Paste (Ctrl+V), drag images in, or add files — a screenshot of the problem helps a
+                  lot.
                 </p>
               </div>
             </div>

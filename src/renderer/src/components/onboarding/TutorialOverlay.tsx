@@ -6,57 +6,66 @@ import { ledger } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore, type ViewKey } from '@renderer/store/ui-store'
 import { useCampaigns } from '@renderer/hooks/use-ledger'
-import { NAV_ITEMS, type NavItem } from '@renderer/lib/nav-items'
+import { NAV_ITEMS } from '@renderer/lib/nav-items'
 import {
   ANTHROPIC_CONSOLE_LABEL,
   ANTHROPIC_CONSOLE_URL,
   API_KEY_STEPS,
+  LOOP_STEPS,
+  REVIEW_COPY,
   SPOTLIGHT_COPY,
   TOOL_BLURBS,
   TOUR_GROUPS
 } from '@renderer/lib/guide-content'
 import { Button } from '@renderer/components/ui/button'
-import { Spotlight, useTargetRect } from '@renderer/components/onboarding/Spotlight'
+import {
+  PageOverlay,
+  ReviewShell,
+  Spotlight,
+  useTargetRect
+} from '@renderer/components/onboarding/Spotlight'
 import { WelcomeCard } from '@renderer/components/onboarding/WelcomeCard'
 
-// The forced first-run tutorial, redesigned as a SPOTLIGHT TOUR (ADR-059 — supersedes the ADR-044/045
-// wizard's presentation; the gate, the validated-key requirement, non-skippability, and the e2e skip
-// seam all stand). One full-screen welcome page captures the user's name, then the REAL app takes over:
-// a scrim greys and click-blocks everything except one highlighted control per step, with an anchored
-// coach mark. ACTION steps force the real UI (the campaign dialog, the session button, Settings' key
-// card) and advance by WATCHING state — which makes them idempotent: a mid-tour relaunch resumes at the
-// persisted `tutorialStep`, and already-satisfied steps fast-forward on entry. INFO steps advance via
-// Next. Linear, no Back; AppShell keeps hotkeys disabled while the tour is active.
+// The forced first-run tutorial — a PER-PAGE spotlight walkthrough (ADR-059 → ADR-060). One full-screen
+// welcome page captures the user's name, then the REAL app takes over across 19 stops: ACTION steps
+// force the real UI (the campaign dialog, the session button, Settings' key card) and advance by
+// WATCHING state (idempotent — a mid-tour relaunch resumes at the persisted `tutorialStep` and satisfied
+// steps fast-forward); INFO steps highlight one control (visible, not operable) with Next; PAGE steps
+// show a whole page UNDIMMED with the coach card sitting over the navbar; the REVIEW step closes with a
+// front-and-center recap card. Linear, no Back, no skip; AppShell keeps hotkeys disabled throughout.
 
 type Step = 'welcome' | TutorialStepId
 
 interface StepDef {
   id: TutorialStepId
-  kind: 'action' | 'info'
-  /** CSS selectors unioned into the cutout — data-tour attributes on the real controls. */
-  targets: string[]
-  side: 'top' | 'right' | 'bottom' | 'left'
-  /** View the target lives in (MainPanel keeps views mounted but hidden — a hidden rect is 0). */
-  view?: ViewKey
+  kind: 'action' | 'info' | 'page' | 'review'
+  /** CSS selectors unioned into the cutout (action/info only) — data-tour attrs on real controls. */
+  targets?: string[]
+  side?: 'top' | 'right' | 'bottom' | 'left'
+  /** The view this step lives in (MainPanel keeps views mounted but hidden — hidden rects are 0). */
+  view: ViewKey
 }
-
-/** The group cutout = the nav heading + every nav item the group teaches (from TOUR_GROUPS, so the
- *  tour and the Quickstart guide can't drift — including Continuity in the ask group). */
-const groupTargets = (g: 'tour-capture' | 'tour-world' | 'tour-ask'): string[] => [
-  `[data-tour="nav-group-${g.replace('tour-', '')}"]`,
-  ...TOUR_GROUPS[g].keys.map((k) => `[data-tour="nav-${k}"]`)
-]
 
 const STEP_DEFS: StepDef[] = [
   { id: 'campaign', kind: 'action', targets: ['[data-tour="new-campaign"]'], side: 'right', view: 'journal' },
-  { id: 'character', kind: 'info', targets: ['[data-tour="nav-character"]'], side: 'right' },
+  { id: 'character-page', kind: 'page', view: 'character' },
+  { id: 'chronicle-page', kind: 'page', view: 'journal' },
   { id: 'session', kind: 'action', targets: ['[data-tour="new-session"]'], side: 'bottom', view: 'journal' },
+  { id: 'composer', kind: 'info', targets: ['[data-tour="chronicle-composer"]'], side: 'top', view: 'journal' },
+  { id: 'sessions-page', kind: 'page', view: 'sessions' },
+  { id: 'extract', kind: 'info', targets: ['[data-tour="tool-extract"]'], side: 'bottom', view: 'sessions' },
+  { id: 'illuminate', kind: 'info', targets: ['[data-tour="tool-illuminate"]'], side: 'bottom', view: 'sessions' },
+  { id: 'transcribe', kind: 'info', targets: ['[data-tour="tool-transcribe"]'], side: 'bottom', view: 'sessions' },
+  { id: 'recap', kind: 'info', targets: ['[data-tour="tool-recap"]'], side: 'bottom', view: 'sessions' },
+  { id: 'codex-page', kind: 'page', view: 'capture' },
+  { id: 'web-page', kind: 'page', view: 'web' },
+  { id: 'lore-page', kind: 'page', view: 'recall' },
+  { id: 'counsel-page', kind: 'page', view: 'suggest' },
+  { id: 'converse-page', kind: 'page', view: 'converse' },
+  { id: 'continuity-page', kind: 'page', view: 'continuity' },
   { id: 'apikey', kind: 'action', targets: ['[data-tour="api-key-card"]'], side: 'bottom', view: 'settings' },
-  { id: 'tour-capture', kind: 'info', targets: groupTargets('tour-capture'), side: 'right' },
-  { id: 'tour-world', kind: 'info', targets: groupTargets('tour-world'), side: 'right' },
-  { id: 'tour-ask', kind: 'info', targets: groupTargets('tour-ask'), side: 'right' },
-  { id: 'bug', kind: 'info', targets: ['[data-tour="report-bug"]'], side: 'right' },
-  { id: 'guide', kind: 'info', targets: ['[data-tour="guide"]'], side: 'right' }
+  { id: 'settings-page', kind: 'page', view: 'settings' },
+  { id: 'review', kind: 'review', view: 'character' }
 ]
 
 const nextOf = (id: TutorialStepId): TutorialStepId | null => {
@@ -64,8 +73,9 @@ const nextOf = (id: TutorialStepId): TutorialStepId | null => {
   return STEP_DEFS[i + 1]?.id ?? null
 }
 
-/** Resume guard: absent → fresh install (welcome). Set-but-unknown (hand-edited settings.json) →
- *  'campaign' — a set step proves welcome passed, and the idempotent action steps fast-forward. */
+/** Resume guard: absent → fresh install (welcome). Set-but-unknown (hand-edited settings.json, or a
+ *  profile from an older step layout) → 'campaign' — a set step proves welcome passed, and the
+ *  idempotent action steps fast-forward. */
 function validateResume(initial: string | undefined): Step {
   if (!initial) return 'welcome'
   return (TUTORIAL_STEP_IDS as readonly string[]).includes(initial)
@@ -92,7 +102,7 @@ export function TutorialOverlay({
   const validatingRef = useRef(false)
 
   const def = step === 'welcome' ? null : (STEP_DEFS.find((d) => d.id === step) ?? null)
-  const rect = useTargetRect(def ? def.targets : null)
+  const rect = useTargetRect(def?.targets ?? null)
 
   const advance = useCallback((next: TutorialStepId): void => {
     setKeyError(null)
@@ -101,9 +111,9 @@ export function TutorialOverlay({
     void ledger.settings.set({ tutorialStep: next }).catch(() => {})
   }, [])
 
-  // Entry side-effect: surface the view the step's target lives in.
+  // Entry side-effect: surface the view the step lives in (every step navigates now — ADR-060).
   useEffect(() => {
-    if (def?.view) setActiveView(def.view)
+    if (def) setActiveView(def.view)
   }, [def, setActiveView])
 
   // Resume guard: past the campaign step with campaigns but no selection (wiped localStorage) → select
@@ -117,11 +127,11 @@ export function TutorialOverlay({
   useEffect(() => {
     if (step !== 'campaign' || campaigns.length === 0) return
     if (!activeCampaignId) setActiveCampaign(campaigns[0].id)
-    advance('character')
+    advance('character-page')
   }, [step, campaigns, activeCampaignId, setActiveCampaign, advance])
 
   useEffect(() => {
-    if (step === 'session' && activeSessionId) advance('apikey')
+    if (step === 'session' && activeSessionId) advance('composer')
   }, [step, activeSessionId, advance])
 
   // Key detector: validate once per save (SettingsView bumps keySavedNonce after each save+validate
@@ -140,7 +150,7 @@ export function TutorialOverlay({
         }
         const { valid } = await ledger.apikey.validate()
         if (cancelled) return
-        if (valid) advance('tour-capture')
+        if (valid) advance('settings-page')
         else setKeyError('That key was rejected — check it in the form above and save again.')
       } catch (e) {
         if (!cancelled) setKeyError(`Couldn't verify the key: ${String(e)}`)
@@ -193,15 +203,100 @@ export function TutorialOverlay({
   const copy = SPOTLIGHT_COPY[def.id]
   const next = nextOf(def.id)
 
-  return (
-    <Spotlight rect={rect} interactive={def.kind === 'action'} side={def.side} wide={def.id === 'apikey'}>
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-display text-base font-semibold text-foreground">{copy.title}</h2>
-          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Step {STEP_DEFS.indexOf(def) + 1} of {STEP_DEFS.length}
-          </span>
+  const header = (
+    <div className="flex items-baseline justify-between gap-3">
+      <h2 className="font-display text-base font-semibold text-foreground">{copy.title}</h2>
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Step {STEP_DEFS.indexOf(def) + 1} of {STEP_DEFS.length}
+      </span>
+    </div>
+  )
+  const nextRow = (
+    <div className="flex justify-end pt-1">
+      <Button size="sm" onClick={() => (next ? advance(next) : void finish())}>
+        {next ? 'Next' : 'Finish'}
+      </Button>
+    </div>
+  )
+
+  if (def.kind === 'review') {
+    return (
+      <ReviewShell>
+        <div className="space-y-5">
+          <div className="space-y-1">
+            <h2 className="font-display text-xl font-semibold text-foreground">{copy.title}</h2>
+            <p className="text-sm text-muted-foreground">
+              Here&rsquo;s the whole loop, and where everything lives.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="inscribed text-xs">The loop</h3>
+            <ul className="space-y-1.5">
+              {LOOP_STEPS.map(({ icon: Icon, label, gloss }) => (
+                <li key={label} className="flex gap-2.5 text-sm">
+                  <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="font-medium text-foreground">{label}</span>
+                    <span className="text-muted-foreground"> — {gloss}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            {(['tour-capture', 'tour-world', 'tour-ask'] as const).map((g) => (
+              <div key={g} className="space-y-1">
+                <h3 className="inscribed text-xs">{TOUR_GROUPS[g].title}</h3>
+                <ul className="space-y-0.5">
+                  {TOUR_GROUPS[g].keys.map((k) => {
+                    const item = NAV_ITEMS.find((n) => n.key === k)
+                    if (!item) return null
+                    return (
+                      <li key={k} className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{item.label}</span> —{' '}
+                        {TOOL_BLURBS[k]}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            All of this lives in the{' '}
+            <span className="font-medium text-foreground">Quickstart guide</span> — the Guide button at
+            the bottom-left of the sidebar — whenever you need it.
+          </p>
+
+          <p className="text-sm leading-relaxed text-foreground">{REVIEW_COPY.message}</p>
+
+          <div className="flex justify-end">
+            <Button onClick={() => void finish()}>Finish</Button>
+          </div>
         </div>
+      </ReviewShell>
+    )
+  }
+
+  if (def.kind === 'page') {
+    return (
+      <PageOverlay
+        scrollSelector={def.id === 'settings-page' ? '[data-tour="api-key-card"]' : undefined}
+      >
+        {header}
+        <p className="text-[13px] leading-relaxed text-muted-foreground">{copy.body}</p>
+        {nextRow}
+      </PageOverlay>
+    )
+  }
+
+  return (
+    <Spotlight rect={rect} interactive={def.kind === 'action'} side={def.side ?? 'right'} wide={def.id === 'apikey'}>
+      <div className="space-y-2">
+        {header}
         <p className="text-[13px] leading-relaxed text-muted-foreground">{copy.body}</p>
 
         {def.id === 'apikey' && (
@@ -229,40 +324,8 @@ export function TutorialOverlay({
           </div>
         )}
 
-        {(def.id === 'tour-capture' || def.id === 'tour-world' || def.id === 'tour-ask') && (
-          <ToolList group={def.id} />
-        )}
-
-        {def.kind === 'info' && (
-          <div className="flex justify-end pt-1">
-            <Button size="sm" onClick={() => (next ? advance(next) : void finish())}>
-              {next ? 'Next' : 'Finish'}
-            </Button>
-          </div>
-        )}
+        {def.kind === 'info' && nextRow}
       </div>
     </Spotlight>
-  )
-}
-
-/** The compact tool list inside a group step's coach mark (the old wizard's ToolTour, shrunk). */
-function ToolList({ group }: { group: 'tour-capture' | 'tour-world' | 'tour-ask' }) {
-  const items = TOUR_GROUPS[group].keys
-    .map((k) => NAV_ITEMS.find((n) => n.key === k))
-    .filter((n): n is NavItem => Boolean(n))
-  return (
-    <ul className="space-y-2">
-      {items.map(({ key, label, icon: Icon }) => (
-        <li key={key} className="flex gap-2.5">
-          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted/50">
-            <Icon className="size-3.5 text-primary" />
-          </div>
-          <div>
-            <div className="text-xs font-medium text-foreground">{label}</div>
-            <div className="text-xs text-muted-foreground">{TOOL_BLURBS[key]}</div>
-          </div>
-        </li>
-      ))}
-    </ul>
   )
 }

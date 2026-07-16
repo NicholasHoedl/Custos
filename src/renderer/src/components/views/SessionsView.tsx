@@ -137,7 +137,12 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                 {selected.date && <p className="text-sm text-muted-foreground">{selected.date}</p>}
               </div>
               <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setExtractOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-tour="tool-extract"
+                  onClick={() => setExtractOpen(true)}
+                >
                   <BookCheck className="size-3.5" />
                   Extract
                   {(unclosed[selected.id] ?? 0) > 0 && (
@@ -149,11 +154,21 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                     </span>
                   )}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setEnrichOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-tour="tool-illuminate"
+                  onClick={() => setEnrichOpen(true)}
+                >
                   <Sparkles className="size-3.5" />
                   Illuminate
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setTranscribeOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-tour="tool-transcribe"
+                  onClick={() => setTranscribeOpen(true)}
+                >
                   <FileInput className="size-3.5" />
                   Transcribe
                 </Button>

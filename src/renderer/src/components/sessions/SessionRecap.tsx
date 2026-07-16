@@ -51,7 +51,7 @@ export function SessionRecap({ session, onSaved }: { session: Session; onSaved?:
             Stop
           </Button>
         ) : (
-          <Button size="sm" variant="outline" onClick={onGenerate}>
+          <Button size="sm" variant="outline" data-tour="tool-recap" onClick={onGenerate}>
             <BookText className="size-3.5" />
             {session.summary ? 'Regenerate' : 'Generate recap'}
           </Button>

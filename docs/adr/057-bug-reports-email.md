@@ -7,7 +7,10 @@ Accepted — **implemented**. A sidebar launcher (directly under Settings, insid
 `bugreport:capture` / `bugreport:submit`); **no migration**. Verified: typecheck + lint + 347 unit (7 new)
 + `tests/e2e/bugreport.spec.ts`. **Superseded in part by ADR-058** — the *transport*: submit now
 auto-sends through a Cloudflare-Worker intake once deployed; this ADR's bundle + mail-draft flow remains
-as the built-in fallback (endpoint unset, offline, or POST failure).
+as the built-in fallback (endpoint unset, offline, or POST failure). **Revised by ADR-060 (2026-07-16):**
+the launcher moved from the sidebar into a Settings "Report a bug" section, and the
+window-snap-before-open (`bugreport:capture`) was removed — from Settings it only ever captured Settings;
+screenshots are attached by hand.
 
 **Date:** 2026-07-16
 **Deciders:** Solo developer

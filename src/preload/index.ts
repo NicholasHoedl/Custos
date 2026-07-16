@@ -140,7 +140,6 @@ const api: LedgerApi = {
   },
   bugreport: {
     diagnostics: (campaignId, view) => ipcRenderer.invoke(IPC.bugreportDiagnostics, campaignId, view),
-    capture: () => ipcRenderer.invoke(IPC.bugreportCapture),
     submit: (req) => ipcRenderer.invoke(IPC.bugreportSubmit, req)
   },
   update: {

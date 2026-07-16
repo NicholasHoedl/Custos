@@ -15,10 +15,11 @@ test.afterAll(async () => {
   cleanup(userDataDir)
 })
 
-// The sidebar bug reporter (sits under Settings): the button snaps the window then opens the form.
-// The email hand-off itself isn't exercised — submit would open a real mail client + file manager on
-// the test machine — so this guards the wiring: launcher → capture IPC → dialog → validation gate.
-test('report-a-bug: sidebar button opens the dialog with name/description/screenshots', async () => {
+// The bug reporter lives on the Settings page (ADR-060; the old sidebar launcher and its window snap
+// are gone). The email hand-off itself isn't exercised — submit would POST to the live worker / open a
+// mail client — so this guards the wiring: Settings section → dialog → the validation gate.
+test('report-a-bug: the Settings section opens the dialog with name/description/screenshots', async () => {
+  await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Report a bug' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByLabel('Your name')).toBeVisible()

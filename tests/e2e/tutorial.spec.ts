@@ -8,7 +8,7 @@ let userDataDir: string
 
 test.beforeEach(async () => {
   // Opt IN to the forced tutorial (all other specs skip it); fakeAi lets the key-validate run offline
-  // (ADR-043/059).
+  // (ADR-043/060).
   ;({ app, page, userDataDir } = await launchApp({ tutorial: true, fakeAi: true }))
 })
 
@@ -17,11 +17,10 @@ test.afterEach(async () => {
   cleanup(userDataDir)
 })
 
-// The forced first-run tutorial, spotlight edition (ADR-059): one full-screen welcome page (name), then
-// a scrim-and-coach-mark tour through the REAL app — the campaign is created via the real dialog, the
-// session via the real Chronicle-header button, the key via the real Settings card (fake validate says
-// valid). Action steps auto-advance on state; info steps advance via Next; nothing is skippable.
-test('tutorial: welcome page then a forced spotlight tour through the real app', async () => {
+// The forced first-run tutorial, per-page edition (ADR-060): one welcome page (name), then 19 stops
+// through the REAL app — ACTION steps use the real dialogs/controls, PAGE steps show whole pages
+// undimmed with the coach card over the navbar, and the tour closes on a front-and-center review card.
+test('tutorial: welcome page then a per-page spotlight walkthrough', async () => {
   // Step 0 — the welcome page: non-skippable, name required.
   const welcome = page.getByRole('dialog', { name: 'First-run tutorial' })
   await expect(welcome).toBeVisible()
@@ -31,57 +30,75 @@ test('tutorial: welcome page then a forced spotlight tour through the real app',
   await welcome.getByLabel('Your name').fill('Alex')
   await welcome.getByRole('button', { name: 'Begin' }).click()
 
-  // The coach mark is a portalled popover with an accessible name (exact — 'Tutorial' is a substring
-  // of the welcome card's 'First-run tutorial').
+  // Every tour surface (popover coach mark, over-nav card, review card) carries aria-label "Tutorial".
   const coach = page.getByRole('dialog', { name: 'Tutorial', exact: true })
 
-  // 1 campaign (ACTION): the REAL sidebar + button, the REAL dialog (campaign + MC atomically, ADR-029).
-  await expect(coach.getByText('Step 1 of 9')).toBeVisible()
+  // 1 campaign (ACTION): the REAL sidebar + button, the REAL dialog (campaign + MC atomically).
+  await expect(coach.getByText('Step 1 of 19')).toBeVisible()
   await page.getByRole('button', { name: 'New campaign' }).click()
   const dlg = page.getByRole('dialog', { name: 'New campaign' })
   await dlg.getByLabel('Name', { exact: true }).fill('Phandalin')
   await dlg.getByLabel('Main character').fill('Vargas')
   await dlg.getByRole('button', { name: 'Create' }).click()
 
-  // 2 character (INFO) — the detector auto-advanced on the campaign appearing.
-  await expect(coach.getByText('Step 2 of 9')).toBeVisible()
-  await expect(coach.getByRole('heading', { name: 'Meet the Character page' })).toBeVisible()
+  // 2 Character page (PAGE — content undimmed, card over the navbar).
+  await expect(coach.getByRole('heading', { name: 'The Character page' })).toBeVisible()
   await coach.getByRole('button', { name: 'Next' }).click()
 
-  // 3 session (ACTION): the real Chronicle-header control.
-  await expect(coach.getByText('Step 3 of 9')).toBeVisible()
+  // 3 Chronicle page (PAGE).
+  await expect(coach.getByRole('heading', { name: 'The Chronicle' })).toBeVisible()
+  await coach.getByRole('button', { name: 'Next' }).click()
+
+  // 4 session (ACTION): the real Chronicle-header control.
+  await expect(coach.getByText('Step 4 of 19')).toBeVisible()
   await page.getByRole('button', { name: 'New session' }).click()
 
-  // 4 apikey (ACTION): Settings is brought forward; the REAL key card (fake validate reports valid).
-  await expect(coach.getByText('Step 4 of 9')).toBeVisible()
-  // exact — the coach mark's own heading is "Add your Anthropic API key" (substring collision)
+  // 5 the composer (INFO).
+  await expect(coach.getByRole('heading', { name: 'Writing chronicle entries' })).toBeVisible()
+  await coach.getByRole('button', { name: 'Next' }).click()
+
+  // 6 Sessions page (PAGE — the newest session auto-selects, so the tools render).
+  await expect(coach.getByRole('heading', { name: 'The Sessions page' })).toBeVisible()
+  await coach.getByRole('button', { name: 'Next' }).click()
+
+  // 7–10 the four session tools, individually (INFO each).
+  for (const title of ['Extract', 'Illuminate', 'Transcribe', 'Generate recap']) {
+    await expect(coach.getByRole('heading', { name: title })).toBeVisible()
+    await coach.getByRole('button', { name: 'Next' }).click()
+  }
+
+  // 11–15 the tool pages (PAGE each).
+  for (const title of ['The Codex', 'The Web', 'Lore', 'Counsel', 'Converse']) {
+    await expect(coach.getByRole('heading', { name: title })).toBeVisible()
+    await coach.getByRole('button', { name: 'Next' }).click()
+  }
+
+  // 16 Continuity (PAGE) — carries the segue into the API-key step.
+  await expect(coach.getByRole('heading', { name: 'Continuity' })).toBeVisible()
+  await expect(coach.getByText(/set yours up next/)).toBeVisible()
+  await coach.getByRole('button', { name: 'Next' }).click()
+
+  // 17 apikey (ACTION): the REAL Settings key card (fake validate reports valid).
+  await expect(coach.getByText('Step 17 of 19')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Anthropic API key', exact: true })).toBeVisible()
   await page.getByPlaceholder('sk-ant-…').fill('sk-ant-test')
   await page.getByRole('button', { name: 'Save & validate' }).click()
 
-  // 5–7 the three nav-group INFO steps; the ask group now includes Continuity (guide-content fix).
-  await expect(coach.getByRole('heading', { name: 'Capture the story' })).toBeVisible()
-  await coach.getByRole('button', { name: 'Next' }).click()
-  await expect(coach.getByRole('heading', { name: 'Your world' })).toBeVisible()
-  await coach.getByRole('button', { name: 'Next' }).click()
-  await expect(coach.getByRole('heading', { name: 'Ask the Keeper' })).toBeVisible()
-  await expect(coach.getByText('Continuity', { exact: true })).toBeVisible()
+  // 18 Settings page (PAGE, view-only + scrollable) — mentions Report a bug's new home.
+  await expect(coach.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+  await expect(coach.getByText(/Report a bug/)).toBeVisible()
   await coach.getByRole('button', { name: 'Next' }).click()
 
-  // 8 bug report, 9 guide → Finish.
-  await expect(coach.getByText('Step 8 of 9')).toBeVisible()
-  await coach.getByRole('button', { name: 'Next' }).click()
-  await expect(coach.getByText('Step 9 of 9')).toBeVisible()
+  // 19 the review card (REVIEW): loop recap + tool purposes + Quickstart pointer → Finish.
+  await expect(coach.getByRole('heading', { name: /all set/ })).toBeVisible()
+  await expect(coach.getByRole('heading', { name: 'The loop' })).toBeVisible()
+  await expect(coach.getByText(/Quickstart guide/)).toBeVisible()
   await coach.getByRole('button', { name: 'Finish' }).click()
 
   // The tour is gone and the app is usable — everything was created through the REAL UI.
   await expect(coach).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Chronicle', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Playing as Vargas/ })).toBeVisible()
-
-  // The Quickstart guide the tour pointed at still opens from the sidebar.
   await page.getByRole('button', { name: 'Guide' }).click()
-  const guide = page.getByRole('dialog', { name: 'Quickstart guide' })
-  await expect(guide).toBeVisible()
-  await expect(guide.getByRole('heading', { name: 'The loop' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Quickstart guide' })).toBeVisible()
 })

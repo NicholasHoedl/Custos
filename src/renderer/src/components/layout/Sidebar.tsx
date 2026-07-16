@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { BookOpen, Bug, HelpCircle, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { BookOpen, HelpCircle, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
@@ -45,7 +45,6 @@ import {
 } from '@renderer/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { QuickstartGuide } from '@renderer/components/onboarding/QuickstartGuide'
-import { BugReportDialog } from '@renderer/components/BugReportDialog'
 
 export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
@@ -53,7 +52,7 @@ export function Sidebar() {
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
+    <aside data-tour="sidebar" className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-2.5 px-5 py-4">
         <BookOpen className="size-5 shrink-0 text-metal" />
         <div className="flex flex-col gap-0.5">
@@ -116,7 +115,6 @@ export function Sidebar() {
           )
           return nodes
         })}
-        <ReportBugButton />
       </nav>
 
       <QuickstartButton />
@@ -149,37 +147,8 @@ function QuickstartButton() {
   )
 }
 
-// "Report a bug" sits directly under Settings (still inside the nav). It snaps the window BEFORE the
-// dialog opens and covers it, so the pre-attached screenshot shows what the user was actually looking
-// at; the snap is best-effort (null just means no pre-attached shot).
-function ReportBugButton() {
-  const [open, setOpen] = useState(false)
-  const [shot, setShot] = useState<string | null>(null)
-
-  async function openDialog(): Promise<void> {
-    try {
-      setShot(await ledger.bugreport.capture())
-    } catch {
-      setShot(null)
-    }
-    setOpen(true)
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        data-tour="report-bug"
-        onClick={() => void openDialog()}
-        className="flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-      >
-        <Bug className="size-4" />
-        Report a bug
-      </button>
-      <BugReportDialog open={open} onOpenChange={setOpen} initialShot={shot} />
-    </>
-  )
-}
+// "Report a bug" moved into the Settings page (ADR-060) — its old sidebar slot is gone, and with it the
+// window-snap-before-open (from Settings the snap only ever captured Settings, so it was dropped).
 
 function CampaignSelector() {
   const { campaigns, refresh } = useCampaigns()

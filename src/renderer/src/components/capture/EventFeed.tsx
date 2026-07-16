@@ -165,7 +165,7 @@ export function EventFeed({ sessionId, restoring = false }: EventFeedProps) {
       </div>
 
       {sessionId && (
-        <div className="border-t border-border p-3">
+        <div data-tour="chronicle-composer" className="border-t border-border p-3">
           <MentionTextarea
             value={text}
             onValueChange={onComposerChange}

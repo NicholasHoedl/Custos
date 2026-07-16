@@ -188,18 +188,29 @@ export type AccentColor = 'ember' | 'cyan' | 'green' | 'red' | 'yellow' | 'purpl
 /** Canonical order for the Settings picker; also the allow-list for the applied [data-accent] value. */
 export const ACCENT_COLORS: AccentColor[] = ['ember', 'cyan', 'green', 'red', 'yellow', 'purple']
 
-/** The spotlight-tour steps (ADR-059), in order. `AppSettings.tutorialStep` persists the step to RESUME
- *  at — its presence also proves the welcome page was passed (see `deriveTutorialDone`). */
+/** The spotlight-tour steps (ADR-059, expanded to the per-page walkthrough by ADR-060), in order.
+ *  `AppSettings.tutorialStep` persists the step to RESUME at — its presence also proves the welcome
+ *  page was passed (see `deriveTutorialDone`). */
 export const TUTORIAL_STEP_IDS = [
   'campaign',
-  'character',
+  'character-page',
+  'chronicle-page',
   'session',
+  'composer',
+  'sessions-page',
+  'extract',
+  'illuminate',
+  'transcribe',
+  'recap',
+  'codex-page',
+  'web-page',
+  'lore-page',
+  'counsel-page',
+  'converse-page',
+  'continuity-page',
   'apikey',
-  'tour-capture',
-  'tour-world',
-  'tour-ask',
-  'bug',
-  'guide'
+  'settings-page',
+  'review'
 ] as const
 export type TutorialStepId = (typeof TUTORIAL_STEP_IDS)[number]
 

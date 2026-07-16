@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Bug,
   Check,
   DatabaseBackup,
   Download,
@@ -30,6 +31,7 @@ import { useOnboarding } from '@renderer/hooks/use-onboarding'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Separator } from '@renderer/components/ui/separator'
+import { BugReportDialog } from '@renderer/components/BugReportDialog'
 import { PaneBody, PaneHeader, ProgressBar } from '@renderer/components/chrome'
 import {
   Select,
@@ -74,6 +76,7 @@ export function SettingsView() {
   const [importing, setImporting] = useState(false)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
+  const [bugOpen, setBugOpen] = useState(false)
 
   useEffect(() => {
     ledger.apikey
@@ -589,6 +592,24 @@ export function SettingsView() {
               <span className="text-xs text-muted-foreground">{updateLabel(updateStatus)}</span>
             )}
           </div>
+        </section>
+
+        <Separator />
+
+        <section className="space-y-3" data-tour="report-bug">
+          <div className="flex items-center gap-2">
+            <Bug className="size-4 text-primary" />
+            <h2 className="font-display text-lg font-medium text-foreground">Report a bug</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Something broken or behaving oddly? Send what went wrong — with screenshots and
+            diagnostics — straight to the developer.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setBugOpen(true)}>
+            <Bug className="size-4" />
+            Report a bug…
+          </Button>
+          <BugReportDialog open={bugOpen} onOpenChange={setBugOpen} />
         </section>
 
         <Separator />

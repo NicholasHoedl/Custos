@@ -8,6 +8,11 @@ and the Quickstart guide all stand. New: `onboarding/Spotlight.tsx` + `WelcomeCa
 `TutorialOverlay.tsx` rewritten in place as the tour controller; a pure `onboarding-gate.ts` +
 `AppSettings.tutorialStep` for mid-tour resume. No migration (settings are JSON).
 
+> **Revised by [ADR-060](060-tutorial-per-page-walkthrough.md) (2026-07-16):** the 9-step table below
+> was expanded into a 19-stop per-page walkthrough (new PAGE and REVIEW step kinds; the nav-group stops
+> became individual page visits). The machinery this ADR introduced — the Spotlight primitives, the
+> `data-tour` convention, `tutorialStep` resume, and the gate — stands unchanged.
+
 **Date:** 2026-07-16
 **Deciders:** Solo developer
 

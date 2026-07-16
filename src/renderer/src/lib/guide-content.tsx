@@ -177,44 +177,91 @@ export const WELCOME_COPY = {
   body: 'Custos is a keeper of campaigns — it remembers your story so you can ask it anything later. Before we set up your first campaign: what should the Keeper call you?'
 }
 
-/** Coach-mark copy for each spotlight step (ADR-059). The tour renders extras itself per step — the
- *  tool list on the group steps, the get-a-key list on `apikey` — so these bodies stay short. The group
- *  titles deliberately match `TOUR_GROUPS` so the guide and the tour never drift. */
+/** Coach-mark copy for each spotlight step (ADR-059, expanded per-page by ADR-060). The tour renders
+ *  extras itself per step — the get-a-key list on `apikey`, the full recap on `review` — so these bodies
+ *  stay short. `continuity-page` deliberately carries the segue into the API-key step. */
 export const SPOTLIGHT_COPY: Record<TutorialStepId, { title: string; body: string }> = {
   campaign: {
     title: 'Create your campaign',
     body: 'Everything lives in a campaign — one story and its cast. This also creates your main character, the hero you play. Click the + button to begin.'
   },
-  character: {
-    title: 'Meet the Character page',
-    body: 'Your hero lives here — profile, backstory, and the voice the Keeper speaks in. Come back any time to flesh them out.'
+  'character-page': {
+    title: 'The Character page',
+    body: 'This is your hero’s home — their profile, backstory, and the persona and voice the Keeper speaks in. Come back any time to flesh them out; a richer character makes every AI answer sharper.'
+  },
+  'chronicle-page': {
+    title: 'The Chronicle',
+    body: 'This is where you’ll live during a game night — a plain running log of what happens at the table, one line at a time. Everything else in Custos grows out of what you write here.'
   },
   session: {
     title: 'Start your first session',
-    body: 'A session is one night at the table, and everything you record lands in the active one. Click + to start Session 1.'
+    body: 'A session is one night at the table, and every chronicle line lands in the active one. Click + to start Session 1.'
+  },
+  composer: {
+    title: 'Writing chronicle entries',
+    body: 'Jot a sentence or two as things happen. Use real names, spelled the same way every time; say who did what to whom; record status changes (“Sildar is captured”) the moment they land; and flag rumors as rumors. Type “/” to drop in an entity by name.'
+  },
+  'sessions-page': {
+    title: 'The Sessions page',
+    body: 'One entry per game night. Review a session’s log here — and when the night’s over, this is where its four tools turn your notes into memory.'
+  },
+  extract: {
+    title: 'Extract',
+    body: 'Reads the session’s chronicle and proposes the people, places, quests, and notes it finds — you review every suggestion before anything is saved. Run it after each session.'
+  },
+  illuminate: {
+    title: 'Illuminate',
+    body: 'The second pass: one focused look at each entity the session touched, proposing relationships and profile details. Review-gated, just like Extract.'
+  },
+  transcribe: {
+    title: 'Transcribe',
+    body: 'Paste notes from anywhere — a doc, a chat log, handwritten scraps — and the Keeper proposes entities and notes from them, filed under this session.'
+  },
+  recap: {
+    title: 'Generate recap',
+    body: '“Previously, on your campaign…” — a short read-aloud recap of the session, perfect for opening the next game night.'
+  },
+  'codex-page': {
+    title: 'The Codex',
+    body: 'Your world library — every person, place, faction, quest, and item you’ve met, built up mostly by Extract. Browse, edit, and inscribe new entries by hand.'
+  },
+  'web-page': {
+    title: 'The Web',
+    body: 'A living map of your campaign’s relationships. It grows as ties form, and you can filter it, focus on one figure, or rewind it session by session.'
+  },
+  'lore-page': {
+    title: 'Lore',
+    body: 'Ask a question in plain language — “what do we know about Glasstaff?” — and get an answer drawn from your own notes, with sources cited. One of the tools that thinks with Claude.'
+  },
+  'counsel-page': {
+    title: 'Counsel',
+    body: 'Stuck in the moment? Describe the situation and get four in-character ways to play it, grounded in your hero and the scene. Also Claude-powered.'
+  },
+  'converse-page': {
+    title: 'Converse',
+    body: 'About to talk to someone? Pick who, and get four in-character questions to draw them out — from safe openers to pointed probes. Also Claude-powered.'
+  },
+  'continuity-page': {
+    title: 'Continuity',
+    body: 'The record-keeper’s audit: scans your campaign for contradictions and slips. Its automatic checks run free — but this and the other lenses need an Anthropic API key to think, so let’s set yours up next.'
   },
   apikey: {
     title: 'Add your Anthropic API key',
-    body: 'This is Settings — models, backups, and your data all live here. The Keeper needs an API key to think; it’s stored encrypted on this device and only ever used to call Anthropic. Paste your key and press Save & validate.'
+    body: 'The Keeper needs an API key to think. It’s stored encrypted on this device and only ever used to call Anthropic. Paste your key below and press Save & validate.'
   },
-  'tour-capture': {
-    title: 'Capture the story',
-    body: 'These two record what happens at the table.'
+  'settings-page': {
+    title: 'Settings',
+    body: 'Everything else lives here: the model each tool uses, backups and your data folder, campaign export and import, the accent color — and, near the bottom, Report a bug, which sends what broke (screenshots and diagnostics included) straight to the developer. Scroll to look around; we’ll finish up next.'
   },
-  'tour-world': {
-    title: 'Your world',
-    body: 'The cast, places, and threads the Keeper tracks for you.'
-  },
-  'tour-ask': {
-    title: 'Ask the Keeper',
-    body: 'Four lenses that answer from everything you’ve recorded.'
-  },
-  bug: {
-    title: 'Something broken?',
-    body: 'Report a bug sends what went wrong — with a screenshot and diagnostics — straight to the developer.'
-  },
-  guide: {
-    title: 'The Quickstart guide',
-    body: 'The whole capture → extract → ask loop, whenever you need a refresher. That’s the tour — you’re ready to play.'
+  review: {
+    title: 'You’re all set',
+    body: '' // the review card renders its own content (the loop + tools + Quickstart pointer + REVIEW_COPY)
   }
+}
+
+// PLACEHOLDER COPY — Nick rewrites this before ship (the review card's closing message).
+/** The closing message on the tour's final review card (ADR-060). */
+export const REVIEW_COPY = {
+  message:
+    'Good hunting out there — write down what happens, and the Keeper will remember the rest.'
 }

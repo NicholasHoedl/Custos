@@ -412,10 +412,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   grouping derives from the as-of `graph.edges` (NOT `getHierarchy`, which is structural) so collapse is
   as-of-correct under the slider. Header counter stays campaign totals + a conditional `· N hidden`. No
   migration; renderer-only.
-- **Bug reports (ADR-057): the sidebar "Report a bug" button — directly under Settings, INSIDE the nav** —
-  opens `components/BugReportDialog.tsx`: name (prefilled from `settings.userName`) + required description +
-  screenshots (paste/drag/picker, cap 5, PLUS an auto window snap the launcher takes via `bugreport:capture`
-  → `webContents.capturePage` BEFORE the dialog covers the app; pre-attached, removable) + an ALWAYS-INCLUDED
+- **Bug reports (ADR-057/058; launcher per ADR-060): a "Report a bug" SECTION on the SETTINGS page**
+  (ADR-060 moved it out of the sidebar and REMOVED the window-snap-before-open + the whole
+  `bugreport:capture` IPC — from Settings the snap only ever captured Settings; screenshots are attached
+  by hand) opening `components/BugReportDialog.tsx`: name (prefilled from `settings.userName`) + optional
+  reply email + required description + screenshots (paste/drag/picker, cap 5) + an ALWAYS-INCLUDED
   diagnostics block attached SILENTLY — no in-dialog toggle or review panel (deliberate: reports without
   diagnostics don't triage; the tester still sees the full text in the revealed bundle's report.txt, and
   submit AWAITS the in-flight gather promise so a fast submit never drops the block)
@@ -470,33 +471,39 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   are set (electron-builder auto-signs; the release CI passes them through). Releases: push a `v*` tag →
   `.github/workflows/release.yml` runs `electron-builder --publish always` → a DRAFT GitHub Release (publish
   it to go live; **Releases must be PUBLIC** for token-free update). Full runbook in `RELEASING.md`.
-- **Forced first-run tutorial = a SPOTLIGHT TOUR (ADR-044/045 presentation superseded by ADR-059):** ONE
+- **Forced first-run tutorial = a PER-PAGE SPOTLIGHT WALKTHROUGH (ADR-059 machinery, ADR-060 flow):** ONE
   full-screen page (`onboarding/WelcomeCard.tsx` — `WELCOME_COPY` in guide-content is **PLACEHOLDER, Nick
   rewrites**; captures `userName` + writes `tutorialStep:'campaign'` awaited), then the REAL app under
-  `onboarding/Spotlight.tsx`: four click-blocking z-40 scrim rects + a ring cutout over ONE real control
-  (found via **`data-tour` attributes** — Sidebar nav items/headings/new-campaign/report-bug/guide,
-  SessionControl new-session, SettingsView api-key-card) + a non-dismissable coach-mark Popover
-  (PopoverAnchor recipe; portals are z-50 at body end so dialogs opened mid-step stay interactive ABOVE the
-  scrim). `TutorialOverlay.tsx` is the controller: 9 steps — campaign (ACTION: the real
-  `CreateCampaignDialog`, which creates the MC atomically per ADR-029) → character (INFO) → session
-  (ACTION: the Chronicle header's New-session) → apikey (ACTION: auto-`setActiveView('settings')`, popup
-  doubles as the Settings orientation + the get-a-key steps; requires a VALIDATED key via the ui-store
-  **`keySavedNonce`** SettingsView bumps after each save — validate once per bump + an entry probe) →
-  tour-capture/world/ask (INFO; group cutouts from `TOUR_GROUPS`, whose ask keys NOW INCLUDE `continuity`)
-  → bug → guide (Finish). **ACTION steps advance by WATCHING state** (campaigns.length / activeSessionId /
-  key valid) so they're idempotent — that's the resume story: each advance persists
+  `onboarding/Spotlight.tsx`'s FOUR step kinds: **ACTION** (4-rect z-40 click-blocking scrim + an
+  INTERACTIVE ring cutout over one real control via **`data-tour` attributes**; Radix portals are z-50 at
+  body end so dialogs opened mid-step stay usable ABOVE the scrim), **INFO** (cutout visible-not-operable
+  + Next), **PAGE** (`PageOverlay`: the page UNDIMMED behind a full-viewport view-only blocker, ONLY the
+  sidebar dimmed, the coach CARD fixed OVER the navbar — left, centered; the settings stop passes a
+  `scrollSelector` whose wheel events forward to the `.overflow-y-auto` container: scroll, don't touch),
+  and **REVIEW** (`ReviewShell`: dimmed backdrop + a centered scrollable card). `TutorialOverlay.tsx`
+  drives **19 stops**: campaign (ACTION — the real atomic `CreateCampaignDialog`, ADR-029) → Character
+  page → Chronicle page → session (ACTION, `new-session`) → the composer (INFO, `chronicle-composer`,
+  explain-only by request) → Sessions page → Extract → Illuminate → Transcribe → Generate recap (INFO
+  each — `data-tour="tool-*"` on SessionsView's header buttons + SessionRecap's button; the newest session
+  AUTO-SELECTS so they render) → Codex → Web → Lore → Counsel → Converse → Continuity (PAGE each;
+  Continuity's copy segues into the key) → apikey (ACTION — VALIDATED key via the ui-store
+  **`keySavedNonce`** SettingsView bumps per save; validate once per bump + an entry probe) → Settings
+  page (PAGE, scrollable; explains Settings + Report a bug's new home there) → review (REVIEW:
+  `LOOP_STEPS` + `TOUR_GROUPS`/`TOOL_BLURBS` + the Quickstart pointer + **`REVIEW_COPY` — the SECOND
+  placeholder Nick writes**; Finish). **ACTION steps advance by WATCHING state** (campaigns.length /
+  activeSessionId / key valid) so they're idempotent — the resume story: each advance persists
   `AppSettings.tutorialStep` (cleared on finish with `tutorialCompleted:true`), and the gate is the pure
   `services/onboarding-gate.ts` `deriveTutorialDone` = `completed || skipped || (campaigns>0 &&
-  tutorialStep===undefined)` — the step clause keeps a mid-tour relaunch resuming (the tour creates a REAL
-  campaign at step 1) while grandfathering pre-tutorial data; `OnboardingStatus.tutorialStep` rides the
-  same status fetch AppShell gates on. Linear, no Back, no skip; AppShell still disables Ctrl+K/F while
-  active. The **Quickstart guide** (`QuickstartGuide.tsx`, "Guide" at the sidebar bottom) is unchanged and
-  is the tour's final stop; blurbs/groups/key-steps stay in ONE `lib/guide-content.tsx` (+ `WELCOME_COPY`
-  and per-step `SPOTLIGHT_COPY`). **e2e:** `launchApp` sets `LEDGER_SKIP_TUTORIAL` BY DEFAULT;
-  `launchApp({ tutorial: true, fakeAi: true })` drives the rewritten `tutorial.spec.ts` (real dialog, real
-  session button, real key card — `apikey:validate` returns valid under `fakeAiEnabled`). `AppSettings`
-  fields: `userName?`, `tutorialCompleted?`, `tutorialStep?`. Multi-provider (OpenAI/Gemini) keys remain
-  **deferred** — a separate AI-backend project (docs/ROADMAP.md).
+  tutorialStep===undefined)` — a mid-tour relaunch RESUMES (the tour creates a REAL campaign at step 1)
+  while pre-tutorial data stays grandfathered; `OnboardingStatus.tutorialStep` rides the same status
+  fetch AppShell gates on. Linear, no Back, no skip; AppShell still disables Ctrl+K/F while active. The
+  **Quickstart guide** ("Guide", sidebar bottom) is unchanged; blurbs/groups/loop/key-steps +
+  `WELCOME_COPY`/`SPOTLIGHT_COPY`/`REVIEW_COPY` all live in ONE `lib/guide-content.tsx` (TOUR_GROUPS ask
+  keys include `continuity`). **e2e:** `launchApp` sets `LEDGER_SKIP_TUTORIAL` BY DEFAULT;
+  `launchApp({ tutorial: true, fakeAi: true })` drives `tutorial.spec.ts` through all 20 stops
+  (`apikey:validate` returns valid under `fakeAiEnabled`). `AppSettings` fields: `userName?`,
+  `tutorialCompleted?`, `tutorialStep?`. Multi-provider (OpenAI/Gemini) keys remain **deferred** — a
+  separate AI-backend project (docs/ROADMAP.md).
 
 ## Git
 Work lands on `main`. A remote (`origin`) is configured, but the GitHub repo may not exist yet, so

@@ -79,9 +79,8 @@ export function useTargetRect(selectors: readonly string[] | null): TargetRect |
 /**
  * The spotlight chrome: four scrim rects around the cutout (they swallow clicks everywhere but the
  * target), a primary ring over it, an optional transparent blocker (INFO steps: the control is visible
- * but not operable — e.g. the bug step mustn't fire the report dialog's window snap), and the anchored
- * coach mark. The popover is deliberately non-dismissable (no Esc, no outside-click) — the tour is the
- * only way forward, matching the old wizard's non-skippability.
+ * but not operable), and the anchored coach mark. The popover is deliberately non-dismissable (no Esc,
+ * no outside-click) — the tour is the only way forward, matching the old wizard's non-skippability.
  */
 export function Spotlight({
   rect,
@@ -156,5 +155,71 @@ export function Spotlight({
         </PopoverContent>
       </Popover>
     </>
+  )
+}
+
+const SIDEBAR_SELECTOR = ['[data-tour="sidebar"]']
+
+/**
+ * PAGE steps (ADR-060): the page itself stays FULLY VISIBLE — a transparent full-viewport blocker makes
+ * the whole app view-only, only the sidebar is dimmed, and the coach card sits OVER the navbar (left,
+ * vertically centered) so nothing covers the content the step is describing. `scrollSelector` (the
+ * settings step) forwards wheel events to the page's scroll container — look around, read-only.
+ */
+export function PageOverlay({
+  scrollSelector,
+  children
+}: {
+  scrollSelector?: string
+  children: ReactNode
+}) {
+  const navRect = useTargetRect(SIDEBAR_SELECTOR)
+  return (
+    <>
+      {/* Render order matters: blocker first, card last — at equal z the card wins pointer events. */}
+      <div
+        className="fixed inset-0 z-40"
+        onWheel={
+          scrollSelector
+            ? (e) => {
+                const el = document.querySelector(scrollSelector)?.closest('.overflow-y-auto')
+                if (el) el.scrollTop += e.deltaY
+              }
+            : undefined
+        }
+      />
+      <div
+        className="fixed z-40 bg-background/80"
+        style={
+          navRect
+            ? { top: navRect.top, left: navRect.left, width: navRect.width, height: navRect.height }
+            : { top: 0, left: 0, width: 256, height: '100%' }
+        }
+      />
+      <div
+        role="dialog"
+        aria-label="Tutorial"
+        className="fixed left-2 top-1/2 z-40 w-72 -translate-y-1/2 space-y-2 rounded-md border border-border bg-popover p-4 text-sm leading-relaxed text-popover-foreground shadow-md"
+      >
+        {children}
+      </div>
+    </>
+  )
+}
+
+/** The REVIEW step (ADR-060): the tour's closing card — the app dimmed behind, a centered scrollable
+ *  card front and center. Non-dismissable; Finish (rendered by the caller) is the only way out. */
+export function ReviewShell({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tutorial"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-background/80 p-6"
+    >
+      <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+        {children}
+      </div>
+    </div>
   )
 }
