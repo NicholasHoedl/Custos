@@ -278,6 +278,14 @@ export interface LedgerApi {
     /** On-demand snapshot — the same WAL-safe VACUUM INTO as the launch backup (P0-2). */
     backupNow(): Promise<BackupNowResult>
   }
+  bugreport: {
+    /** Gather the diagnostics block (version/OS/AI-readiness/campaign counts/log tail) for review. */
+    diagnostics(campaignId: string | null, view: string): Promise<string>
+    /** Snap the sender's window as a PNG data URL — called BEFORE the dialog covers it; null on failure. */
+    capture(): Promise<string | null>
+    /** Write the report bundle, open the prefilled email draft, and reveal the bundle folder. */
+    submit(req: BugReportRequest): Promise<BugReportResult>
+  }
   update: {
     /** Manually check for an update (Settings button). Progress arrives via `onUpdateStatus`. A no-op
      *  that reports `disabled` in dev/unpackaged builds (P2-1). */
@@ -382,6 +390,9 @@ export const IPC = {
   appOpenDataFolder: 'app:open-data-folder',
   appOpenLogsFolder: 'app:open-logs-folder',
   appBackupNow: 'app:backup-now',
+  bugreportDiagnostics: 'bugreport:diagnostics',
+  bugreportCapture: 'bugreport:capture',
+  bugreportSubmit: 'bugreport:submit',
   usageSummary: 'usage:summary',
   updateCheck: 'update:check',
   updateInstall: 'update:install'
@@ -408,6 +419,41 @@ export interface AppInfo {
 }
 
 export type BackupNowResult = { ok: true; path: string } | { ok: false; error: string }
+
+// ---- Bug reporting (the sidebar "Report a bug" dialog — reports go to the developer by EMAIL) ----
+
+/** Where bug reports go. Shown in the dialog's copy fallback and baked into the mailto draft. */
+export const BUG_REPORT_EMAIL = 'CustosService@outlook.com'
+
+/** The deployed intake worker (infra/bugreport-worker → Resend → BUG_REPORT_EMAIL, ADR-058). EMPTY =
+ *  auto-send disabled: submit falls back to the bundle + mail-draft flow, so the app is safe to ship
+ *  before the worker exists. Paste the `*.workers.dev` URL printed by `npx wrangler deploy` here. */
+export const BUG_REPORT_ENDPOINT = 'https://custos-bugreport.custosservice.workers.dev'
+/** Shared spam-gate token — MUST equal the worker's `REPORT_TOKEN` secret (see the worker README). It
+ *  ships in the app bundle, so it raises the bar against drive-by spam; it is not a true secret. */
+export const BUG_REPORT_TOKEN = 'f0b29921746fe8f452087dc11d768e20e80ce7d8bf76ed28'
+
+/** What the renderer submits from the bug-report dialog. */
+export interface BugReportRequest {
+  /** Who sent it (prefilled from settings.userName); empty = anonymous. */
+  name: string
+  /** Optional reply address (never required) — wired to the sent email's reply-to (ADR-058). */
+  replyTo?: string
+  description: string
+  /** The silently gathered diagnostics block — always included by design (no in-dialog toggle or review;
+   *  the full text is still plainly visible in the bundle's report.txt); null = the gather yielded nothing. */
+  diagnostics: string | null
+  /** Screenshot data URLs (png/jpeg/webp/gif) saved beside report.txt in the bundle. */
+  screenshots: string[]
+}
+
+/** `sent: true` = delivered through the intake worker (ADR-058) — nothing written to disk (`dir` is
+ *  null; no local copy by design). `sent: false` = the email fallback ran: the bundle was written to
+ *  `dir` for drag-in, and `mailOpened: false` means no mail client took the draft (dialog offers
+ *  copy-and-send instead). */
+export type BugReportResult =
+  | { ok: true; sent: boolean; dir: string | null; mailOpened: boolean }
+  | { ok: false; error: string }
 
 // ---- One-way streaming channels: main -> renderer (Recall). Payloads are requestId-tagged. ----
 export const RECALL_CHUNK_CHANNEL = 'stream:chunk'

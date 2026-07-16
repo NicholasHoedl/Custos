@@ -138,6 +138,11 @@ const api: LedgerApi = {
     openLogsFolder: () => ipcRenderer.invoke(IPC.appOpenLogsFolder),
     backupNow: () => ipcRenderer.invoke(IPC.appBackupNow)
   },
+  bugreport: {
+    diagnostics: (campaignId, view) => ipcRenderer.invoke(IPC.bugreportDiagnostics, campaignId, view),
+    capture: () => ipcRenderer.invoke(IPC.bugreportCapture),
+    submit: (req) => ipcRenderer.invoke(IPC.bugreportSubmit, req)
+  },
   update: {
     check: () => ipcRenderer.invoke(IPC.updateCheck),
     install: () => ipcRenderer.invoke(IPC.updateInstall)

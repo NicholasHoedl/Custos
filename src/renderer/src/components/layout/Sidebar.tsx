@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { BookOpen, HelpCircle, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { BookOpen, Bug, HelpCircle, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Campaign } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
@@ -45,6 +45,7 @@ import {
 } from '@renderer/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { QuickstartGuide } from '@renderer/components/onboarding/QuickstartGuide'
+import { BugReportDialog } from '@renderer/components/BugReportDialog'
 
 export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
@@ -53,7 +54,7 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center gap-2.5 px-5 py-5">
+      <div className="flex items-center gap-2.5 px-5 py-4">
         <BookOpen className="size-5 shrink-0 text-metal" />
         <div className="flex flex-col gap-0.5">
           <span className="font-display text-2xl font-semibold uppercase leading-none tracking-[0.18em] text-metal">
@@ -72,7 +73,9 @@ export function Sidebar() {
         {activeCampaignId && <SearchBox campaignId={activeCampaignId} />}
       </div>
 
-      <nav className="mt-4 flex flex-1 flex-col gap-1 px-3">
+      {/* min-h-0 + overflow-y-auto: on a too-short window the nav scrolls, instead of its content
+          (which won't flex-shrink below its natural height) pushing the pinned Guide row off-screen. */}
+      <nav className="mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3">
         {NAV_ITEMS.flatMap((item, i) => {
           const { key, label, icon: Icon, group } = item
           const prevGroup = NAV_ITEMS[i - 1]?.group
@@ -87,7 +90,7 @@ export function Sidebar() {
               ) : (
                 <div
                   key={group + '-h'}
-                  className="inscribed px-3 pt-3 text-xs text-muted-foreground"
+                  className="inscribed px-3 pt-2.5 text-xs text-muted-foreground"
                 >
                   {NAV_GROUP_LABELS[group]}
                 </div>
@@ -99,7 +102,7 @@ export function Sidebar() {
               key={key}
               onClick={() => setActiveView(key)}
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 active
                   ? 'bg-primary/10 text-primary'
                   : 'text-sidebar-foreground hover:bg-muted/60 hover:text-foreground'
@@ -111,6 +114,7 @@ export function Sidebar() {
           )
           return nodes
         })}
+        <ReportBugButton />
       </nav>
 
       <QuickstartButton />
@@ -123,13 +127,13 @@ export function Sidebar() {
 function QuickstartButton() {
   const [open, setOpen] = useState(false)
   return (
-    <div className="mt-2 border-t border-border/60 px-3 py-2">
+    <div className="mt-1 border-t border-border/60 px-3 py-1.5">
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
             <HelpCircle className="size-4" />
             Guide
@@ -139,6 +143,37 @@ function QuickstartButton() {
       </Tooltip>
       <QuickstartGuide open={open} onOpenChange={setOpen} />
     </div>
+  )
+}
+
+// "Report a bug" sits directly under Settings (still inside the nav). It snaps the window BEFORE the
+// dialog opens and covers it, so the pre-attached screenshot shows what the user was actually looking
+// at; the snap is best-effort (null just means no pre-attached shot).
+function ReportBugButton() {
+  const [open, setOpen] = useState(false)
+  const [shot, setShot] = useState<string | null>(null)
+
+  async function openDialog(): Promise<void> {
+    try {
+      setShot(await ledger.bugreport.capture())
+    } catch {
+      setShot(null)
+    }
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void openDialog()}
+        className="flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+      >
+        <Bug className="size-4" />
+        Report a bug
+      </button>
+      <BugReportDialog open={open} onOpenChange={setOpen} initialShot={shot} />
+    </>
   )
 }
 

@@ -1,0 +1,10 @@
+# Custos bug-report intake worker (ADR-058). Deploy from this folder: `npx wrangler deploy`.
+name = "custos-bugreport"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# Optional overrides — secrets (RESEND_API_KEY, REPORT_TOKEN) are set separately via
+# `npx wrangler secret put <NAME>`, never in this file.
+# [vars]
+# TO_EMAIL = "custosservice@outlook.com"
+# FROM_EMAIL = "Custos Reports <onboarding@resend.dev>"

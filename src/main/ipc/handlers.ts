@@ -23,6 +23,7 @@ import { registerImportHandlers } from './import'
 import { registerEnrichHandlers } from './enrich'
 import { registerPersonaHandlers } from './persona'
 import { registerAppHandlers } from './app'
+import { registerBugReportHandlers } from './bugreport'
 import { registerUpdateHandlers } from './update'
 
 /** Send a one-way event to the renderer (streaming: recall chunks, model-download progress). */
@@ -62,6 +63,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerEnrichHandlers(ctx) // no vector store — enrich creates no notes/entities (ADR-035)
   registerPersonaHandlers(ctx)
   registerAppHandlers(ctx) // shell: About/version, data-folder + backup-now, renderer-error sink (P0-2/3)
+  registerBugReportHandlers(ctx) // "Report a bug": diagnostics + window snap + email/bundle hand-off
   registerUpdateHandlers(send) // auto-update: launch check + status events + manual check/install (P2-1)
 
   void reindex() // embed anything unindexed (no-ops until the model is downloaded)

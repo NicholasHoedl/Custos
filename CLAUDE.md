@@ -412,6 +412,30 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   grouping derives from the as-of `graph.edges` (NOT `getHierarchy`, which is structural) so collapse is
   as-of-correct under the slider. Header counter stays campaign totals + a conditional `· N hidden`. No
   migration; renderer-only.
+- **Bug reports (ADR-057): the sidebar "Report a bug" button — directly under Settings, INSIDE the nav** —
+  opens `components/BugReportDialog.tsx`: name (prefilled from `settings.userName`) + required description +
+  screenshots (paste/drag/picker, cap 5, PLUS an auto window snap the launcher takes via `bugreport:capture`
+  → `webContents.capturePage` BEFORE the dialog covers the app; pre-attached, removable) + an ALWAYS-INCLUDED
+  diagnostics block attached SILENTLY — no in-dialog toggle or review panel (deliberate: reports without
+  diagnostics don't triage; the tester still sees the full text in the revealed bundle's report.txt, and
+  submit AWAITS the in-flight gather promise so a fast submit never drops the block)
+  (`bugreport:diagnostics` — version/OS/current view/key·online·
+  model readiness/campaign COUNTS-never-content/`main.log` tail). **Submit AUTO-SENDS once the intake
+  worker is deployed (ADR-058)**: iff `BUG_REPORT_ENDPOINT` (`@shared/ipc-types`) is non-empty,
+  `submitBugReport` POSTs `buildReportPayload` (JSON; shots as `{filename, content(base64)}`; optional
+  `replyTo`; 15 s abort)
+  with the `x-custos-report` `BUG_REPORT_TOKEN` header to the Cloudflare Worker
+  (`infra/bugreport-worker/` → Resend → `BUG_REPORT_EMAIL`; deploy runbook in its README). This is the
+  app's ONE deliberate non-Anthropic egress — user-initiated + labeled; the renderer gates copy/labels/the
+  optional reply-email field on the same const (`AUTO_SEND`), so an undeployed build reads EXACTLY like the
+  old flow. A DELIVERED report writes NOTHING to disk (`dir: null` — no local copy, by request); endpoint
+  empty or POST failed/offline → the ADR-057 FALLBACK, which ALONE writes the bundle
+  (`userData/bug-reports/<stamp>/report.txt` + `screenshot-N.*` — the draft needs files to drag in):
+  prefilled `mailto:` draft + `shell.showItemInFolder` (mailto can't attach → two-step drag;
+  `mailOpened:false` → copy-report + the address); `BugReportResult.sent` drives the done-panel. Pure helpers (`buildMailtoUrl` body-capped
+  ~1.2 KB, `formatReportText`, `dataUrlToImage`, `buildReportPayload`) are unit-tested incl. auto-send +
+  fallback via a stubbed fetch; `tests/e2e/bugreport.spec.ts` guards launcher → capture → dialog → the
+  description-gated submit. No migration; no new deps (the worker is plain JS deployed via npx wrangler).
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.
