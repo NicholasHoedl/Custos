@@ -122,6 +122,7 @@ export function SessionControl({
         onClick={newSession}
         disabled={busy}
         aria-label="New session"
+        data-tour="new-session"
       >
         <Plus className="size-4" />
       </Button>

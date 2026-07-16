@@ -13,6 +13,11 @@ flow under the fake-AI seam; the other 16 auto-skip it).
 > (it still creates the campaign + main character + session and requires a live-validated key), and the
 > capture→close-out loop is taught by the always-available **Quickstart guide** instead. The rest of this
 > ADR stands as the original decision.
+>
+> **Revised again by [ADR-059](059-spotlight-tutorial.md) (2026-07-16):** the wizard *presentation* was
+> replaced by a welcome page + an in-app **spotlight tour** (the real controls, highlighted and forced),
+> and the gate gained a `tutorialStep` mid-tour-resume clause. The purpose, key requirement, and
+> non-skippability stand.
 
 **Date:** 2026-07-11
 **Deciders:** Solo developer

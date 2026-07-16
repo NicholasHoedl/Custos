@@ -36,6 +36,9 @@ interface UiState {
   sessionsVersion: number
   /** A pending "open this lens, pre-seeded" request (see PendingLens). Null when nothing is queued. */
   pendingLens: PendingLens | null
+  /** Bumped by SettingsView after each key save+validate cycle — the spotlight tutorial's apikey step
+   *  (ADR-059) re-validates once per bump instead of polling (the key flow has no other push signal). */
+  keySavedNonce: number
   setActiveView: (view: ViewKey) => void
   requestQuickAddFocus: () => void
   requestSearchFocus: () => void
@@ -45,6 +48,7 @@ interface UiState {
   bumpEntities: () => void
   bumpCampaigns: () => void
   bumpSessions: () => void
+  bumpKeySaved: () => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -55,6 +59,7 @@ export const useUiStore = create<UiState>((set) => ({
   campaignsVersion: 0,
   sessionsVersion: 0,
   pendingLens: null,
+  keySavedNonce: 0,
   setActiveView: (activeView) => set({ activeView }),
   requestQuickAddFocus: () =>
     set((s) => ({ activeView: 'capture', quickAddNonce: s.quickAddNonce + 1 })),
@@ -63,5 +68,6 @@ export const useUiStore = create<UiState>((set) => ({
   consumePendingLens: () => set({ pendingLens: null }),
   bumpEntities: () => set((s) => ({ entitiesVersion: s.entitiesVersion + 1 })),
   bumpCampaigns: () => set((s) => ({ campaignsVersion: s.campaignsVersion + 1 })),
-  bumpSessions: () => set((s) => ({ sessionsVersion: s.sessionsVersion + 1 }))
+  bumpSessions: () => set((s) => ({ sessionsVersion: s.sessionsVersion + 1 })),
+  bumpKeySaved: () => set((s) => ({ keySavedNonce: s.keySavedNonce + 1 }))
 }))

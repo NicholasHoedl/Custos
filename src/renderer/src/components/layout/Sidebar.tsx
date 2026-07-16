@@ -90,6 +90,7 @@ export function Sidebar() {
               ) : (
                 <div
                   key={group + '-h'}
+                  data-tour={'nav-group-' + group}
                   className="inscribed px-3 pt-2.5 text-xs text-muted-foreground"
                 >
                   {NAV_GROUP_LABELS[group]}
@@ -100,6 +101,7 @@ export function Sidebar() {
           nodes.push(
             <button
               key={key}
+              data-tour={'nav-' + key}
               onClick={() => setActiveView(key)}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
@@ -132,6 +134,7 @@ function QuickstartButton() {
         <TooltipTrigger asChild>
           <button
             type="button"
+            data-tour="guide"
             onClick={() => setOpen(true)}
             className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
@@ -166,6 +169,7 @@ function ReportBugButton() {
     <>
       <button
         type="button"
+        data-tour="report-bug"
         onClick={() => void openDialog()}
         className="flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
       >
@@ -236,6 +240,7 @@ function CampaignSelector() {
         size="icon"
         onClick={() => setCreateOpen(true)}
         aria-label="New campaign"
+        data-tour="new-campaign"
       >
         <Plus className="size-4" />
       </Button>

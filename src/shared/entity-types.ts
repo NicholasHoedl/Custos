@@ -188,6 +188,21 @@ export type AccentColor = 'ember' | 'cyan' | 'green' | 'red' | 'yellow' | 'purpl
 /** Canonical order for the Settings picker; also the allow-list for the applied [data-accent] value. */
 export const ACCENT_COLORS: AccentColor[] = ['ember', 'cyan', 'green', 'red', 'yellow', 'purple']
 
+/** The spotlight-tour steps (ADR-059), in order. `AppSettings.tutorialStep` persists the step to RESUME
+ *  at — its presence also proves the welcome page was passed (see `deriveTutorialDone`). */
+export const TUTORIAL_STEP_IDS = [
+  'campaign',
+  'character',
+  'session',
+  'apikey',
+  'tour-capture',
+  'tour-world',
+  'tour-ask',
+  'bug',
+  'guide'
+] as const
+export type TutorialStepId = (typeof TUTORIAL_STEP_IDS)[number]
+
 export interface AppSettings {
   recallModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
@@ -206,6 +221,10 @@ export interface AppSettings {
    *  forced onboarding wizard has been completed. Both optional so old settings.json files stay valid. */
   userName?: string
   tutorialCompleted?: boolean
+  /** Where the spotlight tour resumes (ADR-059): absent = fresh install (welcome not passed) OR
+   *  finished/grandfathered; set = mid-tour, which keeps the tutorial alive across relaunches even
+   *  though the tour has already created a real campaign. */
+  tutorialStep?: TutorialStepId
   /** UI accent hue (globals.css [data-accent]); optional so pre-existing settings.json files default to
    *  ember. Unlike the removed theme/fontSize stubs, this one is actually applied (AppShell + Settings). */
   accentColor?: AccentColor

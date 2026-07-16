@@ -1,4 +1,4 @@
-import type { EntityType } from './entity-types'
+import type { EntityType, TutorialStepId } from './entity-types'
 import type { AiRunCost } from './usage-types'
 
 // Shared types for Phase 2 Recall: the streaming request/response contract and the persona brief.
@@ -94,8 +94,12 @@ export interface PersonaBrief {
 export interface OnboardingStatus {
   keyReady: boolean
   modelReady: boolean
-  /** First-run tutorial (ADR-044): the forced wizard is done (persisted flag) or skipped (e2e). */
+  /** First-run tutorial (ADR-044 → ADR-059): the forced tour is done (persisted flag), skipped (e2e),
+   *  or grandfathered (pre-tutorial data). */
   tutorialDone: boolean
+  /** Mid-tour resume point (ADR-059) — present only while a spotlight tour is in progress, so AppShell's
+   *  single status fetch carries both the gate and where to pick back up. */
+  tutorialStep?: TutorialStepId
 }
 
 /** Embedding-model download progress (onboarding). */

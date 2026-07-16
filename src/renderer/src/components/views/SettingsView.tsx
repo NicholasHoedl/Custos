@@ -152,6 +152,9 @@ export function SettingsView() {
       toast.error('Could not save key', { description: String(err) })
     } finally {
       setBusy(false)
+      // Push signal for the spotlight tutorial's apikey step (ADR-059): it validates once per save
+      // attempt instead of polling. Bumped in `finally` so a failed set also nudges a re-check.
+      useUiStore.getState().bumpKeySaved()
     }
   }
 
@@ -200,7 +203,7 @@ export function SettingsView() {
     <div className="flex h-full flex-col">
       <PaneHeader icon={Settings} title="Settings" />
       <PaneBody size="form" className="gap-8">
-        <section className="space-y-3">
+        <section className="space-y-3" data-tour="api-key-card">
           <div className="flex items-center gap-2">
             <KeyRound className="size-4 text-primary" />
             <h2 className="font-display text-lg font-medium text-foreground">Anthropic API key</h2>

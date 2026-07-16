@@ -470,29 +470,33 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   are set (electron-builder auto-signs; the release CI passes them through). Releases: push a `v*` tag →
   `.github/workflows/release.yml` runs `electron-builder --publish always` → a DRAFT GitHub Release (publish
   it to go live; **Releases must be PUBLIC** for token-free update). Full runbook in `RELEASING.md`.
-- **Forced first-run tutorial (ADR-044, trimmed by ADR-045):** a non-skippable guided wizard
-  (`components/onboarding/TutorialOverlay.tsx`) mounted in `AppShell` above the app, gated on
-  `onboarding:status.tutorialDone` (`getSettings().tutorialCompleted || tutorialSkipped() ||
-  listCampaigns(ctx).length > 0` — the last clause treats any existing-data user as already-onboarded). It
-  creates a real campaign+MC+session and **hard-requires + live-validates** an Anthropic key (`apikey.set` +
-  `apikey.validate`; the step shows numbered "how to get a key" instructions), tours the tools, then writes
-  `tutorialCompleted`. (The legacy `OnboardingChecklist` + `LoopExplainer` cards it used to dismiss were
-  REMOVED — the no-campaign empty state is now the minimal `components/NoCampaign.tsx`, and the loop/tool
-  copy lives only in the Quickstart guide.) Flow is **setup-only** —
-  welcome → campaign → character → session → apikey → tour ×3 → done (9 steps). **ADR-045 removed the
-  chronicle-entry + close-out/Illuminate steps**; the capture→extract→illuminate loop is now taught by the
-  **always-available Quickstart guide** (`components/onboarding/QuickstartGuide.tsx`) opened from a
-  `HelpCircle` **"Guide"** button at the **bottom of the Sidebar** (below the flex-1 nav; sits under the
-  z-40 overlay, so it's post-onboarding only). Tool blurbs · tour groups · loop steps · get-a-key steps
-  live in ONE shared **`lib/guide-content.tsx`** (consumed by the tour, the guide, and the
-  key step, so they never drift). AppShell disables Ctrl+K/F while active + renders a blank canvas until the
-  status loads (no flash). **Navbar** (`NAV_ITEMS`): **Chronicle · Sessions · Character · Codex · Web · Lore
-  · Counsel · Converse · Settings** (revises ADR-030's Character-first). **e2e:** `launchApp` sets
-  `LEDGER_SKIP_TUTORIAL` BY DEFAULT so the other 16 specs aren't blocked (`ai-fake.tutorialSkipped` = env
-  `&& !app.isPackaged`); `launchApp({ tutorial: true, fakeAi: true })` drives `tutorial.spec.ts` (the
-  `apikey:validate` handler returns valid under `fakeAiEnabled`). **17 e2e specs.** `AppSettings` fields:
-  `userName?`, `tutorialCompleted?`. Multi-provider (OpenAI/Gemini) keys were asked for but **deferred** — a
-  separate AI-backend project (docs/ROADMAP.md).
+- **Forced first-run tutorial = a SPOTLIGHT TOUR (ADR-044/045 presentation superseded by ADR-059):** ONE
+  full-screen page (`onboarding/WelcomeCard.tsx` — `WELCOME_COPY` in guide-content is **PLACEHOLDER, Nick
+  rewrites**; captures `userName` + writes `tutorialStep:'campaign'` awaited), then the REAL app under
+  `onboarding/Spotlight.tsx`: four click-blocking z-40 scrim rects + a ring cutout over ONE real control
+  (found via **`data-tour` attributes** — Sidebar nav items/headings/new-campaign/report-bug/guide,
+  SessionControl new-session, SettingsView api-key-card) + a non-dismissable coach-mark Popover
+  (PopoverAnchor recipe; portals are z-50 at body end so dialogs opened mid-step stay interactive ABOVE the
+  scrim). `TutorialOverlay.tsx` is the controller: 9 steps — campaign (ACTION: the real
+  `CreateCampaignDialog`, which creates the MC atomically per ADR-029) → character (INFO) → session
+  (ACTION: the Chronicle header's New-session) → apikey (ACTION: auto-`setActiveView('settings')`, popup
+  doubles as the Settings orientation + the get-a-key steps; requires a VALIDATED key via the ui-store
+  **`keySavedNonce`** SettingsView bumps after each save — validate once per bump + an entry probe) →
+  tour-capture/world/ask (INFO; group cutouts from `TOUR_GROUPS`, whose ask keys NOW INCLUDE `continuity`)
+  → bug → guide (Finish). **ACTION steps advance by WATCHING state** (campaigns.length / activeSessionId /
+  key valid) so they're idempotent — that's the resume story: each advance persists
+  `AppSettings.tutorialStep` (cleared on finish with `tutorialCompleted:true`), and the gate is the pure
+  `services/onboarding-gate.ts` `deriveTutorialDone` = `completed || skipped || (campaigns>0 &&
+  tutorialStep===undefined)` — the step clause keeps a mid-tour relaunch resuming (the tour creates a REAL
+  campaign at step 1) while grandfathering pre-tutorial data; `OnboardingStatus.tutorialStep` rides the
+  same status fetch AppShell gates on. Linear, no Back, no skip; AppShell still disables Ctrl+K/F while
+  active. The **Quickstart guide** (`QuickstartGuide.tsx`, "Guide" at the sidebar bottom) is unchanged and
+  is the tour's final stop; blurbs/groups/key-steps stay in ONE `lib/guide-content.tsx` (+ `WELCOME_COPY`
+  and per-step `SPOTLIGHT_COPY`). **e2e:** `launchApp` sets `LEDGER_SKIP_TUTORIAL` BY DEFAULT;
+  `launchApp({ tutorial: true, fakeAi: true })` drives the rewritten `tutorial.spec.ts` (real dialog, real
+  session button, real key card — `apikey:validate` returns valid under `fakeAiEnabled`). `AppSettings`
+  fields: `userName?`, `tutorialCompleted?`, `tutorialStep?`. Multi-provider (OpenAI/Gemini) keys remain
+  **deferred** — a separate AI-backend project (docs/ROADMAP.md).
 
 ## Git
 Work lands on `main`. A remote (`origin`) is configured, but the GitHub repo may not exist yet, so

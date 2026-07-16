@@ -5,6 +5,7 @@ import { CommandPalette } from '@renderer/components/CommandPalette'
 import { TutorialOverlay } from '@renderer/components/onboarding/TutorialOverlay'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { TooltipProvider } from '@renderer/components/ui/tooltip'
+import type { OnboardingStatus } from '@shared/recall-types'
 import { ledger } from '@renderer/lib/ipc'
 import { applyAccent } from '@renderer/lib/accent'
 import { useUiStore } from '@renderer/store/ui-store'
@@ -13,15 +14,19 @@ export function AppShell() {
   const requestQuickAddFocus = useUiStore((s) => s.requestQuickAddFocus)
   const requestSearchFocus = useUiStore((s) => s.requestSearchFocus)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  // Forced first-run tutorial gate (ADR-044): null = still loading (render a blank canvas so the app never
-  // flashes before the overlay); false = show the wizard; true = normal app.
-  const [tutorialDone, setTutorialDone] = useState<boolean | null>(null)
+  // Forced first-run tutorial gate (ADR-044 → ADR-059): null = still loading (render a blank canvas so
+  // the app never flashes before the overlay); tutorialDone false = the spotlight tour (resuming at
+  // status.tutorialStep); true = normal app. The whole status is kept so the tour's resume point rides
+  // the same atomic fetch as the gate.
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null)
+  const tutorialDone = onboarding === null ? null : onboarding.tutorialDone
 
   useEffect(() => {
     ledger.onboarding
       .status()
-      .then((s) => setTutorialDone(s.tutorialDone))
-      .catch(() => setTutorialDone(true)) // never trap the app behind a failed status check
+      .then(setOnboarding)
+      // never trap the app behind a failed status check
+      .catch(() => setOnboarding({ keyReady: false, modelReady: false, tutorialDone: true }))
   }, [])
 
   // Apply the saved accent color on launch (globals.css keys off [data-accent]). SettingsView applies
@@ -77,7 +82,16 @@ export function AppShell() {
       </div>
       <Toaster theme="dark" richColors position="bottom-right" />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      {tutorialDone === false && <TutorialOverlay onDone={() => setTutorialDone(true)} />}
+      {tutorialDone === false && (
+        <TutorialOverlay
+          initialStep={onboarding?.tutorialStep}
+          onDone={() =>
+            setOnboarding((s) =>
+              s ? { ...s, tutorialDone: true } : { keyReady: false, modelReady: false, tutorialDone: true }
+            )
+          }
+        />
+      )}
     </TooltipProvider>
   )
 }

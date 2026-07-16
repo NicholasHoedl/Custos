@@ -1,4 +1,5 @@
 import { BookCheck, Library, NotebookPen, Wand2, type LucideIcon } from 'lucide-react'
+import type { TutorialStepId } from '@shared/entity-types'
 import type { ViewKey } from '@renderer/store/ui-store'
 
 // Shared teaching content — the single source for the first-run tutorial's tool tour
@@ -131,7 +132,7 @@ export const TOUR_GROUPS: Record<
 > = {
   'tour-capture': { title: 'Capture the story', keys: ['journal', 'sessions'] },
   'tour-world': { title: 'Your world', keys: ['character', 'capture', 'web'] },
-  'tour-ask': { title: 'Ask the Keeper', keys: ['recall', 'suggest', 'converse'] }
+  'tour-ask': { title: 'Ask the Keeper', keys: ['recall', 'suggest', 'converse', 'continuity'] }
 }
 
 export interface LoopStep {
@@ -168,3 +169,52 @@ export const API_KEY_STEPS: string[] = [
   'Under API Keys, choose Create Key, then copy it — keys start with “sk-ant-”.',
   'Paste it into Custos to save and verify it. Your key is stored encrypted on this device and used only to call Anthropic.'
 ]
+
+// PLACEHOLDER COPY — Nick rewrites this before ship (keep the shape: a title + one short paragraph).
+/** The welcome page — the spotlight tutorial's only full-screen step (ADR-059). */
+export const WELCOME_COPY = {
+  title: 'Welcome to Custos',
+  body: 'Custos is a keeper of campaigns — it remembers your story so you can ask it anything later. Before we set up your first campaign: what should the Keeper call you?'
+}
+
+/** Coach-mark copy for each spotlight step (ADR-059). The tour renders extras itself per step — the
+ *  tool list on the group steps, the get-a-key list on `apikey` — so these bodies stay short. The group
+ *  titles deliberately match `TOUR_GROUPS` so the guide and the tour never drift. */
+export const SPOTLIGHT_COPY: Record<TutorialStepId, { title: string; body: string }> = {
+  campaign: {
+    title: 'Create your campaign',
+    body: 'Everything lives in a campaign — one story and its cast. This also creates your main character, the hero you play. Click the + button to begin.'
+  },
+  character: {
+    title: 'Meet the Character page',
+    body: 'Your hero lives here — profile, backstory, and the voice the Keeper speaks in. Come back any time to flesh them out.'
+  },
+  session: {
+    title: 'Start your first session',
+    body: 'A session is one night at the table, and everything you record lands in the active one. Click + to start Session 1.'
+  },
+  apikey: {
+    title: 'Add your Anthropic API key',
+    body: 'This is Settings — models, backups, and your data all live here. The Keeper needs an API key to think; it’s stored encrypted on this device and only ever used to call Anthropic. Paste your key and press Save & validate.'
+  },
+  'tour-capture': {
+    title: 'Capture the story',
+    body: 'These two record what happens at the table.'
+  },
+  'tour-world': {
+    title: 'Your world',
+    body: 'The cast, places, and threads the Keeper tracks for you.'
+  },
+  'tour-ask': {
+    title: 'Ask the Keeper',
+    body: 'Four lenses that answer from everything you’ve recorded.'
+  },
+  bug: {
+    title: 'Something broken?',
+    body: 'Report a bug sends what went wrong — with a screenshot and diagnostics — straight to the developer.'
+  },
+  guide: {
+    title: 'The Quickstart guide',
+    body: 'The whole capture → extract → ask loop, whenever you need a refresher. That’s the tour — you’re ready to play.'
+  }
+}

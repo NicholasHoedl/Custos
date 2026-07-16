@@ -8,6 +8,10 @@ and close-out/Illuminate steps (now setup-only: name → campaign → main chara
 **always-available Quickstart guide**, opened from an out-of-the-way button at the bottom of the sidebar.
 Verified: typecheck + lint + 263 unit + **17 e2e**.
 
+> **Revised by [ADR-059](059-spotlight-tutorial.md) (2026-07-16):** the wizard presentation described
+> here was replaced by a welcome page + an in-app spotlight tour; the Quickstart guide (this ADR's other
+> half) stands unchanged and is now the tour's final stop.
+
 **Date:** 2026-07-12
 **Deciders:** Solo developer
 
