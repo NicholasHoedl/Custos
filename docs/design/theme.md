@@ -97,6 +97,17 @@ utilities via `--color-metal` / `--color-blood` (`text-metal`, `text-blood`, `de
 --pewter         #9E9DA2   cool pewter — inscribed labels, wordmark
 ```
 
+**Accent variants (Settings → Accent color).** The ember accent is user-swappable — Settings offers
+ember (default), cyan, green, red, yellow, purple. Each is a `:root[data-accent='<name>']` block in
+`globals.css` that overrides ONLY the raw `--ember` / `--ember-deep` / `--ember-bright` trio; because every
+accent-derived role (`--primary`, `--accent`, `--ring`) and `--type-pc` resolve *through* those tokens, the
+whole app (including the MC's Web node) re-tints from three lines. Deep bases (red, purple) also set
+`--primary-foreground: var(--bone)` so ink on a filled button stays legible; ember needs no block — the
+base `:root` IS ember. `AccentColor` + `ACCENT_COLORS` live in `@shared/entity-types`; the picker's
+swatch/label preview is `ACCENT_META` (`renderer/lib/accent.ts`, kept in sync with the CSS by hand + a
+unit test). `applyAccent()` sets `[data-accent]` on `<html>` — AppShell on launch from the saved
+`settings.accentColor`, SettingsView live on each pick.
+
 **Web-graph entity-type hues (ADR-046).** The one data-viz surface that steps outside the single-accent
 rule: each entity type gets a muted "heraldry" outline color + a lucide icon on its node (with a legend),
 so type reads at a glance. Kept desaturated to hold the grim register — `--blood` is avoided (death) and

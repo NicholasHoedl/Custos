@@ -72,6 +72,39 @@
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 }
 
+/* ---- Accent variants (Settings → Accent color; entity-types `AccentColor`). Each block overrides ONLY
+ * the raw --ember* trio; every accent-derived role (--primary, --accent, --ring) and the Web graph's
+ * --type-pc resolve THROUGH those tokens, so the whole app re-tints. Default (ember) needs no block — the
+ * base :root above IS ember. Deep bases (red, purple) also flip --primary-foreground to bone so ink on a
+ * filled primary button stays legible. Keep the swatch hexes in lib/accent.ts ACCENT_META in sync. ---- */
+:root[data-accent='cyan'] {
+  --ember: #2fb0c6;
+  --ember-deep: #1c5f6b;
+  --ember-bright: #5fd0e0;
+}
+:root[data-accent='green'] {
+  --ember: #4fa863;
+  --ember-deep: #2c6238;
+  --ember-bright: #78c98a;
+}
+:root[data-accent='red'] {
+  --ember: #cf463a;
+  --ember-deep: #7d2820;
+  --ember-bright: #e86b5e;
+  --primary-foreground: var(--bone);
+}
+:root[data-accent='yellow'] {
+  --ember: #d4a333;
+  --ember-deep: #7e5f19;
+  --ember-bright: #ecc766;
+}
+:root[data-accent='purple'] {
+  --ember: #8f5fbe;
+  --ember-deep: #523472;
+  --ember-bright: #bd9bde;
+  --primary-foreground: var(--bone);
+}
+
 /* ---- Expose semantic roles to Tailwind v4 utilities ---- */
 @theme inline {
   --color-background: var(--background);

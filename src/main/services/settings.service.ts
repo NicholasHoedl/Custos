@@ -17,7 +17,8 @@ const DEFAULTS: AppSettings = {
   illuminateModel: 'claude-haiku-4-5',
   illuminateEffort: 'medium',
   hotkey: DEFAULT_HOTKEY,
-  tutorialCompleted: false // forced first-run tutorial (ADR-044); flips true on completion
+  tutorialCompleted: false, // forced first-run tutorial (ADR-044); flips true on completion
+  accentColor: 'ember' // UI accent hue; the base :root in globals.css IS ember
 }
 
 function settingsPath(): string {

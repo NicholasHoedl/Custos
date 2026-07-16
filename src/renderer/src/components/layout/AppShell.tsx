@@ -6,6 +6,7 @@ import { TutorialOverlay } from '@renderer/components/onboarding/TutorialOverlay
 import { Toaster } from '@renderer/components/ui/sonner'
 import { TooltipProvider } from '@renderer/components/ui/tooltip'
 import { ledger } from '@renderer/lib/ipc'
+import { applyAccent } from '@renderer/lib/accent'
 import { useUiStore } from '@renderer/store/ui-store'
 
 export function AppShell() {
@@ -21,6 +22,15 @@ export function AppShell() {
       .status()
       .then((s) => setTutorialDone(s.tutorialDone))
       .catch(() => setTutorialDone(true)) // never trap the app behind a failed status check
+  }, [])
+
+  // Apply the saved accent color on launch (globals.css keys off [data-accent]). SettingsView applies
+  // live changes itself, so this only needs to run once at startup; leave the default ember on failure.
+  useEffect(() => {
+    ledger.settings
+      .get()
+      .then((s) => applyAccent(s.accentColor))
+      .catch(() => {})
   }, [])
 
   // Global hotkey: main process focuses the window then asks us to focus quick-add (ADR-010).

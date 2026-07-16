@@ -182,6 +182,12 @@ export interface EventLogEntry {
 // declared but never read, so they were removed (ROADMAP R-1/R-2). Dark lives unconditionally in
 // globals.css; the Toaster hardcodes theme="dark".
 
+/** The user-selectable UI accent hue. Drives every accent-derived token through the raw --ember* trio
+ *  that globals.css re-tints per `:root[data-accent]` (see docs/design/theme.md). 'ember' is the default. */
+export type AccentColor = 'ember' | 'cyan' | 'green' | 'red' | 'yellow' | 'purple'
+/** Canonical order for the Settings picker; also the allow-list for the applied [data-accent] value. */
+export const ACCENT_COLORS: AccentColor[] = ['ember', 'cyan', 'green', 'red', 'yellow', 'purple']
+
 export interface AppSettings {
   recallModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
   suggestModel: 'claude-sonnet-4-6' | 'claude-opus-4-8'
@@ -200,4 +206,7 @@ export interface AppSettings {
    *  forced onboarding wizard has been completed. Both optional so old settings.json files stay valid. */
   userName?: string
   tutorialCompleted?: boolean
+  /** UI accent hue (globals.css [data-accent]); optional so pre-existing settings.json files default to
+   *  ember. Unlike the removed theme/fontSize stubs, this one is actually applied (AppShell + Settings). */
+  accentColor?: AccentColor
 }

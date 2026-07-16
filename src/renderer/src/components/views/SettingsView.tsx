@@ -9,6 +9,7 @@ import {
   FileUp,
   FolderOpen,
   KeyRound,
+  Palette,
   RefreshCw,
   RotateCw,
   ScrollText,
@@ -20,6 +21,8 @@ import type { AppInfo, UpdateStatus } from '@shared/ipc-types'
 import { AI_FEATURE_LABELS, type AiFeature, type UsageSummary } from '@shared/usage-types'
 import { ledger } from '@renderer/lib/ipc'
 import { formatUsd } from '@renderer/lib/format'
+import { cn } from '@renderer/lib/utils'
+import { ACCENT_COLORS, ACCENT_META, applyAccent } from '@renderer/lib/accent'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useSettings } from '@renderer/hooks/use-settings'
@@ -242,6 +245,52 @@ export function SettingsView() {
             <Button onClick={saveKey} disabled={!keyInput.trim() || busy}>
               Save &amp; validate
             </Button>
+          </div>
+        </section>
+
+        <Separator />
+
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Palette className="size-4 text-primary" />
+            <h2 className="font-display text-lg font-medium text-foreground">Accent color</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            The single accent the app uses for focus, active state, and highlights. Ember is the
+            default — pick another to re-tint everything.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {ACCENT_COLORS.map((c) => {
+              const active = (settings?.accentColor ?? 'ember') === c
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    applyAccent(c) // live, before the persist round-trip
+                    void update({ accentColor: c })
+                  }}
+                  aria-label={ACCENT_META[c].label}
+                  aria-pressed={active}
+                  className="group flex flex-col items-center gap-1.5"
+                >
+                  <span
+                    className={cn(
+                      'size-9 rounded-full ring-offset-2 ring-offset-background transition',
+                      active
+                        ? 'ring-2 ring-foreground'
+                        : 'ring-1 ring-border group-hover:ring-foreground/40'
+                    )}
+                    style={{ backgroundColor: ACCENT_META[c].swatch }}
+                  />
+                  <span
+                    className={cn('text-xs', active ? 'text-foreground' : 'text-muted-foreground')}
+                  >
+                    {ACCENT_META[c].label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </section>
 
