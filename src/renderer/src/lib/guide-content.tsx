@@ -23,11 +23,13 @@ export const TOOL_BLURBS: Record<string, string> = {
   suggest:
     'Not sure what to do? Get four in-character options for the moment, grounded in your character and the scene.',
   converse:
-    'About to talk to someone? Get four in-character questions to draw them out, from safe openers to pointed probes.'
+    'About to talk to someone? Get four in-character questions to draw them out, from safe openers to pointed probes.',
+  continuity:
+    'Audit your campaign for inconsistencies — a fallen NPC still acting, two notes that disagree, a status that doesn’t match its lifecycle — with automatic checks plus an AI pass over your notes.'
 }
 
-/** The three AI lenses, the ones whose output is only as good as the prompt. */
-export type LensKey = 'recall' | 'suggest' | 'converse'
+/** The AI lenses whose header carries an info popover. */
+export type LensKey = 'recall' | 'suggest' | 'converse' | 'continuity'
 
 /**
  * Copy for each AI lens's header info popover (`components/lens/LensPromptInfo.tsx`). `name` names the tool
@@ -39,7 +41,7 @@ export type LensKey = 'recall' | 'suggest' | 'converse'
  */
 export const LENS_PROMPT_TIPS: Record<
   LensKey,
-  { name: string; does: string; using: string[]; query: string[] }
+  { name: string; does: string; using: string[]; query: string[]; queryLabel?: string }
 > = {
   recall: {
     name: 'Lore',
@@ -81,6 +83,21 @@ export const LENS_PROMPT_TIPS: Record<
       'The questions draw on what you’ve recorded about that character — their description, traits, goals, flaws, your notes on them, and how the two of you stand. Flesh out a thin character first, or the questions stay thin. With a thread set, Converse also pulls in related people and places from your notes.',
       'In a follow-up, include how they answered — a dodge, a flinch, a boast — so the next questions push on the tell, not just the words.'
     ]
+  },
+  continuity: {
+    name: 'Continuity',
+    does: 'Scans your whole campaign for inconsistencies — automatic checks plus an AI pass over your notes — and lists what to fix.',
+    using: [
+      'Press Run check any time. The automatic checks work with no API key or internet; the AI contradiction pass needs a key (add one in Settings).',
+      'Click an entity in a finding to jump straight to it and fix the problem.',
+      'Re-run after a session — findings you’ve resolved drop off, so it stays a short, current to-do list.'
+    ],
+    query: [
+      'Automatic checks (instant, precise): a status that doesn’t match its lifecycle, a pair recorded as both allies and enemies, a live tie or a fresh note on an entity that has ended.',
+      'The AI pass reads your notes for contradictions the checks can’t see: two notes that disagree, a “fallen” character still acting, a rumor a later note resolved but still tagged uncertain.',
+      'It flags only what your record actually supports, and never changes anything — every fix is yours to make.'
+    ],
+    queryLabel: 'What it checks'
   }
 }
 

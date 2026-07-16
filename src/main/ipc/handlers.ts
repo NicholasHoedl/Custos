@@ -17,6 +17,7 @@ import { registerRecallHandlers } from './recall'
 import { registerRecapHandlers } from './recap'
 import { registerSuggestHandlers } from './suggest'
 import { registerConverseHandlers } from './converse'
+import { registerContinuityHandlers } from './continuity'
 import { registerDeriveProfileHandlers } from './derive-profile'
 import { registerImportHandlers } from './import'
 import { registerEnrichHandlers } from './enrich'
@@ -55,6 +56,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerRecapHandlers(ctx, send)
   registerSuggestHandlers(ctx, store)
   registerConverseHandlers(ctx, store)
+  registerContinuityHandlers(ctx)
   registerDeriveProfileHandlers(ctx)
   registerImportHandlers(ctx, store)
   registerEnrichHandlers(ctx) // no vector store — enrich creates no notes/entities (ADR-035)

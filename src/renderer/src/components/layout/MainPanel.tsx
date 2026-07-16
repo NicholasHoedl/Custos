@@ -9,6 +9,7 @@ import { WebView } from '@renderer/components/views/WebView'
 import { RecallView } from '@renderer/components/views/RecallView'
 import { SuggestView } from '@renderer/components/views/SuggestView'
 import { ConverseView } from '@renderer/components/views/ConverseView'
+import { ContinuityView } from '@renderer/components/views/ContinuityView'
 import { SettingsView } from '@renderer/components/views/SettingsView'
 
 // Single-window panel switching — one feature view at a time (ARCHITECTURE §3). Not a router.
@@ -23,6 +24,7 @@ const VIEWS: { key: ViewKey; Component: ComponentType }[] = [
   { key: 'recall', Component: RecallView },
   { key: 'suggest', Component: SuggestView },
   { key: 'converse', Component: ConverseView },
+  { key: 'continuity', Component: ContinuityView },
   { key: 'settings', Component: SettingsView }
 ]
 

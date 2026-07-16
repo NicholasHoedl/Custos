@@ -9,6 +9,7 @@ export type ViewKey =
   | 'recall'
   | 'suggest'
   | 'converse'
+  | 'continuity'
   | 'settings'
 
 /** A cross-view request to open an AI lens pre-seeded from elsewhere — e.g. the Web graph: a node →

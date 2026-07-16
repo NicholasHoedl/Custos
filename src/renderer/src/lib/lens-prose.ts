@@ -6,6 +6,7 @@ import {
   type SuggestCategory
 } from '@shared/suggest-types'
 import { converseTagLabel, type ConverseQuestion } from '@shared/converse-types'
+import { CONTINUITY_CATEGORY_LABELS, type ContinuityFinding } from '@shared/continuity-types'
 
 // Turn a lens result into plain, readable prose — the payload for Copy-to-clipboard and "Inscribe to
 // Annals" (ROADMAP P1-1). The audit's point: a memory tool must let you keep an answer, not just watch
@@ -44,6 +45,18 @@ export function directionsProse(situation: string, sugg: StorySuggestion[]): str
     })
     .join('\n\n')
   return `${head}\n\n${body}`
+}
+
+/** Continuity: the audit's findings, each with its severity + category, evidence, and any suggested fix. */
+export function continuityProse(findings: ContinuityFinding[]): string {
+  if (findings.length === 0) return 'Continuity — no inconsistencies found.'
+  const body = findings
+    .map((f) => {
+      const fix = f.suggestedFix ? `\n  Fix: ${f.suggestedFix}` : ''
+      return `• [${f.severity} · ${CONTINUITY_CATEGORY_LABELS[f.category]}] ${f.summary}\n  ${f.detail}${fix}`
+    })
+    .join('\n\n')
+  return `Continuity — ${findings.length} finding${findings.length === 1 ? '' : 's'}\n\n${body}`
 }
 
 /** Converse: the target, the optional thread, then each question with its "read". */

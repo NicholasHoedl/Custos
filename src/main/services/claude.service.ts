@@ -7,6 +7,7 @@ import {
   type StorySuggestion
 } from '@shared/suggest-types'
 import { CONVERSE_TAGS, type ConverseQuestion } from '@shared/converse-types'
+import { CONTINUITY_CATEGORIES, type RawContinuityFinding } from '@shared/continuity-types'
 import type { RelationshipView } from '@shared/graph-types'
 import {
   ENTITY_TYPES,
@@ -773,6 +774,14 @@ export function buildStructuredParams(
   return params
 }
 
+// The SDK REFUSES a non-streaming request whose max_tokens could outlast its 10-min timeout: it throws
+// "Streaming is required…" when (3600 · max_tokens) / 128000 > 600, i.e. max_tokens > 21333 (see
+// `_calculateNonstreamingTimeout` in @anthropic-ai/sdk). That throw is client-side + instant, and — lacking
+// the word "timeout" — classifies as a generic `api` error. A large output budget (the Continuity audit
+// needs one; adaptive thinking SHARES it) MUST therefore stream. `.finalMessage()` yields the same Message
+// shape, so everything downstream is unchanged. Smaller calls keep the plain non-streaming path.
+const NONSTREAMING_MAX_TOKENS = 21_333
+
 /**
  * Shared single-shot structured call (ADR-008/009): a json_schema output format, with adaptive thinking +
  * effort on models that support them (a plain call otherwise — see `buildStructuredParams`). Returns the
@@ -781,7 +790,11 @@ export function buildStructuredParams(
 async function structuredCall(opts: StructuredCallOpts): Promise<Record<string, unknown>> {
   const c = getClient()
   if (!c) throw new Error('no_key')
-  const message = await c.messages.create(buildStructuredParams(opts), { signal: opts.signal })
+  const params = buildStructuredParams(opts)
+  const message =
+    params.max_tokens > NONSTREAMING_MAX_TOKENS
+      ? await c.messages.stream(params, { signal: opts.signal }).finalMessage()
+      : await c.messages.create(params, { signal: opts.signal })
   // Record BEFORE the outcome checks — refused/truncated calls still billed whatever they used.
   opts.onUsage?.(recordUsage(opts.feature, opts.model, usageOf(message)))
   if (message.stop_reason === 'refusal') throw new Error('refusal')
@@ -1782,6 +1795,146 @@ export async function converse(params: ConverseParams): Promise<ConverseQuestion
       pcName: params.context.pcName ?? 'you'
     }),
     arrayKey: 'questions',
+    signal: params.signal
+  })
+}
+
+// ---- Continuity (ADR-056): the read-only campaign audit — one whole-campaign structured call that flags
+// semantic self-contradictions the deterministic checks can't (a note implying an [ended] entity still
+// acts, two notes disagreeing, a rumor a later note resolved, a disposition that flips). No persona — an
+// out-of-character maintenance report. The deterministic half runs in continuity.service. ----
+
+const CONTINUITY_INSTRUCTIONS = `You audit a tabletop RPG campaign's recorded memory for CONTINUITY ERRORS — places where the record contradicts itself. You are given the campaign's entities (with their current state; [ended] marks one no longer in play), their relationships, and the notes recorded about them (newest first; a note tagged (rumored) or (suspected) is unconfirmed).
+
+Find genuine self-contradictions:
+- A note implying an [ended] entity is still ACTING (speaking, moving, deciding) — not a memorial, a flashback, or a mention of its legacy.
+- Two notes asserting CONTRADICTORY facts about the same entity or event (one says X, another says not-X).
+- A rumor (a (rumored)/(suspected) note) that a LATER note confirms or refutes, but whose uncertainty tag was never updated — category "unresolved-rumor".
+- A relationship or feeling that FLIPS (allies turned enemies, trust turned to fear) with no narrated cause.
+
+RESTRAINT. Flag ONLY contradictions the record actually supports — never invent a problem, never flag something that is merely unresolved but consistent, and prefer FEW high-confidence findings over many weak ones. If the record is consistent, return an empty findings array — that is a good outcome. Do NOT repeat anything under "Already flagged".
+
+Each finding carries: a "category"; a "severity" ("high" = a hard factual contradiction, "medium", "low" = soft or uncertain); a one-line "summary"; a "detail" that QUOTES the specific conflicting records as evidence; "entityRefs" = the REAL ids of the entities involved (from the entities list — never a name, never a "#index"); and optionally a short "suggestedFix". Write plainly and OUT of character — this is a maintenance report, not narration.`
+
+const CONTINUITY_FINDING_ITEM = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    category: { type: 'string', enum: [...CONTINUITY_CATEGORIES] },
+    severity: { type: 'string', enum: ['high', 'medium', 'low'] },
+    summary: { type: 'string' },
+    detail: { type: 'string' },
+    entityRefs: { type: 'array', items: { type: 'string' } },
+    suggestedFix: { type: 'string' }
+  },
+  required: ['category', 'severity', 'summary', 'detail', 'entityRefs']
+}
+
+const CONTINUITY_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: { findings: { type: 'array', items: CONTINUITY_FINDING_ITEM } },
+  required: ['findings']
+}
+
+// The default 8192 is too small here: on adaptive-thinking models (Opus/Sonnet) that budget is SHARED
+// between thinking and output, and a whole-campaign audit at high effort reasons a LOT before emitting the
+// findings JSON — the thinking alone can eat 8192 and truncate the response (a `too_long` failure). This is
+// a deliberate, occasional batch op, so give it generous room (still well under the 200k context). Other
+// lenses keep the 8192 default — their output is tiny and their grounding focused.
+const CONTINUITY_MAX_OUTPUT_TOKENS = 32000
+
+export function buildContinuitySystem(): Anthropic.TextBlockParam[] {
+  return [{ type: 'text', text: CONTINUITY_INSTRUCTIONS, cache_control: { type: 'ephemeral' } }]
+}
+
+/** The whole-campaign grounding the model audits. `notes` are already sliced to the token budget by the
+ *  service (newest first); `omittedNotes` counts the older ones dropped; `alreadyFlagged` are the
+ *  deterministic findings' summaries, so the model doesn't repeat them. */
+export interface ContinuityGather {
+  entities: { id: string; name: string; type: string; status: string | null; lifecycle: Lifecycle }[]
+  tieLines: string | null
+  notes: { sessionNumber: number | null; entityNames: string[]; content: string; confidence: NoteConfidence }[]
+  omittedNotes: number
+  alreadyFlagged: string[]
+}
+
+export function buildContinuityUserContent(g: ContinuityGather): Anthropic.ContentBlockParam[] {
+  const content: Anthropic.ContentBlockParam[] = []
+
+  const entLines = g.entities
+    .map((e) => {
+      const mark =
+        e.lifecycle === 'ended'
+          ? ' [ended]'
+          : e.lifecycle === 'presumed_ended'
+            ? ' [presumed ended — unconfirmed]'
+            : ''
+      const status = e.status ? `: ${e.status}` : ''
+      return `- ${e.id} · ${e.name} (${e.type})${mark}${status}`
+    })
+    .join('\n')
+  content.push({
+    type: 'text',
+    text: `Entities in the campaign — reference these by id in entityRefs:\n${entLines}`
+  })
+
+  if (g.tieLines) {
+    content.push({ type: 'text', text: `Current relationships:\n${g.tieLines}` })
+  }
+
+  if (g.notes.length) {
+    const omitted =
+      g.omittedNotes > 0
+        ? `(+${g.omittedNotes} older notes omitted to fit — the automatic checks still cover them)\n`
+        : ''
+    const lines = g.notes
+      .map((n) => {
+        const sess = n.sessionNumber != null ? `[s${n.sessionNumber}] ` : ''
+        const who = n.entityNames.length ? `(${n.entityNames.join(', ')}) ` : ''
+        return `- ${sess}${who}${n.content}${confidenceTag(n.confidence)}`
+      })
+      .join('\n')
+    content.push({
+      type: 'text',
+      text: `Notes, newest first (${g.notes.length} shown):\n${omitted}${lines}`
+    })
+  }
+
+  if (g.alreadyFlagged.length) {
+    content.push({
+      type: 'text',
+      text: `Already flagged by automatic checks — do NOT repeat these:\n${g.alreadyFlagged.map((s) => `- ${s}`).join('\n')}`
+    })
+  }
+
+  content.push({
+    type: 'text',
+    text: `Audit this record for continuity errors the automatic checks miss. Return findings as JSON — real entity ids only, and only genuine contradictions the record supports.`
+  })
+  return content
+}
+
+export interface ContinuityCallParams extends ContinuityGather {
+  model: string
+  effort: 'medium' | 'high'
+  onUsage?: (cost: AiRunCost) => void
+  signal?: AbortSignal
+}
+
+/** Continuity audit call: the model's contradiction findings over the whole-campaign gather. Returns the
+ *  raw array (the service validates categories/severity + resolves entityRefs to real ids). */
+export async function continuity(params: ContinuityCallParams): Promise<RawContinuityFinding[]> {
+  return structuredArrayCall<RawContinuityFinding>({
+    feature: 'continuity',
+    onUsage: params.onUsage,
+    model: params.model,
+    effort: params.effort,
+    schema: CONTINUITY_SCHEMA,
+    system: buildContinuitySystem(),
+    content: buildContinuityUserContent(params),
+    arrayKey: 'findings',
+    maxTokens: CONTINUITY_MAX_OUTPUT_TOKENS,
     signal: params.signal
   })
 }

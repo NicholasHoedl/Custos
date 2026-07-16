@@ -5,6 +5,7 @@ import {
   ScrollText,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   UserRound,
   Waypoints,
@@ -29,11 +30,11 @@ export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
   settings: ''
 }
 
-// The nine primary views, in nav order (label ↔ code-name per ADR-024/032/036; Web is P2-3). Shared by
-// the Sidebar and the command palette (P2-4) so the two never drift on labels or icons. Order follows the
-// data lifecycle the first-run tutorial teaches (ADR-044): capture (Chronicle) → process (Sessions) → the
-// world (Character/Codex/Web) → the AI lenses (Lore/Counsel/Converse). Chronicle is first (revises ADR-030's
-// Character-first — Character stays the MC's home, just not first in nav).
+// The primary views, in nav order (label ↔ code-name per ADR-024/032/036; Web is P2-3, Continuity is
+// ADR-056). Shared by the Sidebar and the command palette (P2-4) so the two never drift on labels or icons.
+// Order follows the data lifecycle the first-run tutorial teaches (ADR-044): capture (Chronicle) → process
+// (Sessions) → the world (Character/Codex/Web) → the AI lenses (Lore/Counsel/Converse/Continuity). Chronicle
+// is first (revises ADR-030's Character-first — Character stays the MC's home, just not first in nav).
 export const NAV_ITEMS: NavItem[] = [
   { key: 'journal', label: 'Chronicle', icon: NotebookPen, group: 'capture' },
   { key: 'sessions', label: 'Sessions', icon: CalendarClock, group: 'capture' },
@@ -43,5 +44,6 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'recall', label: 'Lore', icon: Search, group: 'ask' },
   { key: 'suggest', label: 'Counsel', icon: Sparkles, group: 'ask' },
   { key: 'converse', label: 'Converse', icon: MessagesSquare, group: 'ask' },
+  { key: 'continuity', label: 'Continuity', icon: ShieldCheck, group: 'ask' },
   { key: 'settings', label: 'Settings', icon: Settings, group: 'settings' }
 ]

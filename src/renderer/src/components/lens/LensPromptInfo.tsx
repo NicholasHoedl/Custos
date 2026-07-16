@@ -9,7 +9,7 @@ import { LENS_PROMPT_TIPS, type LensKey } from '@renderer/lib/guide-content'
  * `PaneHeader`.
  */
 export function LensPromptInfo({ lens }: { lens: LensKey }) {
-  const { name, does, using, query } = LENS_PROMPT_TIPS[lens]
+  const { name, does, using, query, queryLabel } = LENS_PROMPT_TIPS[lens]
   return (
     <InfoPopover label={`About ${name}`}>
       <p className="text-sm font-medium text-foreground">What {name} does</p>
@@ -20,7 +20,7 @@ export function LensPromptInfo({ lens }: { lens: LensKey }) {
           <li key={tip}>{tip}</li>
         ))}
       </ul>
-      <p className="text-sm font-medium text-foreground">Writing a good query</p>
+      <p className="text-sm font-medium text-foreground">{queryLabel ?? 'Writing a good query'}</p>
       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
         {query.map((tip) => (
           <li key={tip}>{tip}</li>

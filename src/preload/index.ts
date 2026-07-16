@@ -106,6 +106,10 @@ const api: LedgerApi = {
     query: (input) => ipcRenderer.invoke(IPC.converseQuery, input),
     cancel: (requestId) => ipcRenderer.invoke(IPC.converseCancel, requestId)
   },
+  continuity: {
+    query: (input) => ipcRenderer.invoke(IPC.continuityQuery, input),
+    cancel: (requestId) => ipcRenderer.invoke(IPC.continuityCancel, requestId)
+  },
   deriveProfile: {
     query: (input) => ipcRenderer.invoke(IPC.deriveProfileQuery, input)
   },

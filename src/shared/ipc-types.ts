@@ -24,6 +24,7 @@ import type {
   RecallSourcesEvent
 } from './recall-types'
 import type { ConverseRequest, ConverseResult } from './converse-types'
+import type { ContinuityRequest, ContinuityResult } from './continuity-types'
 import type { DeriveProfileRequest, DeriveProfileResult } from './derive-profile-types'
 import type { SuggestRequest, SuggestResult } from './suggest-types'
 import type { RecapChunk, RecapDone, RecapError, RecapRequest } from './recap-types'
@@ -234,6 +235,12 @@ export interface LedgerApi {
     /** Abort the in-flight Converse call by requestId (P1-5). */
     cancel(requestId: string): Promise<void>
   }
+  continuity: {
+    /** Audit the campaign for inconsistencies (ADR-056): deterministic checks + an additive AI pass. */
+    query(input: ContinuityRequest): Promise<ContinuityResult>
+    /** Abort the in-flight Continuity AI call by requestId. */
+    cancel(requestId: string): Promise<void>
+  }
   deriveProfile: {
     /** Derive a main character's profile fields from their backstory, for review (ADR-029). */
     query(input: DeriveProfileRequest): Promise<DeriveProfileResult>
@@ -357,6 +364,8 @@ export const IPC = {
   suggestCancel: 'suggest:cancel',
   converseQuery: 'converse:query',
   converseCancel: 'converse:cancel',
+  continuityQuery: 'continuity:query',
+  continuityCancel: 'continuity:cancel',
   deriveProfileQuery: 'derive-profile:query',
   importExtract: 'import:extract',
   importExtractCancel: 'import:extract-cancel',

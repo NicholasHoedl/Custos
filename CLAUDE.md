@@ -146,11 +146,12 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
   populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
   fields but is test-only; `getHierarchy` ignores them (structural).
-- **UI label ↔ code name (ADR-024/032/036/040/044/047):** the nav labels are Chronicle · Sessions · Character ·
-  Codex · **Web** · Lore · Counsel · Converse · Settings (9 views, Chronicle-first per ADR-044, now GROUPED in
+- **UI label ↔ code name (ADR-024/032/036/040/044/047/056):** the nav labels are Chronicle · Sessions · Character ·
+  Codex · **Web** · Lore · Counsel · Converse · **Continuity** · Settings (10 views, Chronicle-first per ADR-044, now GROUPED in
   the Sidebar under **Capture / World / Ask** + Settings via `NavItem.group` + `.inscribed` headings, ADR-047;
-  **Web** is P2-3/ADR-040, `'web'`, right after Codex); the code names stay `recall` (Lore), `suggest`
-  (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate).
+  **Web** is P2-3/ADR-040, `'web'`, right after Codex; **Continuity** is ADR-056, `'continuity'`, last in the Ask group);
+  the code names stay `recall` (Lore), `suggest`
+  (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate), `continuity` (Continuity).
   **Every view's header is now the shared `PaneHeader` toolbar (leading icon + `text-lg` Fraunces title +
   right `action` slot) over a `PaneBody` (`chrome.tsx`; `PaneShell` was deleted) — page chrome stays compact,
   content identity (entity/session/character names) stays large Fraunces (ADR-047).** The three AI lenses fill
@@ -196,6 +197,33 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   or Transcribe/import rows — deferred, convert via the same `onValueChange` (+ an optional shared `entities`
   prop to avoid N fetches). e2e `tests/e2e/mention.spec.ts` (pure UI); parser unit `tests/unit/renderer/
   mention.test.ts`.
+- **Continuity — the read-only campaign AUDIT (ADR-056, code name `continuity`, Ask group).** A new lens that
+  flags inconsistencies in the accumulated memory. TWO sources, one report: (1) always-on **deterministic
+  checks** — the pure, unit-tested **`@shared/continuity-checks.ts`** (`runDeterministicChecks` over plain
+  records the service gathers; mirrors `graph-reduce`): status↔lifecycle mismatch (a preset's lifecycle ≠
+  `entity.lifecycle`, via `profileFor`) + a live `ally_of` ∧ `enemy_of` pair — precise, instant, **no key**
+  (a dead entity merely HOLDING a tie is deliberately NOT flagged — ties/notes persist past death; the "still
+  ACTING" leak is the AI pass's job); (2) an **additive AI pass** — `claude.service.continuity()` → `structuredArrayCall<RawContinuityFinding>`
+  (`feature:'continuity'`, `arrayKey:'findings'`), NO persona (system = `CONTINUITY_INSTRUCTIONS` only, like
+  `buildEnrichSystem`), over a token-bounded whole-campaign gather (`formatState`/`formatRelationships`-style
+  lines + notes newest-first + `confidenceTag`, capped under `MAX_EXTRACT_INPUT_TOKENS`), for the semantic
+  contradictions. **GOTCHA:** the call passes `maxTokens: 32000` (not the 8192 default) — on adaptive-thinking
+  models that budget is SHARED with thinking, and a whole-campaign audit at high effort thinks enough to eat
+  8192 and truncate the JSON (a `too_long` failure); the other lenses keep 8192 (tiny output, focused grounding).
+  **A `maxTokens > 21333` FORCES streaming:** the SDK throws an instant client-side `"Streaming is required…"`
+  (→ a generic `api` failure) for a NON-streaming call whose budget could outlast its 10-min timeout
+  (`(3600·max_tokens)/128000 > 600`), so `structuredCall` sends any call above `NONSTREAMING_MAX_TOKENS` via
+  `messages.stream().finalMessage()` (same Message shape downstream); calls ≤ that stay on `messages.create`. `continuity.service.runContinuity` gathers → runs the checks → (key+online) runs the AI pass
+  (fake seam `fakeContinuity`) → maps raw findings to real ids → merges + sorts by severity. **The result
+  ALWAYS returns the deterministic findings**; the AI part reports its own `ai: {status: skipped|failed|ok}`
+  (`ContinuityResult` has no hard ok/fail — the tool is useful with no key). Findings link the entities (jump
+  to Codex) + carry an optional `suggestedFix`. **DETERMINISTIC findings also carry a structured one-click
+  `fix`** (`ContinuityFixAction` = `set-lifecycle` | `sever-tie`; faction-conflict offers one per tie): the card
+  renders a button per `fix.actions`, `use-continuity.applyFix` dispatches to the EXISTING `ledger.entity.update`
+  / `ledger.link.sever` IPC (no AI, no key), `bumpEntities()`, then optimistically prunes the finding (no
+  re-run → no AI re-cost). AI findings stay advisory (no `fix`); NOTHING edits notes. Button-driven view
+  (`ContinuityView`, no query box) with a `speed` toggle; `LensPromptInfo` gained an optional `queryLabel`
+  ("What it checks"). v1 audits the LIVE "now" picture (as-of audit reserved). No migration.
 - **Three AI lenses, two shapes.** Recall (**Lore**) *streams* prose with citations; Suggest (**Counsel**)
   and Converse (ADR-025 → **ADR-034** → **ADR-049**) are *single-shot structured* — `structuredArrayCall` → a
   discriminated-union result, no stream, no citations. Converse now emits **questions ONLY** (no briefing): a

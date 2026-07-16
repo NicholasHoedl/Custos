@@ -3,6 +3,7 @@ import type { RawExtraction } from '@shared/import-types'
 import type { RawEnrichment } from '@shared/enrich-types'
 import type { MomentSuggestion, StorySuggestion } from '@shared/suggest-types'
 import type { ConverseQuestion } from '@shared/converse-types'
+import type { RawContinuityFinding } from '@shared/continuity-types'
 import type { DerivedProfile } from '@shared/derive-profile-types'
 
 // TEST-ONLY fake-AI seam (ROADMAP P2-6, ADR-041). When `LEDGER_FAKE_AI` is set AND the app is not
@@ -156,6 +157,22 @@ export function fakeConverse(): ConverseQuestion[] {
       question: 'What is the one thing you are hoping no one here finds out?',
       tag: 'secret-seeking',
       read: 'A high-cost probe — worth the risk only after some rapport.'
+    }
+  ]
+}
+
+/** Continuity: one canned AI contradiction finding (entityRefs empty so it survives id-resolution against
+ *  any seeded campaign; the deterministic checks run for real alongside it). */
+export function fakeContinuity(): RawContinuityFinding[] {
+  return [
+    {
+      category: 'contradiction',
+      severity: 'high',
+      summary: 'Two notes disagree about where the Sword of Souls ended up',
+      detail:
+        'One note says the party recovered the sword; a later note says it was lost in the river. Both can’t be true.',
+      entityRefs: [],
+      suggestedFix: 'Reconcile the two notes — decide where the sword actually ended up.'
     }
   ]
 }
