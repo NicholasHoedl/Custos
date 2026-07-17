@@ -19,6 +19,17 @@ extraResources:
     to: drizzle
 win:
   target: nsis
+# Installs as a normal per-user Windows program — the user double-clicks the installer (no terminal, no
+# admin), it drops Start-menu + desktop shortcuts and launches the app, and thereafter they open it from
+# its shortcut like any other program. These pin electron-builder's friendly NSIS defaults so the
+# behavior is explicit and won't drift.
+nsis:
+  oneClick: true # double-click → installs + launches; no wizard to click through
+  perMachine: false # per-user install under %LOCALAPPDATA% — no administrator prompt
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true # open Custos as soon as the install completes
+  shortcutName: Custos
 # Auto-update feed (P2-1, ADR-042). electron-builder emits latest.yml alongside the installer, and
 # `--publish always` (the CI release job) uploads them to the GitHub Release for the pushed tag.
 # electron-updater reads latest.yml from the repo's PUBLIC Releases (no auth). Owner/repo must match the

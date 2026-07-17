@@ -7,34 +7,35 @@ as of *any* session.
 
 Everything lives on your machine. Retrieval runs offline; only the written answers call Claude.
 
-## The three pillars
+## The main loop
 
-- **Codex** — entry of entities (a full per-type profile form), notes, and links, organized per
-  campaign and session. An OS-global hotkey (`Ctrl+Alt+L`) opens the add-entity form from anywhere.
-- **Lore** — ask a natural-language question; get a cited, streamed answer synthesized from the
-  relevant notes (semantic search over local embeddings).
-- **Counsel** — narrative ideas for the moment (four plain-English options that fit your main character) or
-  open-ended directions for where to take the story next.
+Custos is built around one night-to-night loop (the same one its in-app Quickstart teaches):
 
-Built on top of these:
+1. **Chronicle** — jot down what happens at the table, one plain line at a time. This is the view you
+   live in during a session.
+2. **Extract** — turn a session's log into structured entities, notes, and status changes in a single AI
+   pass, reviewed before anything is saved.
+3. **Illuminate** — the Keeper re-reads everything known about each entity the session touched and fills
+   in the relationships and profile details the notes support (again, review-gated).
+4. **Ask** — **Lore** answers natural-language questions with citations from your own notes; **Counsel**
+   offers narrative options for the moment; **Converse** gives you in-character questions to draw an NPC
+   (or a fellow party member) out. Every answer is grounded in what you've captured, in your main
+   character's voice, reconstructed as of *any* session.
+
+## The rest of the app
 
 - **Home** — the default landing view: your campaign at a glance — who you're playing, a "previously
   on…" recap of the last session, what needs doing before the next one, open threads (quests and
   rumors), a mini relationship map, and a box to ask the Keeper.
-- **Character page** — every campaign has one **main character** (the hero you play and the voice the
-  Keeper speaks in); a dashboard manages their profile, persona, and voice examples, and a
-  **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties
-  your backstory implies — all review-gated.
-- **Converse** — pick a character to talk *with* (an NPC or a fellow party member) and get a spread of
-  tagged, in-character questions to draw them out, from safe openers to pointed probes; name a thread to
-  steer them, then feed back what they say for follow-ups.
-- **Chronicle** — jot plain lines of what happened, one at a time; this is the view you live in during a
-  session. Its header hosts the active-session switcher.
-- **Sessions** — browse each session with its summary and a "previously on…" recap, and run the
-  per-session AI tools: **Extract** turns the raw log into entities, notes, and status changes;
-  **Illuminate** re-reads everything known about each entity the session touched and fills in the profile
-  details and relationship ties the notes support; **Transcribe** pastes in outside notes; and **Insert
-  before** backfills an earlier session if you started tracking mid-campaign.
+- **Codex** — the world library: add and browse every person, place, faction, quest, item, event, and
+  creature through a full per-type profile form. An OS-global hotkey (`Ctrl+Alt+L`) opens the add-entity
+  form from anywhere.
+- **Character page** — every campaign has one main character; a dashboard manages their profile, persona,
+  and voice examples, and a **Draft-from-backstory** tool derives the profile *and* proposes the people,
+  places, notes, and ties your backstory implies — all review-gated.
+- **Sessions** — browse each session with its summary and recap; alongside Extract and Illuminate,
+  **Transcribe** pastes in outside notes and **Insert before** backfills an earlier session if you
+  started tracking mid-campaign.
 - **Web** — a live force-directed graph of the campaign's relationships you can filter, focus, and rewind
   session by session.
 - **Continuity** — a read-only audit that flags contradictions in your records (a fallen character still
@@ -50,15 +51,21 @@ Drizzle ORM · local sentence embeddings + cross-encoder reranking via `@hugging
 
 ## Download & install
 
-Grab the latest `Custos Setup X.Y.Z.exe` from the [Releases](https://github.com/NicholasHoedl/Custos/releases)
-page and run it (a per-user install, no admin needed). The installer is **not yet code-signed**, so
-Windows SmartScreen may warn about an "unknown publisher" — choose **More info → Run anyway**. Once
-installed, Custos **updates itself**: it checks for new releases on launch and installs them in the
-background, and you can check manually from **Settings → Your data → Check for updates**.
+**This is how to run Custos — no terminal, no developer tools.** Grab the latest
+`Custos Setup X.Y.Z.exe` from the [Releases](https://github.com/NicholasHoedl/Custos/releases) page and
+**double-click it**. It installs like any Windows program — a per-user install (no administrator prompt)
+that adds a **Start-menu and desktop shortcut** and opens the app when it finishes. After that you launch
+Custos by clicking its shortcut, exactly like any other application.
 
-## Getting started (from source)
+The installer is **not yet code-signed**, so the first time you run it Windows SmartScreen may warn about
+an "unknown publisher" — choose **More info → Run anyway** (a one-time click). Once installed, Custos
+**updates itself**: it checks for new releases on launch and installs them in the background, and you can
+also check manually from **Settings → Your data → Check for updates**.
 
-Requires Node 22 and (for the AI features) an Anthropic API key.
+## Building from source (developers only)
+
+Everything below is for building or hacking on Custos itself — **players don't need any of this; just use
+the installer above.** Requires Node 22 and (for the AI features) an Anthropic API key.
 
 ```bash
 npm install        # postinstall rebuilds better-sqlite3 for the Electron ABI
