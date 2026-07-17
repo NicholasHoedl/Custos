@@ -43,12 +43,6 @@ Custos is built around one night-to-night loop (the same one its in-app Quicksta
 - A global **command palette** (`Ctrl+K` — jump to any view or find any entity), and **chronology**
   throughout: the world reconstructed "as of session N" with no future-knowledge leak.
 
-## Stack
-
-Electron · React 19 · TypeScript · Tailwind 4 + shadcn/ui · Zustand · SQLite (better-sqlite3) +
-Drizzle ORM · local sentence embeddings + cross-encoder reranking via `@huggingface/transformers`
-(`Alibaba-NLP/gte-base-en-v1.5`) · the Anthropic SDK (main-process only). Windows-first.
-
 ## Download & install
 
 **This is how to run Custos — no terminal, no developer tools.** Grab the latest
@@ -62,39 +56,20 @@ an "unknown publisher" — choose **More info → Run anyway** (a one-time click
 **updates itself**: it checks for new releases on launch and installs them in the background, and you can
 also check manually from **Settings → Your data → Check for updates**.
 
-## Building from source (developers only)
+## First run
 
-Everything below is for building or hacking on Custos itself — **players don't need any of this; just use
-the installer above.** Requires Node 22 and (for the AI features) an Anthropic API key.
+The first time you open Custos, a short guided tour walks you through creating your campaign and its main
+character. Capture works right away — but the AI features need your own **Anthropic API key** (get one at
+[console.anthropic.com](https://console.anthropic.com/settings/keys)) and a one-time download of the local
+search model (~230 MB):
 
-```bash
-npm install        # postinstall rebuilds better-sqlite3 for the Electron ABI
-npm run dev         # launch the app with hot reload
-```
+- **Lore** and **Counsel** need both the key and the search model.
+- **Converse** and the **Character** tools need only the key.
+- **Continuity**'s automatic checks — and all your capture (Chronicle, Codex, Sessions) — work with neither.
 
-On first launch a short guided tutorial walks you through creating a campaign (each is created with its
-**main character** — the hero you play), then adding your API key (you can skip it for now) and
-downloading the local search model (~230 MB — a long-context embedder plus a reranker). The key is stored
-encrypted via Electron safeStorage — it never leaves your machine except to call Anthropic. Codex capture
-works without either; Lore and Counsel need both the key and the model; Converse and the Character tools
-need only the key; Continuity's automatic consistency checks run with neither.
-
-## Scripts
-
-| Command | What it does |
-|---|---|
-| `npm run dev` | Run the app with hot reload |
-| `npm run build` | Typecheck + build the production bundle |
-| `npm run dist` | Build the Windows installer into `dist/` (unsigned by default — see [`RELEASING.md`](RELEASING.md)) |
-| `npm test` | Run the unit + integration suite (Vitest, under Electron-as-Node) |
-| `npm run test:e2e` | Build + run the Playwright end-to-end tests |
-| `npm run typecheck` | Type-check the main + renderer projects |
-| `npm run lint` | ESLint |
-| `npm run format` | Format the codebase with Prettier |
-| `npm run db:generate` | Generate a new Drizzle migration from schema changes |
-| `npm run rebuild` | Rebuild the native `better-sqlite3` binding for the current Electron ABI |
-| `npm start` | Preview the built production bundle (`electron-vite preview`) |
-| `npm run test:watch` | Run the Vitest suite in watch mode |
+Your key is stored **encrypted on your device** and is only ever used to call Anthropic directly — it never
+passes through anyone else's servers. You can skip it during setup and add or change it anytime in
+**Settings**.
 
 ## Your data
 
@@ -108,17 +83,6 @@ Everything is stored under the app's user-data directory (`%APPDATA%\Custos` on 
 - `anthropic.key.enc` — your encrypted API key.
 - `usage.json` — AI token-usage + cost totals in monthly buckets (the Settings "AI usage" card).
 - `window-state.json` — the persisted window position and size.
-
-## Documentation
-
-- [`SPEC.md`](SPEC.md) — product spec; §10 lists everything delivered beyond the MVP.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system architecture and module layout.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — the current roadmap (the post-MVP "professionalization" arc, P0–P2).
-- [`ROADMAP.md`](ROADMAP.md) — the original, now-historical MVP plan (kept because the ADRs and SPEC cite
-  its item codes; superseded for forward planning by `docs/ROADMAP.md`).
-- [`docs/adr/`](docs/adr/README.md) — Architecture Decision Records: the *why* behind the
-  significant choices.
-- [`docs/design/`](docs/design) — design docs for the larger features (e.g. Chronology).
 
 ## License
 
