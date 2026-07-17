@@ -9,9 +9,9 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 
 ## The main loop
 
-Custos is built around one night-to-night loop (the same one its in-app Quickstart teaches):
+Custos is built around one night-to-night loop:
 
-1. **Chronicle** — jot down what happens at the table, one plain line at a time. This is the view you
+1. **Chronicle** — jot down what happens at the table. This is the view you
    live in during a session.
 2. **Extract** — turn a session's log into structured entities, notes, and status changes in a single AI
    pass, reviewed before anything is saved.
@@ -45,7 +45,7 @@ Custos is built around one night-to-night loop (the same one its in-app Quicksta
 
 ## Download & install
 
-**This is how to run Custos — no terminal, no developer tools.** Grab the latest
+**This is how to run Custos** Grab the latest
 `Custos Setup X.Y.Z.exe` from the [Releases](https://github.com/NicholasHoedl/Custos/releases) page and
 **double-click it**. It installs like any Windows program — a per-user install (no administrator prompt)
 that adds a **Start-menu and desktop shortcut** and opens the app when it finishes. After that you launch
