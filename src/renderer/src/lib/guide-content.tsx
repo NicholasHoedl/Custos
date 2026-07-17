@@ -174,7 +174,7 @@ export const API_KEY_STEPS: string[] = [
 /** The welcome page — the spotlight tutorial's only full-screen step (ADR-059). */
 export const WELCOME_COPY = {
   title: 'Welcome to Custos',
-  body: 'Custos is a keeper of campaigns — it remembers your story so you can ask it anything later. Before we set up your first campaign: what should the Keeper call you?'
+  body: 'Custos means keeper - in this case, it means a keeper of your TTRPG campaigns. This application utilizes AI to build and remember your world as you progress and provides a suite of AI powered tools to interact with the data you save. As it stands, Custos remains largely untested and there are no doubt abundant opportunities for improvements. In the settings page there is a feedback section whereby you can report bugs and request new features - this feedback would be very useful for future versions of Custos and would be greatly appreciated. Thank you, and have fun!'
 }
 
 /** Coach-mark copy for each spotlight step (ADR-059, expanded per-page by ADR-060). The tour renders
@@ -263,5 +263,5 @@ export const SPOTLIGHT_COPY: Record<TutorialStepId, { title: string; body: strin
 /** The closing message on the tour's final review card (ADR-060). */
 export const REVIEW_COPY = {
   message:
-    'Good hunting out there — write down what happens, and the Keeper will remember the rest.'
+    'Good Luck! Remember to give feedback - everything helps!'
 }
