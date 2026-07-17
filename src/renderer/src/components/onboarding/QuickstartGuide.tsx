@@ -102,7 +102,7 @@ export function QuickstartGuide({
               <span className="text-foreground">Counsel</span>, and{' '}
               <span className="text-foreground">Converse</span> — need an Anthropic API key, which
               you add in Settings. Lore and Counsel also use the local search model, a one-time
-              download of about 25&nbsp;MB, also in Settings.
+              download of about 225&nbsp;MB, also in Settings.
             </p>
             <p className="text-sm font-medium text-foreground">To get an API key:</p>
             <ol className="list-decimal space-y-1.5 rounded-md border border-border bg-background/50 py-2 pl-7 pr-3 text-sm text-muted-foreground">

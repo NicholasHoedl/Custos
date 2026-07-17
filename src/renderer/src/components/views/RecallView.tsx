@@ -126,7 +126,7 @@ export function RecallView() {
             title={
               setupError ? 'Model download failed' : 'Finish setup: download the local search model'
             }
-            body={setupError ?? 'A one-time ~30 MB download enables offline semantic search.'}
+            body={setupError ?? 'A one-time ~225 MB download enables offline semantic search.'}
             action={
               progress?.status === 'downloading' || downloading ? (
                 <ProgressBar progress={progress} />

@@ -188,7 +188,7 @@ export function SuggestView() {
               setupError ? 'Model download failed' : 'Finish setup: download the local search model'
             }
             body={
-              setupError ?? 'A one-time ~30 MB download lets Counsel find the relevant context.'
+              setupError ?? 'A one-time ~225 MB download lets Counsel find the relevant context.'
             }
             action={
               progress?.status === 'downloading' || downloading ? (
