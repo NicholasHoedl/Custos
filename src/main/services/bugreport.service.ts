@@ -8,7 +8,8 @@ import {
   BUG_REPORT_ENDPOINT,
   BUG_REPORT_TOKEN,
   type BugReportRequest,
-  type BugReportResult
+  type BugReportResult,
+  type FeatureRequestRequest
 } from '@shared/ipc-types'
 import type { DbContext } from './db-context'
 import { listEntities } from './entity.service'
@@ -139,21 +140,109 @@ export function buildReportPayload(req: BugReportRequest): Record<string, unknow
   }
 }
 
-/** POST the report to the deployed worker. Throws on ANY failure (timeout/offline/non-2xx) — the
- *  caller falls back to the mail-draft flow, so a dead endpoint can never lose a report. */
-async function sendReport(req: BugReportRequest, endpoint: string, token: string): Promise<void> {
+/** POST a JSON payload to the deployed intake worker with the shared spam-gate token. Throws on ANY
+ *  failure (timeout/offline/non-2xx) — every caller falls back to the mail-draft flow, so a dead
+ *  endpoint can never lose a submission. Shared by bug reports AND feature requests (ADR-064). */
+async function postToWorker(
+  payload: Record<string, unknown>,
+  endpoint: string,
+  token: string
+): Promise<void> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 15_000) // a hung request must not hang Submit
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-custos-report': token },
-      body: JSON.stringify(buildReportPayload(req)),
+      body: JSON.stringify(payload),
       signal: ctrl.signal
     })
     if (!res.ok) throw new Error(`report endpoint answered ${res.status}`)
   } finally {
     clearTimeout(timer)
+  }
+}
+
+// ---- Feature requests (ADR-064) — a different email KIND to the same inbox/worker/token; no
+// screenshots or diagnostics, a problem + a proposed feature instead of a bug description. ----
+
+/** The JSON body POSTed for a feature request. `kind:'feature'` makes the worker use the feature subject
+ *  + Problem/Proposed-feature layout (an older worker ignores it and would fall back to the bug path). */
+export function buildFeaturePayload(req: FeatureRequestRequest): Record<string, unknown> {
+  return {
+    kind: 'feature',
+    name: req.name,
+    replyTo: req.replyTo ?? '',
+    problem: req.problem,
+    proposedFeature: req.proposedFeature,
+    appVersion: app.getVersion()
+  }
+}
+
+/** The request.txt body written on the mailto fallback path. */
+export function formatFeatureText(req: FeatureRequestRequest): string {
+  return [
+    'Custos feature request',
+    `From: ${req.name.trim() || 'anonymous'}`,
+    '',
+    '--- Problem ---',
+    req.problem.trim() || '(none given)',
+    '',
+    '--- Proposed feature ---',
+    req.proposedFeature.trim() || '(none given)',
+    ''
+  ].join('\n')
+}
+
+/** The prefilled feature-request draft (fallback only). Feature requests have no attachments, so the
+ *  body carries both fields directly — capped, with the overflow in the revealed request.txt. */
+export function buildFeatureMailtoUrl(
+  name: string,
+  problem: string,
+  proposedFeature: string
+): string {
+  const from = name.trim()
+  const subject = `[Custos] Feature request${from ? ` from ${from}` : ''}`
+  let body = `Problem:\n${problem.trim()}\n\nProposed feature:\n${proposedFeature.trim()}\n`
+  if (body.length > MAILTO_BODY_CHARS)
+    body = `${body.slice(0, MAILTO_BODY_CHARS)}… (cut off — the full text is in the attached request.txt)\n`
+  return `mailto:${BUG_REPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
+/** Submit a feature request — mirrors submitBugReport (POST-first, nothing on disk when delivered;
+ *  fallback writes request.txt + opens a mailto draft + reveals the folder). `cfg` exists for tests. */
+export async function submitFeatureRequest(
+  req: FeatureRequestRequest,
+  cfg: { endpoint: string; token: string } = { endpoint: BUG_REPORT_ENDPOINT, token: BUG_REPORT_TOKEN }
+): Promise<BugReportResult> {
+  try {
+    if (cfg.endpoint) {
+      try {
+        await postToWorker(buildFeaturePayload(req), cfg.endpoint, cfg.token)
+        return { ok: true, sent: true, dir: null, mailOpened: false } // delivered — nothing on disk
+      } catch (err) {
+        log.warn('featurerequest: auto-send failed — falling back to the mail draft', err)
+      }
+    }
+
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')
+    const dir = join(app.getPath('userData'), 'feature-requests', stamp)
+    mkdirSync(dir, { recursive: true })
+    const requestPath = join(dir, 'request.txt')
+    writeFileSync(requestPath, formatFeatureText(req), 'utf-8')
+
+    let mailOpened = true
+    try {
+      await shell.openExternal(buildFeatureMailtoUrl(req.name, req.problem, req.proposedFeature))
+    } catch (err) {
+      mailOpened = false // no mail client — the dialog falls back to "copy the request"
+      log.warn('featurerequest: could not open a mail draft', err)
+    }
+    shell.showItemInFolder(requestPath)
+    return { ok: true, sent: false, dir, mailOpened }
+  } catch (err) {
+    log.error('featurerequest: submit failed', err)
+    return { ok: false, error: String(err) }
   }
 }
 
@@ -169,7 +258,7 @@ export async function submitBugReport(
     // Auto-send first: a delivered report leaves no local copy (user preference).
     if (cfg.endpoint) {
       try {
-        await sendReport(req, cfg.endpoint, cfg.token)
+        await postToWorker(buildReportPayload(req), cfg.endpoint, cfg.token)
         return { ok: true, sent: true, dir: null, mailOpened: false } // delivered — nothing on disk
       } catch (err) {
         log.warn('bugreport: auto-send failed — falling back to the mail draft', err)

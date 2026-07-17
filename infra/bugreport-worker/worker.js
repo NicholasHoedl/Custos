@@ -1,7 +1,9 @@
 /* global Response, fetch */
-// Custos bug-report intake (ADR-058). Receives the app's POST, gates on a shared token, and forwards
-// the report to the dev inbox via Resend with the screenshots attached. Deploy from this folder with
-// `npx wrangler deploy` — README.md has the full walkthrough.
+// Custos feedback intake (ADR-058/064). Receives the app's POST, gates on a shared token, and forwards
+// it to the dev inbox via Resend. TWO kinds share this worker/token/inbox: a BUG REPORT (default —
+// description + diagnostics + screenshot attachments) and a FEATURE REQUEST (`kind:'feature'` — a
+// problem + a proposed feature, no attachments), each with its own subject + body. Deploy from this
+// folder with `npx wrangler deploy` — README.md has the full walkthrough.
 //
 // Secrets (set once each with `npx wrangler secret put <NAME>`):
 //   RESEND_API_KEY — from resend.com → API Keys. Lives only on Cloudflare, never in the app.
@@ -33,17 +35,29 @@ export default {
       return json({ ok: false, error: 'invalid JSON' }, 400)
     }
 
+    // `kind` is absent on older app builds ⇒ treated as a bug report (backward-compatible).
+    const kind = str(body.kind, 20)
+    const isFeature = kind === 'feature'
     const name = str(body.name, 200).trim()
     const replyTo = str(body.replyTo, 200).trim()
     const description = str(body.description, 20_000).trim()
     const diagnostics = str(body.diagnostics, 120_000)
     const appVersion = str(body.appVersion, 50)
-    if (!description) return json({ ok: false, error: 'description required' }, 400)
+    const problem = str(body.problem, 20_000).trim()
+    const proposedFeature = str(body.proposedFeature, 20_000).trim()
 
-    // Screenshots arrive as { filename, content(base64) }; cap count + total size, sanitize names.
+    if (isFeature) {
+      if (!problem && !proposedFeature)
+        return json({ ok: false, error: 'problem or proposedFeature required' }, 400)
+    } else if (!description) {
+      return json({ ok: false, error: 'description required' }, 400)
+    }
+
+    // Screenshots (bug reports only) arrive as { filename, content(base64) }; cap count + total size.
     const attachments = []
     let total = 0
-    for (const s of Array.isArray(body.screenshots) ? body.screenshots.slice(0, MAX_SHOTS) : []) {
+    const shots = isFeature || !Array.isArray(body.screenshots) ? [] : body.screenshots.slice(0, MAX_SHOTS)
+    for (const s of shots) {
       if (!s || typeof s.filename !== 'string' || typeof s.content !== 'string') continue
       total += s.content.length
       if (total > MAX_TOTAL_BASE64) break
@@ -53,20 +67,39 @@ export default {
       })
     }
 
-    const text = [
-      'Custos bug report',
-      `From: ${name || 'anonymous'}`,
-      replyTo ? `Reply-to: ${replyTo}` : null,
-      appVersion ? `App: v${appVersion}` : null,
-      '',
-      '--- What went wrong ---',
-      description,
-      diagnostics ? '' : null,
-      diagnostics ? '--- Diagnostics ---' : null,
-      diagnostics || null
-    ]
+    const text = (
+      isFeature
+        ? [
+            'Custos feature request',
+            `From: ${name || 'anonymous'}`,
+            replyTo ? `Reply-to: ${replyTo}` : null,
+            appVersion ? `App: v${appVersion}` : null,
+            '',
+            '--- Problem ---',
+            problem || '(none given)',
+            '',
+            '--- Proposed feature ---',
+            proposedFeature || '(none given)'
+          ]
+        : [
+            'Custos bug report',
+            `From: ${name || 'anonymous'}`,
+            replyTo ? `Reply-to: ${replyTo}` : null,
+            appVersion ? `App: v${appVersion}` : null,
+            '',
+            '--- What went wrong ---',
+            description,
+            diagnostics ? '' : null,
+            diagnostics ? '--- Diagnostics ---' : null,
+            diagnostics || null
+          ]
+    )
       .filter((line) => line !== null)
       .join('\n')
+
+    const subject = isFeature
+      ? `[Custos] Feature request${name ? ` from ${name}` : ''}`
+      : `[Custos] Bug report${name ? ` from ${name}` : ''}`
 
     const email = {
       // Resend's built-in test sender delivers only TO the Resend account owner's address — which is
@@ -75,7 +108,7 @@ export default {
       // Lowercased: Resend's no-domain restriction compares the recipient against the account
       // owner's address CASE-SENSITIVELY (custosservice@outlook.com) — mixed case gets a 403.
       to: [(env.TO_EMAIL || 'custosservice@outlook.com').toLowerCase()],
-      subject: `[Custos] Bug report${name ? ` from ${name}` : ''}`,
+      subject,
       text,
       attachments
     }

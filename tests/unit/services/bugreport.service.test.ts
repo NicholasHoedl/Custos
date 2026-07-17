@@ -31,10 +31,13 @@ vi.mock('../../../src/main/services/session.service', () => ({ listSessions: () 
 import { shell } from 'electron'
 import { BUG_REPORT_EMAIL } from '@shared/ipc-types'
 import {
+  buildFeatureMailtoUrl,
   buildMailtoUrl,
   dataUrlToImage,
+  formatFeatureText,
   formatReportText,
-  submitBugReport
+  submitBugReport,
+  submitFeatureRequest
 } from '../../../src/main/services/bugreport.service'
 
 const scratch = join(tmpdir(), 'custos-bugreport-test')
@@ -202,5 +205,94 @@ describe('submitBugReport auto-send (ADR-058)', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+})
+
+// ---- Feature requests (ADR-064) — a distinct email KIND to the same worker/inbox. ----
+
+describe('buildFeatureMailtoUrl', () => {
+  it('uses a feature-request subject and carries both fields in the body', () => {
+    const url = buildFeatureMailtoUrl('Nick', 'Notes are hard to find', 'Add full-text search')
+    expect(url.startsWith(`mailto:${BUG_REPORT_EMAIL}?subject=`)).toBe(true)
+    const decoded = decodeURIComponent(url)
+    expect(decoded).toContain('Feature request from Nick')
+    expect(decoded).toContain('Notes are hard to find')
+    expect(decoded).toContain('Add full-text search')
+  })
+})
+
+describe('formatFeatureText', () => {
+  it('carries name + a Problem and Proposed-feature section', () => {
+    const text = formatFeatureText({
+      name: 'Nick',
+      problem: 'Too many clicks',
+      proposedFeature: 'A shortcut'
+    })
+    expect(text).toContain('Custos feature request')
+    expect(text).toContain('From: Nick')
+    expect(text).toContain('--- Problem ---')
+    expect(text).toContain('Too many clicks')
+    expect(text).toContain('--- Proposed feature ---')
+    expect(text).toContain('A shortcut')
+  })
+})
+
+describe('submitFeatureRequest', () => {
+  const CFG = { endpoint: 'https://custos-bugreport.example.workers.dev/', token: 'tok' }
+
+  it('POSTs kind:feature with the token header and writes nothing on success', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const res = await submitFeatureRequest(
+        {
+          name: 'Nick',
+          replyTo: 'nick@example.com',
+          problem: 'Notes are hard to find',
+          proposedFeature: 'Add search'
+        },
+        CFG
+      )
+      expect(res.ok).toBe(true)
+      if (!res.ok) return
+      expect(res.sent).toBe(true)
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [
+        string,
+        { headers: Record<string, string>; body: string }
+      ]
+      expect(url).toBe(CFG.endpoint)
+      expect(init.headers['x-custos-report']).toBe('tok')
+      const payload = JSON.parse(init.body)
+      expect(payload.kind).toBe('feature')
+      expect(payload.problem).toBe('Notes are hard to find')
+      expect(payload.proposedFeature).toBe('Add search')
+      expect(payload.replyTo).toBe('nick@example.com')
+      expect(payload.appVersion).toBe('9.9.9')
+      expect(payload.screenshots).toBeUndefined() // feature requests carry no attachments
+      // delivered → nothing on disk, no mail draft
+      expect(res.dir).toBeNull()
+      expect(vi.mocked(shell.openExternal)).not.toHaveBeenCalled()
+      expect(existsSync(join(scratch, 'feature-requests'))).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('falls back to a request.txt bundle + mail draft when the endpoint is disabled', async () => {
+    const res = await submitFeatureRequest(
+      { name: 'Nick', problem: 'Too slow', proposedFeature: 'Cache it' },
+      { endpoint: '', token: '' }
+    )
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.sent).toBe(false)
+    if (!res.dir) throw new Error('the fallback must write the bundle dir')
+    const requestPath = join(res.dir, 'request.txt')
+    expect(existsSync(requestPath)).toBe(true)
+    const text = readFileSync(requestPath, 'utf-8')
+    expect(text).toContain('Too slow')
+    expect(text).toContain('Cache it')
+    expect(vi.mocked(shell.openExternal)).toHaveBeenCalledWith(expect.stringMatching(/^mailto:/))
+    expect(vi.mocked(shell.showItemInFolder)).toHaveBeenCalledWith(requestPath)
   })
 })

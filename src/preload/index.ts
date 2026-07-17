@@ -143,6 +143,9 @@ const api: LedgerApi = {
     diagnostics: (campaignId, view) => ipcRenderer.invoke(IPC.bugreportDiagnostics, campaignId, view),
     submit: (req) => ipcRenderer.invoke(IPC.bugreportSubmit, req)
   },
+  featurerequest: {
+    submit: (req) => ipcRenderer.invoke(IPC.featureRequestSubmit, req)
+  },
   update: {
     check: () => ipcRenderer.invoke(IPC.updateCheck),
     install: () => ipcRenderer.invoke(IPC.updateInstall)

@@ -499,6 +499,13 @@ Illuminate → Ask), every tool, and how to get set up (including where to get a
 out-of-the-way **"Guide"** button at the bottom of the sidebar. It's where the capture→close-out loop is
 taught now that the first-run tutorial no longer runs it.
 
+**Feedback — report a bug or request a feature** (ADR-057/058/064) — a Settings "Feedback" section sends
+either straight to the developer by email: a **bug report** (description + auto-attached diagnostics +
+screenshots) or a **feature request** (a problem + a proposed feature). Both auto-send through a small
+Cloudflare Worker → Resend to the dev inbox, each as its own kind of email, with an offline/failure
+fallback to a prefilled mail draft + a bundle folder. The app's one deliberate non-Anthropic egress —
+user-initiated and labeled.
+
 **Insert session before** (ADR-062) — backfill for mid-campaign adopters: an **"Insert before"** action
 on the Sessions page adds a new empty session at any existing session's number, shifting that session and
 everything later (notes, chronicle entries, and all chronology stamps travel with them) up by one in a

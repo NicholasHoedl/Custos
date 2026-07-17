@@ -292,6 +292,11 @@ export interface LedgerApi {
     /** Auto-send the report (or fall back to the bundle + prefilled email draft). */
     submit(req: BugReportRequest): Promise<BugReportResult>
   }
+  featurerequest: {
+    /** Send a feature request — a different email KIND to the same inbox (ADR-064); same POST-first +
+     *  mailto-fallback path as bug reports, minus screenshots/diagnostics. */
+    submit(req: FeatureRequestRequest): Promise<BugReportResult>
+  }
   update: {
     /** Manually check for an update (Settings button). Progress arrives via `onUpdateStatus`. A no-op
      *  that reports `disabled` in dev/unpackaged builds (P2-1). */
@@ -399,6 +404,7 @@ export const IPC = {
   appBackupNow: 'app:backup-now',
   bugreportDiagnostics: 'bugreport:diagnostics',
   bugreportSubmit: 'bugreport:submit',
+  featureRequestSubmit: 'featurerequest:submit',
   usageSummary: 'usage:summary',
   updateCheck: 'update:check',
   updateInstall: 'update:install'
@@ -456,10 +462,23 @@ export interface BugReportRequest {
 /** `sent: true` = delivered through the intake worker (ADR-058) — nothing written to disk (`dir` is
  *  null; no local copy by design). `sent: false` = the email fallback ran: the bundle was written to
  *  `dir` for drag-in, and `mailOpened: false` means no mail client took the draft (dialog offers
- *  copy-and-send instead). */
+ *  copy-and-send instead). Shared by bug reports AND feature requests (ADR-064). */
 export type BugReportResult =
   | { ok: true; sent: boolean; dir: string | null; mailOpened: boolean }
   | { ok: false; error: string }
+
+/** What the renderer submits from the "Request a feature" dialog (ADR-064) — a distinct email KIND to the
+ *  same inbox/worker as bug reports. No screenshots or diagnostics; carries a problem + a proposed fix. */
+export interface FeatureRequestRequest {
+  /** Who sent it (prefilled from settings.userName); empty = anonymous. */
+  name: string
+  /** Optional reply address (never required) — wired to the sent email's reply-to. */
+  replyTo?: string
+  /** The problem/pain the user is dealing with. */
+  problem: string
+  /** The change or feature they'd like to see to address it. */
+  proposedFeature: string
+}
 
 // ---- One-way streaming channels: main -> renderer (Recall). Payloads are requestId-tagged. ----
 export const RECALL_CHUNK_CHANNEL = 'stream:chunk'

@@ -10,6 +10,8 @@ import {
   FileUp,
   FolderOpen,
   KeyRound,
+  Lightbulb,
+  MessagesSquare,
   Palette,
   RefreshCw,
   RotateCw,
@@ -32,6 +34,7 @@ import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Separator } from '@renderer/components/ui/separator'
 import { BugReportDialog } from '@renderer/components/BugReportDialog'
+import { FeatureRequestDialog } from '@renderer/components/FeatureRequestDialog'
 import { PaneBody, PaneHeader, ProgressBar } from '@renderer/components/chrome'
 import {
   Select,
@@ -77,6 +80,7 @@ export function SettingsView() {
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
   const [bugOpen, setBugOpen] = useState(false)
+  const [featureOpen, setFeatureOpen] = useState(false)
 
   useEffect(() => {
     ledger.apikey
@@ -596,20 +600,27 @@ export function SettingsView() {
 
         <Separator />
 
-        <section className="space-y-3" data-tour="report-bug">
+        <section className="space-y-3" data-tour="feedback">
           <div className="flex items-center gap-2">
-            <Bug className="size-4 text-primary" />
-            <h2 className="font-display text-lg font-medium text-foreground">Report a bug</h2>
+            <MessagesSquare className="size-4 text-primary" />
+            <h2 className="font-display text-lg font-medium text-foreground">Feedback</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Something broken or behaving oddly? Send what went wrong — with screenshots and
-            diagnostics — straight to the developer.
+            Something broken, or an idea for a change? Send it straight to the developer — a bug
+            report with screenshots and diagnostics, or a feature request.
           </p>
-          <Button size="sm" variant="outline" onClick={() => setBugOpen(true)}>
-            <Bug className="size-4" />
-            Report a bug…
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setBugOpen(true)}>
+              <Bug className="size-4" />
+              Report a bug…
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setFeatureOpen(true)}>
+              <Lightbulb className="size-4" />
+              Request a feature…
+            </Button>
+          </div>
           <BugReportDialog open={bugOpen} onOpenChange={setBugOpen} />
+          <FeatureRequestDialog open={featureOpen} onOpenChange={setFeatureOpen} />
         </section>
 
         <Separator />

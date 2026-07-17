@@ -429,7 +429,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   grouping derives from the as-of `graph.edges` (NOT `getHierarchy`, which is structural) so collapse is
   as-of-correct under the slider. Header counter stays campaign totals + a conditional `· N hidden`. No
   migration; renderer-only.
-- **Bug reports (ADR-057/058; launcher per ADR-060): a "Report a bug" SECTION on the SETTINGS page**
+- **Feedback = Report a bug + Request a feature (ADR-057/058/064): a "Feedback" SECTION on the SETTINGS
+  page** (`data-tour="feedback"`; renamed from "Report a bug" by ADR-064 — it now hosts BOTH buttons).
   (ADR-060 moved it out of the sidebar and REMOVED the window-snap-before-open + the whole
   `bugreport:capture` IPC — from Settings the snap only ever captured Settings; screenshots are attached
   by hand) opening `components/BugReportDialog.tsx`: name (prefilled from `settings.userName`) + optional
@@ -454,6 +455,17 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   ~1.2 KB, `formatReportText`, `dataUrlToImage`, `buildReportPayload`) are unit-tested incl. auto-send +
   fallback via a stubbed fetch; `tests/e2e/bugreport.spec.ts` guards launcher → capture → dialog → the
   description-gated submit. No migration; no new deps (the worker is plain JS deployed via npx wrangler).
+  **REQUEST A FEATURE (ADR-064)** is the section's second option: `components/FeatureRequestDialog.tsx` (the
+  bug dialog MINUS screenshots/diagnostics, PLUS two textareas — **problem** + **proposed feature**; gate =
+  both non-empty) → `ledger.featurerequest.submit` → `submitFeatureRequest` (same POST-first/mailto-fallback
+  shape via the shared `postToWorker`; fallback writes `feature-requests/<stamp>/request.txt`, no
+  attachments). It's a DIFFERENT EMAIL KIND on the SAME worker/token/inbox: the payload carries
+  `kind:'feature'` and the **worker branches** — subject `[Custos] Feature request`, a Problem/
+  Proposed-feature body, no attachments (an absent `kind` stays the bug path, backward-compatible).
+  **GOTCHA: the worker must be REDEPLOYED (`npx wrangler deploy`) before shipping the feature button** — an
+  old worker ignores `kind`/`problem`/`proposedFeature` and 400s (it still requires `description`). Tests:
+  feature cases in `bugreport.service.test.ts` (inject `{endpoint:'',token:''}` / a fake CFG — never the live
+  worker) + `tests/e2e/featurerequest.spec.ts` (both-fields gate). No migration; no new deps.
 - **Home — the dashboard + DEFAULT landing view (ADR-061, `views/HomeView.tsx`):** identity hero
   (campaign + MC `Portrait` + last-played) · "Previously…" (the SAME `SessionRecap` mounted for the
   latest session, key-gated) · needs-attention (unclosed-extract counts, setup nags, **two before-session-1

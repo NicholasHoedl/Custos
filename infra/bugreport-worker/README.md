@@ -1,9 +1,21 @@
-# Custos bug-report intake worker
+# Custos feedback intake worker
 
-Receives the app's bug-report POST and forwards it to **CustosService@outlook.com** as an email (via
-Resend) with the screenshots attached — so testers get one-click "Send report" instead of dragging
-files into a mail draft (ADR-058). Until this is deployed and the URL is baked into the app, the app
-automatically uses the old two-step email flow, so nothing is broken in the meantime.
+Receives the app's feedback POST and forwards it to **CustosService@outlook.com** as an email (via
+Resend) — so testers get one-click "Send" instead of dragging files into a mail draft (ADR-058).
+Until this is deployed and the URL is baked into the app, the app automatically uses the old two-step
+email flow, so nothing is broken in the meantime.
+
+**Two email kinds share this worker** (ADR-064), distinguished by a `kind` field in the POST body:
+- **Bug report** (default / `kind` absent) — description + diagnostics + screenshot attachments;
+  subject `[Custos] Bug report`.
+- **Feature request** (`kind: "feature"`) — a problem + a proposed feature, no attachments; subject
+  `[Custos] Feature request`.
+
+Same token, inbox, and sender for both. **If you're updating an already-deployed worker to add the
+feature-request kind, just re-run `npx wrangler deploy` from this folder** (Step 3) — the secrets and
+subdomain persist. An older deployed worker ignores the `kind`/`problem`/`proposedFeature` fields and
+would 400 a feature request (it still requires `description`), so deploy this version before shipping
+an app build that offers "Request a feature".
 
 Everything below is free at friends-cohort scale (Cloudflare Workers free: 100k requests/day; Resend
 free: ~100 emails/day).
@@ -73,7 +85,9 @@ curl -X POST https://custos-bugreport.<your-subdomain>.workers.dev/ \
 ```
 
 Expected: `{"ok":true}` and an email in CustosService@outlook.com within seconds (check junk the
-first time). Re-run without the `x-custos-report` header to confirm you get a `401`.
+first time). Re-run without the `x-custos-report` header to confirm you get a `401`. To smoke-test a
+feature request, add `\"kind\":\"feature\"` + `\"problem\":\"…\"` + `\"proposedFeature\":\"…\"` to the
+body (and drop `description`) — expect a `[Custos] Feature request` email.
 
 ## Step 6 — Turn auto-send on in the app
 
