@@ -1,2 +1,15 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Keep internal documentation + design files out of downloadable SOURCE ARCHIVES.
+# GitHub builds the "Download ZIP" (Code button) and a release's "Source code (zip/tar.gz)"
+# with `git archive`, which honors export-ignore — so these are stripped from those downloads.
+# NOTE: this does NOT affect `git clone`, and the files stay browsable in the GitHub web UI;
+# it only removes them from archive downloads. (The built app already excludes them too — see
+# electron-builder.yml.)
+/docs            export-ignore
+/SPEC.md         export-ignore
+/ARCHITECTURE.md export-ignore
+/ROADMAP.md      export-ignore
+/CLAUDE.md       export-ignore
+/RELEASING.md    export-ignore
