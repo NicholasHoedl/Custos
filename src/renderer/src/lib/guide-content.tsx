@@ -11,20 +11,20 @@ import type { ViewKey } from '@renderer/store/ui-store'
 /** One-line "what it's for" per nav view, keyed by `NAV_ITEMS.key`. Used by the tour + the guide. */
 export const TOOL_BLURBS: Record<string, string> = {
   journal:
-    'Note what happens as you play, one plain line at a time. This is the view you’ll live in during a session.',
+    'Note what happens as you play. This is the view you’ll live in during a session.',
   sessions:
-    'Every game night is a session. Review what happened, get a “previously on…” recap, and turn its log into your world — Extract, Illuminate, and Transcribe all live here.',
+    'Every game night is a session. Review what happened, get a recap, and turn its narrative into a living record — Extract, Illuminate, and Transcribe all live here.',
   character:
     'Your main character’s home: their profile, backstory, and the persona and voice the Keeper speaks in.',
   capture:
     'Your world library — every person, place, faction, quest, and item you meet. Browse, edit, and add new entries.',
   web: 'A living map of your campaign’s relationships — an interactive graph you can filter, focus, and rewind through past sessions.',
   recall:
-    'Ask a question in plain language and get an answer drawn from your own notes, with its sources cited. Needs the free search model (download it in Settings).',
+    'Ask a question in plain language and get an answer drawn from your own notes, with its sources cited. Requires the free search model (downloadable in Settings).',
   suggest:
-    'Not sure what to do? Get four in-character options for the moment, grounded in your character and the scene.',
+    'Not sure what to do? Get four in-character options for the moment, grounded in your character and the scenario.',
   converse:
-    'About to talk to someone? Get four in-character questions to draw them out, from safe openers to pointed probes.',
+    'About to talk to someone? Get four in-character questions to draw out narrative threads and forward a conversation, from safe openers to pointed probes.',
   continuity:
     'Audit your campaign for inconsistencies — a fallen NPC still acting, two notes that disagree, a status that doesn’t match its lifecycle — with automatic checks plus an AI pass over your notes.'
 }
@@ -46,13 +46,13 @@ export const LENS_PROMPT_TIPS: Record<
 > = {
   recall: {
     name: 'Lore',
-    does: 'Searches your notes and answers in your character’s voice, citing the entries it drew from.',
+    does: 'Searches your notes and answers, citing the entries it drew from.',
     using: [
-      'Ask one question at a time. Follow-ups remember the thread, so you can build on the last answer.',
+      'Ask one question at a time. Follow-ups remember the conversation, so you can build on the last answer.',
       'Use “as of” to answer from an earlier session’s point of view, with no spoilers from later ones.'
     ],
     query: [
-      'Name the person, place, or thing. Lore matches your words against your notes and entity names, so “Glasstaff” finds far more than “the wizard” — and a bare “him” finds nothing.',
+      'Name the person, place, or thing. Lore matches your words against your notes and entity names, so “Glasstaff” finds far more than “the wizard” — and a bare “him” finds nothing. Use a forward slash [/] to access paste-able type search and entity search (e.g., /npc, /que, /glasstaff)',
       'Ask about what you’ve actually recorded. Lore answers only from your notes, and it keeps a rumor a rumor rather than inventing details.',
       'Ask one concrete question rather than a broad “what’s going on?” A focused question gets a focused, right-sized answer instead of a shallow tour.'
     ]
@@ -61,19 +61,19 @@ export const LENS_PROMPT_TIPS: Record<
     name: 'Counsel',
     does: 'Reads your character and the campaign, then offers four ways to play the moment — or, with no situation given, story directions drawn from your open threads.',
     using: [
-      'Set the scene — especially the mode (Combat, Social, Stealth, Downtime…) — so the options fit the moment.',
+      'Set the scene — especially the mode (Combat, Social, Stealth, Downtime…) — so the options fit the type of scenario.',
       'Add a goal to aim all four options at it, or leave it blank for a wider spread.',
       'Not quite right? Refine re-rolls the same moment — bolder, more cautious, or from a fresh angle.'
     ],
     query: [
-      'Describe the exact moment — who just did or said what, and the choice you now face. “The mayor just admitted he pays the Redbrands, and he’s waiting on our answer” works far better than “we’re in trouble.”',
+      'Describe the exact moment — who just did or said what, and the choice you now face. “The mayor just admitted he is corrupt, and he’s waiting on our answer” works far better than “we’re in trouble.”',
       'Name who’s involved and what’s at stake. The four options anchor to those characters’ real ties to you.',
       'Vague in, generic out: given only “we’re in trouble,” Counsel has to guess what you mean and falls back on safe, middle-of-the-road moves.'
     ]
   },
   converse: {
     name: 'Converse',
-    does: 'Suggests four in-character questions to ask someone, from safe openers to pointed probes.',
+    does: 'Suggests four in-character questions to ask someone.',
     using: [
       'Pick who you’re talking with — an NPC or another player’s character.',
       'To follow up, choose the question you actually asked and paraphrase their answer. The next four build on what they said.',
@@ -110,9 +110,9 @@ export const LENS_PROMPT_TIPS: Record<
  */
 export const CHRONICLE_TIPS: { name: string; does: string; using: string[]; writing: string[] } = {
   name: 'Chronicle',
-  does: 'A plain running log of your session. Later, Extract turns it into people, places, and notes, and Illuminate fills in how they connect — so the Keeper can answer from what you actually played.',
+  does: 'A running log of your session. Later, Extract turns it into people, places, and notes, and Illuminate fills in how they connect — so the Keeper can answer from what you actually played.',
   using: [
-    'Jot one plain line as things happen — a sentence or two, no polish needed. The newest sits at the bottom, like a transcript.',
+    'Jot things as they happen — one sentence to a paragraph, no polish needed.',
     'Type “/” to drop in an entity by name — or “/npc”, “/loc”, “/que”… to browse a type — without leaving the composer to look it up.',
     'When the night’s over, open the Sessions page and run Extract, then Illuminate. Editing a line afterward won’t rewrite notes you’ve already extracted — they’re separate records.'
   ],
