@@ -15,9 +15,9 @@ test.afterAll(async () => {
   cleanup(userDataDir)
 })
 
-// Open the full "Inscribe" form (top of the entity browser; defaults to NPC), fill it, and create.
+// Open the full "Add entity" form (top of the entity browser; defaults to NPC), fill it, and create.
 async function addEntity(name: string, description?: string): Promise<void> {
-  await page.getByRole('button', { name: 'Inscribe' }).click() // opens the Inscribe pane (not a popup)
+  await page.getByRole('button', { name: 'Add entity' }).click() // opens the add pane (not a popup)
   await page.getByLabel('Name').fill(name)
   if (description) await page.getByLabel('Description').fill(description)
   await page.getByRole('button', { name: 'Create' }).click()
@@ -32,10 +32,13 @@ test('capture flow: campaign, session, entities, link, search, delete', async ()
   await page.getByLabel('Main character').fill('Vargas')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // Start a session (auto-numbered) from the Chronicle header — the session control moved there
-  // (ADR-036), so this must happen BEFORE navigating away (the default view is Chronicle).
+  // Start a session (auto-numbered) from the Chronicle header — the session control lives there
+  // (ADR-036). The app now lands on Home (ADR-061), so navigate to the Chronicle first.
+  await page.getByRole('button', { name: 'Chronicle', exact: true }).click()
   await page.getByRole('button', { name: 'New session' }).click()
-  await expect(page.getByText(/Session 1/).first()).toBeVisible()
+  // The session control (a combobox) now shows Session 1 — text matching would also hit the hidden
+  // Home hero's "· Session 1" line (ADR-061), so target the visible control.
+  await expect(page.getByRole('combobox').filter({ hasText: /Session 1/ })).toBeVisible()
 
   // Entity capture lives on the Codex view — navigate there.
   await page.getByRole('button', { name: 'Codex' }).click()

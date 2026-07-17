@@ -26,8 +26,8 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 
-// Edit a note's text + confidence anywhere it's listed (ADR-032) — the entity/dashboard annals were
-// delete-only, forcing a trip to the Annals view to fix a typo. Entity links aren't editable here (that's
+// Edit a note's text + confidence anywhere it's listed (ADR-032) — the entity/dashboard notes were
+// delete-only, forcing a trip to the Notes view to fix a typo. Entity links aren't editable here (that's
 // the manual note composer's job); this is the in-place text/confidence fix.
 export function NoteEditDialog({
   note,

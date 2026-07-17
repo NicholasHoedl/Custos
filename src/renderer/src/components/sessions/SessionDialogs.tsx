@@ -170,3 +170,64 @@ export function DeleteSessionDialog({
     </AlertDialog>
   )
 }
+
+// Backfill (ADR-062): insert a NEW empty session at the anchor's number — the one sanctioned renumber.
+// For the "started tracking mid-campaign" case: your real sessions 1–2 can be added before the session
+// you began with. Confirm-style (the shift renumbers everything later), but constructive, not destructive.
+export function InsertSessionBeforeDialog({
+  session,
+  campaignId,
+  open,
+  onOpenChange,
+  onInserted
+}: {
+  session: Session
+  campaignId: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onInserted: (newSessionId: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function doInsert() {
+    if (busy) return
+    setBusy(true)
+    try {
+      const s = await ledger.session.insertBefore({ campaignId, beforeSessionId: session.id })
+      useUiStore.getState().bumpSessions()
+      // Chronology stamps shifted too — refresh the graph/EntityHistory readers of stored numbers.
+      useUiStore.getState().bumpEntities()
+      toast.success(`Session ${s.number} inserted — later sessions renumbered`)
+      onOpenChange(false)
+      onInserted(s.id)
+    } catch (err) {
+      toast.error('Could not insert session', { description: String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display">
+            Insert a session before Session {session.number}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Creates a new empty session as Session {session.number}. Session {session.number} and every
+            later session become {session.number + 1} and up — their notes, chronicle entries, and
+            chronology move with them. Anything recorded as “Before tracking” stays before everything,
+            including the new session.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <Button onClick={doInsert} disabled={busy}>
+            {busy ? 'Inserting…' : 'Insert session'}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}

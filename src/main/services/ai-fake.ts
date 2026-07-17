@@ -31,7 +31,7 @@ export function tutorialSkipped(): boolean {
 
 /**
  * Tier-1 (capture) canned output: one new NPC + one note tagging it (`#0`). Non-empty so the tier-1
- * `ChangesetReview` renders the Entities + Annals sections; the distinct name means use-import defaults
+ * `ChangesetReview` renders the Entities + Notes sections; the distinct name means use-import defaults
  * it to "create" (no fuzzy match against the campaign's lone main character).
  */
 export function fakeExtraction(): RawExtraction {

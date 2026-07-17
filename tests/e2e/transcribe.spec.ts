@@ -22,7 +22,9 @@ test('Transcribe: pasting notes proposes a changeset that applies', async () => 
   await createCampaign(page, 'Phandalin', 'Vargas')
   await plantKeyAndReload(page)
 
-  // Transcribe lives on the Sessions page now and targets the selected session — start one, then open it.
+  // Transcribe lives on the Sessions page now and targets the selected session — start one (from the
+  // Chronicle header; the app lands on Home per ADR-061), then open it.
+  await page.getByRole('button', { name: 'Chronicle', exact: true }).click()
   await page.getByRole('button', { name: 'New session' }).click()
   await page.getByRole('button', { name: 'Sessions', exact: true }).click()
   await page.getByRole('button', { name: 'Transcribe', exact: true }).click()

@@ -21,9 +21,9 @@ test.afterAll(async () => {
 test('mention: /npc offers an entity and inserts its name', async () => {
   await createCampaign(page, 'Phandalin', 'Vargas')
 
-  // Seed an NPC to mention (Codex → Inscribe form, defaults to NPC).
+  // Seed an NPC to mention (Codex → Add entity form, defaults to NPC).
   await page.getByRole('button', { name: 'Codex' }).click()
-  await page.getByRole('button', { name: 'Inscribe' }).click()
+  await page.getByRole('button', { name: 'Add entity' }).click()
   await page.getByLabel('Name').fill('Aldric Vane')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('heading', { name: 'Aldric Vane' })).toBeVisible()

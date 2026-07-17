@@ -23,7 +23,7 @@ test('Recall: a query streams an answer and lists real fuzzy-grounded sources', 
 
   // Seed an entity with a description so fuzzy retrieval has a chunk to return.
   await page.getByRole('button', { name: 'Codex' }).click()
-  await page.getByRole('button', { name: 'Inscribe' }).click()
+  await page.getByRole('button', { name: 'Add entity' }).click()
   await page.getByLabel('Name').fill('Aldric Vane')
   await page
     .getByLabel('Description')
@@ -33,7 +33,8 @@ test('Recall: a query streams an answer and lists real fuzzy-grounded sources', 
 
   await plantKeyAndReload(page)
 
-  await page.getByRole('button', { name: 'Lore' }).click()
+  // exact — the Home dashboard's "Ask Lore" button (visible right after the reload) also substring-matches.
+  await page.getByRole('button', { name: 'Lore', exact: true }).click()
   await page.getByPlaceholder('Who is Glastav').fill('Who is Aldric Vane, and can we trust him?')
   await page.getByRole('button', { name: 'Ask' }).click()
 

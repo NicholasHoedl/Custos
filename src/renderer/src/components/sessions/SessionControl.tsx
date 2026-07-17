@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Session } from '@shared/entity-types'
@@ -53,9 +53,22 @@ export function SessionControl({
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
+  // A just-created session id isn't in the (stale) list until the bump's refetch lands — activating it
+  // immediately made the auto-select effect below see an "invalid" id and revert to the OLD latest, so
+  // "+" created Session N+1 but silently left Session N active (and entries kept landing there). Park
+  // the intent here; the effect activates it once the id is actually listed.
+  const pendingActivate = useRef<string | null>(null)
+
   // Auto-select the most recent session whenever the active one isn't a valid session in this campaign
   // — covers first load (none active) and recovery after the active session is deleted.
   useEffect(() => {
+    if (pendingActivate.current) {
+      if (sessions.some((s) => s.id === pendingActivate.current)) {
+        setActiveSession(pendingActivate.current)
+        pendingActivate.current = null
+      }
+      return // hold the latest-pick while a just-created id is in flight
+    }
     if (sessions.length > 0 && !sessions.some((s) => s.id === activeSessionId)) {
       const latest = sessions.reduce((a, b) => (a.number >= b.number ? a : b))
       setActiveSession(latest.id)
@@ -67,8 +80,8 @@ export function SessionControl({
     setBusy(true)
     try {
       const session = await ledger.session.create({ campaignId })
+      pendingActivate.current = session.id
       useUiStore.getState().bumpSessions()
-      setActiveSession(session.id)
       toast.success(`Session ${session.number} started`)
     } catch (err) {
       toast.error('Could not start session', { description: String(err) })

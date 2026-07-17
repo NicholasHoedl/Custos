@@ -1,5 +1,10 @@
 import { ipcMain } from 'electron'
-import { IPC, type CreateSessionInput, type UpdateSessionInput } from '@shared/ipc-types'
+import {
+  IPC,
+  type CreateSessionInput,
+  type InsertSessionBeforeInput,
+  type UpdateSessionInput
+} from '@shared/ipc-types'
 import type { DbContext } from '../services/db-context'
 import * as svc from '../services/session.service'
 
@@ -11,5 +16,8 @@ export function registerSessionHandlers(ctx: DbContext): void {
     svc.updateSession(ctx, id, patch)
   )
   ipcMain.handle(IPC.sessionDelete, (_e, id: string) => svc.deleteSession(ctx, id))
+  ipcMain.handle(IPC.sessionInsertBefore, (_e, input: InsertSessionBeforeInput) =>
+    svc.insertSessionBefore(ctx, input)
+  )
   ipcMain.handle(IPC.sessionUnclosed, (_e, campaignId: string) => svc.unclosedCounts(ctx, campaignId))
 }

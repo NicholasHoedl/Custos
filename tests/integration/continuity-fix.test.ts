@@ -92,4 +92,16 @@ describe('Continuity fix round-trip (ADR-056 deterministic fix actions)', () => 
     expect(links.filter((l) => l.endSessionNumber === null)).toHaveLength(1)
     expect(links.filter((l) => l.endSessionNumber !== null)).toHaveLength(1)
   })
+
+  it('checksOnly returns the deterministic findings and skips the AI pass outright (ADR-061)', async () => {
+    const ctx = makeTestDb()
+    const campaignId = createCampaign(ctx, { name: 'C' }).id
+    createSession(ctx, { campaignId })
+    createEntity(ctx, { campaignId, type: 'npc', name: 'Klarg', status: 'Dead', lifecycle: 'active' })
+
+    const res = await runContinuity(ctx, { campaignId, checksOnly: true }, signal)
+    expect(res.ai).toEqual({ status: 'skipped', reason: 'checks_only' })
+    expect(byCategory(res.findings, 'status-mismatch')).toBeDefined()
+    expect(res.cost).toBeUndefined()
+  })
 })

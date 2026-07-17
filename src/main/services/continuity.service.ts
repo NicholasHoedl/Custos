@@ -133,7 +133,10 @@ export async function runContinuity(
   let cost: AiRunCost | undefined
   let aiFindings: ContinuityFinding[] = []
 
-  if (entities.length === 0) {
+  if (req.checksOnly) {
+    // The dashboard's record-health probe (ADR-061): deterministic findings only — no gather, no call.
+    ai = { status: 'skipped', reason: 'checks_only' }
+  } else if (entities.length === 0) {
     ai = { status: 'skipped', reason: 'empty' }
   } else if (!isAvailable()) {
     ai = { status: 'skipped', reason: 'no_key' }

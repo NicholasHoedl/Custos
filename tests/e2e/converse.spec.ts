@@ -22,7 +22,7 @@ test('Converse: preparing questions for a target returns a tagged spread', async
 
   // A target character to talk with (an NPC — the default inscribe type).
   await page.getByRole('button', { name: 'Codex' }).click()
-  await page.getByRole('button', { name: 'Inscribe' }).click()
+  await page.getByRole('button', { name: 'Add entity' }).click()
   await page.getByLabel('Name').fill('Sister Garaele')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('heading', { name: 'Sister Garaele' })).toBeVisible()

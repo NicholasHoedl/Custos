@@ -80,9 +80,9 @@ export function Sidebar() {
           const prevGroup = NAV_ITEMS[i - 1]?.group
           const active = key === activeView
           const nodes: ReactNode[] = []
-          // Emit a section heading before the first item of each group — except Settings, which is
-          // set off by a plain divider rather than a heading.
-          if (group !== prevGroup) {
+          // Emit a section heading before the first item of each group — except Settings (a plain
+          // divider) and Home (the single top item, no marker at all — ADR-061).
+          if (group !== prevGroup && group !== 'home') {
             nodes.push(
               group === 'settings' ? (
                 <div key="settings-sep" className="mt-1 border-t border-border/60 pt-2" />

@@ -56,6 +56,12 @@ export interface UpdateSessionInput {
   summary?: string | null
   date?: string | null
 }
+/** Backfill (ADR-062): insert a NEW empty session at the anchor's number; the anchor and everything
+ *  later (and their chronology stamps) shift +1 in one transaction. */
+export interface InsertSessionBeforeInput {
+  campaignId: string
+  beforeSessionId: string
+}
 export interface CreateEntityInput {
   campaignId: string
   type: EntityType
@@ -164,6 +170,8 @@ export interface LedgerApi {
     create(input: CreateSessionInput): Promise<Session>
     update(id: string, patch: UpdateSessionInput): Promise<Session>
     delete(id: string): Promise<void>
+    /** Insert a new empty session before an existing one — the ONE sanctioned renumber (ADR-062). */
+    insertBefore(input: InsertSessionBeforeInput): Promise<Session>
     /** Per-session count of chronicle entries added since the last close-out (P1-2); sparse map. */
     unclosed(campaignId: string): Promise<Record<string, number>>
   }
@@ -329,6 +337,7 @@ export const IPC = {
   sessionCreate: 'session:create',
   sessionUpdate: 'session:update',
   sessionDelete: 'session:delete',
+  sessionInsertBefore: 'session:insertBefore',
   sessionUnclosed: 'session:unclosed',
   entityList: 'entity:list',
   entityGet: 'entity:get',

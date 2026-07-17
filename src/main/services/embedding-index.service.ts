@@ -28,7 +28,7 @@ interface IndexEntityRow {
 }
 
 // The type-specific attribute keys worth embedding — the ones that carry combat/social signal. Human-only
-// fields (player/level/rarity/value/date/reach/kind) are skipped to keep the vector tight and on-topic.
+// fields (player/rarity/value/date/reach/kind) are skipped to keep the vector tight and on-topic.
 const EMBED_ATTR_KEYS: Record<string, readonly string[]> = {
   creature: ['tactics', 'weakness', 'abilities', 'habitat'],
   faction: ['alignment'],

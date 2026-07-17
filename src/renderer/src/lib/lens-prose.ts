@@ -8,9 +8,9 @@ import {
 import { converseTagLabel, type ConverseQuestion } from '@shared/converse-types'
 import { CONTINUITY_CATEGORY_LABELS, type ContinuityFinding } from '@shared/continuity-types'
 
-// Turn a lens result into plain, readable prose — the payload for Copy-to-clipboard and "Inscribe to
-// Annals" (ROADMAP P1-1). The audit's point: a memory tool must let you keep an answer, not just watch
-// it scroll away. Inscribe reuses the campaign-lore note (entityIds: [], ADR-021); these serializers
+// Turn a lens result into plain, readable prose — the payload for Copy-to-clipboard and "Save
+// note" (ROADMAP P1-1). The audit's point: a memory tool must let you keep an answer, not just watch
+// it scroll away. Save note reuses the campaign-lore note (entityIds: [], ADR-021); these serializers
 // give it a human-readable body (no tags/enums-as-chips, just the words).
 
 export async function copyToClipboard(text: string): Promise<void> {

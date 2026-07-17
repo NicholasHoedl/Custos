@@ -39,6 +39,7 @@ capture is a deterministic by-product of editing, and history is append-only.
 | 7 | **As-of via explicit selector**; hard **no-future-leak clamp** (retrieval + state ≤ N). | Deterministic time-scoping; an as-of answer must not cite the future. |
 | 8 | **Backfill = "pre-tracking, origin unknown."** | Existing facts are usable without fabricating a false origin session. |
 | 9 | **v1 UI:** lifecycle selector + as-of edit override + as-of query selector + inline history disclosure. Full timeline view deferred. | Smallest surface that still lets you *audit* the auto-capture. |
+| 10 | **Amendment (ADR-062):** session numbers are assigned once and never *reordered*, but a uniform +1 **insert-shift** is sanctioned — `insertSessionBefore` renumbers the anchor + everything later AND every denormalized stamp (`status_history.since_session_number`, `entity_link.start/end_session_number`) atomically. NULL (pre-tracking) stamps are never touched. | Mid-campaign adopters need to backfill earlier sessions; a uniform shift preserves all relative order, so no validity interval can invert. |
 
 ## 4. Design
 

@@ -17,7 +17,7 @@ export const TOOL_BLURBS: Record<string, string> = {
   character:
     'Your main character’s home: their profile, backstory, and the persona and voice the Keeper speaks in.',
   capture:
-    'Your world library — every person, place, faction, quest, and item you meet. Browse, edit, and inscribe new entries.',
+    'Your world library — every person, place, faction, quest, and item you meet. Browse, edit, and add new entries.',
   web: 'A living map of your campaign’s relationships — an interactive graph you can filter, focus, and rewind through past sessions.',
   recall:
     'Ask a question in plain language and get an answer drawn from your own notes, with its sources cited. Needs the free search model (download it in Settings).',
@@ -223,7 +223,7 @@ export const SPOTLIGHT_COPY: Record<TutorialStepId, { title: string; body: strin
   },
   'codex-page': {
     title: 'The Codex',
-    body: 'Your world library — every person, place, faction, quest, and item you’ve met, built up mostly by Extract. Browse, edit, and inscribe new entries by hand.'
+    body: 'Your world library — every person, place, faction, quest, and item you’ve met, built up mostly by Extract. Browse, edit, and add new entries by hand.'
   },
   'web-page': {
     title: 'The Web',
@@ -243,11 +243,11 @@ export const SPOTLIGHT_COPY: Record<TutorialStepId, { title: string; body: strin
   },
   'continuity-page': {
     title: 'Continuity',
-    body: 'The record-keeper’s audit: scans your campaign for contradictions and slips. Its automatic checks run free — but this and the other lenses need an Anthropic API key to think, so let’s set yours up next.'
+    body: 'The record-keeper’s audit: scans your campaign for contradictions and slips. Its automatic checks run free — but this and the other lenses need an Anthropic API key to think, so let’s set yours up next (or skip and add it later).'
   },
   apikey: {
     title: 'Add your Anthropic API key',
-    body: 'The Keeper needs an API key to think. It’s stored encrypted on this device and only ever used to call Anthropic. Paste your key below and press Save & validate.'
+    body: 'The Keeper needs an API key to think. It’s stored encrypted on this device and only ever used to call Anthropic. Paste your key below and press Save & validate — or skip for now and add it later in Settings.'
   },
   'settings-page': {
     title: 'Settings',

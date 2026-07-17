@@ -67,7 +67,7 @@ export function SessionRecap({ session, onSaved }: { session: Session; onSaved?:
       )}
       {recap.status === 'done' && recap.reason === 'empty' && (
         <Banner icon={<Sparkles className="size-4" />}>
-          This session has no chronicle entries or annals yet — capture some first, then recap it.
+          This session has no chronicle entries or notes yet — capture some first, then recap it.
         </Banner>
       )}
       {recap.status === 'done' && recap.reason === 'offline' && (

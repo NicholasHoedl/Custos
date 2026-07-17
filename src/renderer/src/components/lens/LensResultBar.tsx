@@ -8,12 +8,12 @@ import type { LensHistoryEntry } from '@renderer/hooks/use-lens-history'
 import { Button } from '@renderer/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 
-// Shared Copy / Inscribe / Recent toolbar for the three AI lenses (ROADMAP P1-1). "Inscribe" saves the
-// prose to Annals as a campaign-lore note (entityIds: [], ADR-021) stamped at the active session — the
-// durable answer to "AI answers are disposable in a memory tool." Copy/Inscribe act on the live result;
-// Recent lets you copy/inscribe any of the last few answers this session.
+// Shared Copy / Save note / Recent toolbar for the three AI lenses (ROADMAP P1-1). "Save note" keeps the
+// prose as a campaign-lore note (entityIds: [], ADR-021) stamped at the active session — the
+// durable answer to "AI answers are disposable in a memory tool." Copy/Save act on the live result;
+// Recent lets you copy/save any of the last few answers this session.
 
-/** Copy + Inscribe bound to the active campaign/session. Shared by the live bar and the Recent rows,
+/** Copy + Save-note bound to the active campaign/session. Shared by the live bar and the Recent rows,
  *  and by the Lore transcript's per-turn actions (overhaul). */
 export function useLensSave(): {
   copy: (prose: string) => void
@@ -33,8 +33,8 @@ export function useLensSave(): {
       if (!campaignId) return
       ledger.note
         .create({ campaignId, content: prose, entityIds: [], sessionId: sessionId ?? undefined })
-        .then(() => toast.success('Inscribed to Annals'))
-        .catch((e) => toast.error('Could not inscribe', { description: String(e) }))
+        .then(() => toast.success('Saved to notes'))
+        .catch((e) => toast.error('Could not save note', { description: String(e) }))
     },
     [campaignId, sessionId]
   )
@@ -73,7 +73,7 @@ export function LensResultBar({
             onClick={() => inscribe(prose)}
           >
             <BookPlus className="size-3.5" />
-            Inscribe
+            Save note
           </Button>
         </>
       )}
@@ -104,7 +104,7 @@ export function LensResultBar({
                   </button>
                   <button
                     onClick={() => inscribe(e.prose)}
-                    aria-label="Inscribe to Annals"
+                    aria-label="Save as note"
                     className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-primary group-hover:opacity-100"
                   >
                     <BookPlus className="size-3.5" />

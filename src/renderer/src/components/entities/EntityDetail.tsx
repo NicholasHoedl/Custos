@@ -210,7 +210,7 @@ export function EntityDetail({
         <Separator />
 
         <div className="space-y-2">
-          <h3 className="inscribed text-xs">Annals</h3>
+          <h3 className="inscribed text-xs">Notes</h3>
           <NoteList notes={notes} onChanged={refreshNotes} />
         </div>
 

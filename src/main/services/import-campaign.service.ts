@@ -8,7 +8,9 @@ import { sourceHash } from './persona.service'
 
 // Campaign IMPORT (ROADMAP P0-2) — the missing half of export.service. Restores a CampaignExport JSON
 // into the live DB in ONE transaction, preserving ids + timestamps verbatim (chronology is
-// session-number-stamped, so nothing needs renumbering). UUIDs never collide across machines; the only
+// session-number-stamped and numbers travel together inside a file, so nothing needs renumbering on
+// import; the only in-app renumber is session.service.insertSessionBefore's uniform shift, ADR-062).
+// UUIDs never collide across machines; the only
 // realistic collision is re-importing a campaign that still exists, which is rejected by id up front.
 // Rows are inserted in FK dependency order with runtime foreign_keys=ON as the net; the guards below
 // additionally drop rows whose referents are missing from a hand-edited/corrupt file rather than

@@ -21,7 +21,9 @@ test('Recap: generating a recap streams text and saves it to the session', async
   await createCampaign(page, 'Phandalin', 'Vargas')
   await plantKeyAndReload(page)
 
-  // A session with one chronicle entry gives the recap something to summarize.
+  // A session with one chronicle entry gives the recap something to summarize. The app lands on
+  // Home (ADR-061), so head to the Chronicle first.
+  await page.getByRole('button', { name: 'Chronicle', exact: true }).click()
   await page.getByRole('button', { name: 'New session' }).click()
   await page.getByPlaceholder('A sentence or two').fill('The party met a stranger and struck a deal.')
   await page.getByRole('button', { name: 'Add', exact: true }).click()

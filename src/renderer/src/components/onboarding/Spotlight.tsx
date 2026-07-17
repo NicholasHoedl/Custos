@@ -80,7 +80,8 @@ export function useTargetRect(selectors: readonly string[] | null): TargetRect |
  * The spotlight chrome: four scrim rects around the cutout (they swallow clicks everywhere but the
  * target), a primary ring over it, an optional transparent blocker (INFO steps: the control is visible
  * but not operable), and the anchored coach mark. The popover is deliberately non-dismissable (no Esc,
- * no outside-click) — the tour is the only way forward, matching the old wizard's non-skippability.
+ * no outside-click) — advancing through the tour is the only way forward (its one opt-out is the API-key
+ * step's explicit "Skip for now" button, ADR-063; Esc/outside-click never dismiss).
  */
 export function Spotlight({
   rect,

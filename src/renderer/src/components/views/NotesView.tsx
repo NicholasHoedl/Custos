@@ -46,7 +46,7 @@ export function NotesView() {
   if (!activeCampaignId) {
     return (
       <EmptyState icon={StickyNote} title="No campaign selected">
-        Choose a campaign in the sidebar to keep its annals.
+        Choose a campaign in the sidebar to keep its notes.
       </EmptyState>
     )
   }
@@ -123,7 +123,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <PaneHeader icon={StickyNote} title="Annals" />
+      <PaneHeader icon={StickyNote} title="Notes" />
       <PaneBody size="reading">
         <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
           <MentionTextarea
@@ -201,7 +201,7 @@ function NotesWorkspace({ campaignId }: { campaignId: string }) {
         <div className="flex-1 space-y-2 overflow-y-auto">
           {notes.length === 0 ? (
             <p className="px-1 pt-8 text-center text-sm text-muted-foreground">
-              No annals yet. Write one above and file it under the people, places, and things it
+              No notes yet. Write one above and file it under the people, places, and things it
               touches.
             </p>
           ) : (

@@ -1,6 +1,10 @@
-import { desc, eq, max } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, lt, max, sql } from 'drizzle-orm'
 import type { Session } from '@shared/entity-types'
-import type { CreateSessionInput, UpdateSessionInput } from '@shared/ipc-types'
+import type {
+  CreateSessionInput,
+  InsertSessionBeforeInput,
+  UpdateSessionInput
+} from '@shared/ipc-types'
 import * as schema from '../db/schema'
 import type { DbContext } from './db-context'
 import { newId, now, rowToSession } from './serialize'
@@ -96,6 +100,94 @@ export function updateSession(ctx: DbContext, id: string, patch: UpdateSessionIn
 // session link nulled (note.sessionId onDelete: 'set null') so no captured note is ever lost.
 export function deleteSession(ctx: DbContext, id: string): void {
   ctx.drizzle.delete(schema.session).where(eq(schema.session.id, id)).run()
+}
+
+/**
+ * Backfill (ADR-062): insert a NEW empty session at the anchor's number; the anchor and every later
+ * session shift +1, and the denormalized chronology stamps (status_history.since_session_number,
+ * entity_link.start/end_session_number — ADR-017's session-number timeline) shift with them in the
+ * SAME transaction. This is the ONE sanctioned renumber, and it's a UNIFORM shift — existing sessions
+ * never change relative order, so no tie interval can invert. Notes/events reference sessions by ID
+ * and travel for free.
+ *
+ * Invariants:
+ * - NULL stamps are never touched: SQL `>= k` is false for NULL, so pre-tracking baselines (NULL
+ *   since/start) stay pre-tracking and OPEN intervals (NULL end) stay open — which also keeps the
+ *   partial `link_open_unique_idx ... WHERE end_session_number IS NULL` membership stable.
+ * - The session shift uses a NEGATE two-phase (`n → -(n+1)` then `negatives → -n`): SQLite checks the
+ *   (campaign_id, number) UNIQUE index PER ROW during UPDATE (no deferred constraints, and UPDATE's
+ *   ORDER BY does not control write order), so a naive single `+1` collides. Intermediate negatives
+ *   can't collide with live positives, and the flipped results (k+1…) can't collide with the
+ *   unshifted rows (< k).
+ */
+export function insertSessionBefore(ctx: DbContext, input: InsertSessionBeforeInput): Session {
+  const before = getSession(ctx, input.beforeSessionId)
+  if (!before) throw new Error(`Session ${input.beforeSessionId} not found`)
+  // Never trust a renderer-supplied pairing (mirrors resolveCaptureSessionNumber's ethos).
+  if (before.campaignId !== input.campaignId) {
+    throw new Error(
+      `Session ${input.beforeSessionId} does not belong to campaign ${input.campaignId}`
+    )
+  }
+  const k = before.number
+  const row = {
+    id: newId(),
+    campaignId: input.campaignId,
+    number: k,
+    title: null,
+    summary: null,
+    date: new Date().toISOString().slice(0, 10),
+    createdAt: now()
+  }
+  ctx.drizzle.transaction((tx) => {
+    // Session numbers: negate two-phase (see doc comment).
+    tx.update(schema.session)
+      .set({ number: sql`-(${schema.session.number} + 1)` })
+      .where(and(eq(schema.session.campaignId, input.campaignId), gte(schema.session.number, k)))
+      .run()
+    tx.update(schema.session)
+      .set({ number: sql`-${schema.session.number}` })
+      .where(and(eq(schema.session.campaignId, input.campaignId), lt(schema.session.number, 0)))
+      .run()
+    // Status history has no campaign column — scope through the campaign's entities.
+    tx.update(schema.statusHistory)
+      .set({ sinceSessionNumber: sql`${schema.statusHistory.sinceSessionNumber} + 1` })
+      .where(
+        and(
+          gte(schema.statusHistory.sinceSessionNumber, k),
+          inArray(
+            schema.statusHistory.entityId,
+            tx
+              .select({ id: schema.entity.id })
+              .from(schema.entity)
+              .where(eq(schema.entity.campaignId, input.campaignId))
+          )
+        )
+      )
+      .run()
+    // Tie intervals: plain +1 per column (no unique constraint spans the shifted values).
+    tx.update(schema.entityLink)
+      .set({ startSessionNumber: sql`${schema.entityLink.startSessionNumber} + 1` })
+      .where(
+        and(
+          eq(schema.entityLink.campaignId, input.campaignId),
+          gte(schema.entityLink.startSessionNumber, k)
+        )
+      )
+      .run()
+    tx.update(schema.entityLink)
+      .set({ endSessionNumber: sql`${schema.entityLink.endSessionNumber} + 1` })
+      .where(
+        and(
+          eq(schema.entityLink.campaignId, input.campaignId),
+          gte(schema.entityLink.endSessionNumber, k)
+        )
+      )
+      .run()
+    // Number k is now free — the new session takes it.
+    tx.insert(schema.session).values(row).run()
+  })
+  return rowToSession(row)
 }
 
 /**

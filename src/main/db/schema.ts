@@ -75,7 +75,9 @@ export const entity = sqliteTable(
 // Chronology (ADR-017): append-only trail of an entity's status + lifecycle over time. A baseline row
 // per entity (since_session_number NULL = pre-tracking) plus one row per status/lifecycle change,
 // stamped with the session NUMBER it happened in (denormalized — no FK; the timeline is
-// session.number, assigned once and never renumbered). `stateAsOf` reads the latest row <= N.
+// session.number, assigned once — the ONE sanctioned renumber is insertSessionBefore's uniform +1
+// shift, which moves session numbers and every denormalized copy [this table, entity_link start/end]
+// together in one transaction, ADR-062). `stateAsOf` reads the latest row <= N.
 export const statusHistory = sqliteTable(
   'status_history',
   {
@@ -156,8 +158,9 @@ export const entityLink = sqliteTable(
       .references(() => campaign.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at'), // nullable so ADD COLUMN is clean; the service always sets it
     // Chronology (ADR-017): relationship validity interval, by session NUMBER (denormalized — the
-    // timeline is session.number). start_session_number NULL = pre-tracking; end_session_number NULL =
-    // still live (an OPEN interval). Severing sets end_session_number; the row is never deleted.
+    // timeline is session.number; renumbered ONLY by insertSessionBefore's uniform shift, ADR-062).
+    // start_session_number NULL = pre-tracking; end_session_number NULL = still live (an OPEN
+    // interval). Severing sets end_session_number; the row is never deleted.
     startSessionNumber: integer('start_session_number'),
     endSessionNumber: integer('end_session_number')
   },

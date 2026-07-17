@@ -40,6 +40,7 @@ const api: LedgerApi = {
     create: (input) => ipcRenderer.invoke(IPC.sessionCreate, input),
     update: (id, patch) => ipcRenderer.invoke(IPC.sessionUpdate, id, patch),
     delete: (id) => ipcRenderer.invoke(IPC.sessionDelete, id),
+    insertBefore: (input) => ipcRenderer.invoke(IPC.sessionInsertBefore, input),
     unclosed: (campaignId) => ipcRenderer.invoke(IPC.sessionUnclosed, campaignId)
   },
   entity: {

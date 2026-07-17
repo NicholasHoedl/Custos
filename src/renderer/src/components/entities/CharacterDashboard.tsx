@@ -215,13 +215,6 @@ export function CharacterDashboard({
                     placeholder="e.g. Rogue"
                   />
                 </Field>
-                <Field label="Level">
-                  <InlineText
-                    value={String(entity.attributes.level ?? '')}
-                    onSave={(v) => void saveAttribute('level', v)}
-                    placeholder="1"
-                  />
-                </Field>
                 <Field label="Player">
                   <InlineText
                     value={String(entity.attributes.player ?? '')}
@@ -335,7 +328,7 @@ export function CharacterDashboard({
 
         {/* Full-width secondary: notes */}
         <div className="mt-4 space-y-4">
-          <Card title="Annals">
+          <Card title="Notes">
             <NoteList notes={notes} onChanged={refreshNotes} />
           </Card>
         </div>

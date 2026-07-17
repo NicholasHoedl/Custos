@@ -618,7 +618,7 @@ export function WebView() {
           <CenterNote>Choose a campaign to see its web of relationships.</CenterNote>
         ) : empty ? (
           <CenterNote>
-            No entities yet. Inscribe a few in the Codex and tie them together — they’ll appear
+            No entities yet. Add a few in the Codex and tie them together — they’ll appear
             here.
           </CenterNote>
         ) : (

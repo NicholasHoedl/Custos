@@ -13,7 +13,7 @@ import {
 } from '@renderer/components/ui/alert-dialog'
 
 // Shared confirm for note deletion (ROADMAP P0-1) — previously the ONE destructive action in the app
-// that fired on a bare click (both the Annals view and the entity/Character note lists). Owns the IPC
+// that fired on a bare click (both the Notes view and the entity/Character note lists). Owns the IPC
 // delete + error toast; callers pass onDeleted to refresh their own lists. Open while `note` is set;
 // Radix fires onOpenChange(false) on cancel AND on action, so the caller clears its state there.
 export function DeleteNoteDialog({

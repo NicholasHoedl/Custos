@@ -32,7 +32,9 @@ import { WelcomeCard } from '@renderer/components/onboarding/WelcomeCard'
 // WATCHING state (idempotent — a mid-tour relaunch resumes at the persisted `tutorialStep` and satisfied
 // steps fast-forward); INFO steps highlight one control (visible, not operable) with Next; PAGE steps
 // show a whole page UNDIMMED with the coach card sitting over the navbar; the REVIEW step closes with a
-// front-and-center recap card. Linear, no Back, no skip; AppShell keeps hotkeys disabled throughout.
+// front-and-center recap card. Linear, no Back; the ONE skip is the API-key step ("Skip for now" →
+// advances keyless, ADR-063 — the Home needs-attention strip then carries the reminder). AppShell keeps
+// hotkeys disabled throughout.
 
 type Step = 'welcome' | TutorialStepId
 
@@ -47,7 +49,7 @@ interface StepDef {
 }
 
 const STEP_DEFS: StepDef[] = [
-  { id: 'campaign', kind: 'action', targets: ['[data-tour="new-campaign"]'], side: 'right', view: 'journal' },
+  { id: 'campaign', kind: 'action', targets: ['[data-tour="new-campaign"]'], side: 'right', view: 'home' },
   { id: 'character-page', kind: 'page', view: 'character' },
   { id: 'chronicle-page', kind: 'page', view: 'journal' },
   { id: 'session', kind: 'action', targets: ['[data-tour="new-session"]'], side: 'bottom', view: 'journal' },
@@ -65,7 +67,7 @@ const STEP_DEFS: StepDef[] = [
   { id: 'continuity-page', kind: 'page', view: 'continuity' },
   { id: 'apikey', kind: 'action', targets: ['[data-tour="api-key-card"]'], side: 'bottom', view: 'settings' },
   { id: 'settings-page', kind: 'page', view: 'settings' },
-  { id: 'review', kind: 'review', view: 'character' }
+  { id: 'review', kind: 'review', view: 'home' } // the closing card floats over the new dashboard
 ]
 
 const nextOf = (id: TutorialStepId): TutorialStepId | null => {
@@ -178,7 +180,7 @@ export function TutorialOverlay({
       toast.error('Could not finish the tutorial', { description: String(e) })
       return
     }
-    setActiveView('journal')
+    setActiveView('home') // finishing the tour lands the user on the dashboard (ADR-061)
     onDone()
   }
 
@@ -321,6 +323,13 @@ export function TutorialOverlay({
                 {keyError}
               </p>
             )}
+            {/* The key is optional (ADR-063): skipping advances the tour; Home's needs-attention strip
+                then reminds until a key is saved. */}
+            <div className="flex justify-end pt-1">
+              <Button size="sm" variant="ghost" onClick={() => advance('settings-page')}>
+                Skip for now
+              </Button>
+            </div>
           </div>
         )}
 

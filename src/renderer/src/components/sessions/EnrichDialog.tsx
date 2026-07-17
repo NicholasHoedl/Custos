@@ -103,13 +103,13 @@ export function EnrichDialog({
         ) : enrich.phase === 'scanning' || enrich.phase === 'idle' ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Reading the session&apos;s annals…
+            Reading the session&apos;s notes…
           </div>
         ) : enrich.phase === 'checklist' ? (
           <>
             {enrich.touched.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No entities touched in this session&apos;s annals — chronicle something first.
+                No entities touched in this session&apos;s notes — chronicle something first.
               </p>
             ) : (
               <div className="max-h-[60vh] space-y-1.5 overflow-y-auto pr-1">
@@ -182,7 +182,7 @@ export function EnrichDialog({
                   </p>
                 ) : (
                   <p className="text-sm text-foreground">
-                    Nothing new — every profile already reflects this session&apos;s annals.
+                    Nothing new — every profile already reflects this session&apos;s notes.
                   </p>
                 )}
                 {enrich.result && enrich.result.skipped.length > 0 && (

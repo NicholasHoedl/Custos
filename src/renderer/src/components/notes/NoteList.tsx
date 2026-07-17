@@ -5,13 +5,13 @@ import { formatTimestamp } from '@renderer/lib/format'
 import { NoteEditDialog } from './NoteEditDialog'
 import { DeleteNoteDialog } from './DeleteNoteDialog'
 
-// Read + edit + delete list of an entity's annals, shared by EntityDetail and the Character dashboard
-// (ADR-032) — both were delete-only, so fixing a note's typo meant hunting it down in the Annals view.
+// Read + edit + delete list of an entity's notes, shared by EntityDetail and the Character dashboard
+// (ADR-032) — both were delete-only, so fixing a note's typo meant hunting it down in the Notes view.
 // Deletion confirms via the shared DeleteNoteDialog (P0-1).
 export function NoteList({
   notes,
   onChanged,
-  emptyText = 'No annals recorded.'
+  emptyText = 'No notes recorded.'
 }: {
   notes: Note[]
   onChanged: () => void

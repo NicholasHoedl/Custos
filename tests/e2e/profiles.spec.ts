@@ -28,8 +28,8 @@ test('per-type profile editor: chips, custom status, type-specific field', async
   // The Chronicle is the default view now; entity capture lives on the Codex view — navigate there.
   await page.getByRole('button', { name: 'Codex' }).click()
 
-  // Open the full "Inscribe" pane (defaults to NPC) and drive its per-type fields directly.
-  await page.getByRole('button', { name: 'Inscribe' }).click()
+  // Open the full "Add entity" pane (defaults to NPC) and drive its per-type fields directly.
+  await page.getByRole('button', { name: 'Add entity' }).click()
   await page.getByLabel('Name').fill('Aldric Vane')
 
   // Traits are chips: add two (Enter), remove one (×).

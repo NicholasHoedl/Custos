@@ -246,7 +246,7 @@ export function ChangesetReview({
         )}
         {imp.notes.length > 0 && (
           <Section
-            label="Annals"
+            label="Notes"
             compact={compact}
             bulk={bulk ? includeBulk(imp.notes, imp.setNotes) : undefined}
             count={bulk ? counts.notes : undefined}

@@ -37,7 +37,7 @@ test('command palette: Ctrl+K navigates to a view and finds an entity', async ()
 
   // Add an entity in Codex so the palette has something to find.
   await page.getByRole('button', { name: 'Codex' }).click()
-  await page.getByRole('button', { name: 'Inscribe' }).click()
+  await page.getByRole('button', { name: 'Add entity' }).click()
   await page.getByLabel('Name').fill('Gundren Rockseeker')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('heading', { name: 'Gundren Rockseeker' })).toBeVisible()

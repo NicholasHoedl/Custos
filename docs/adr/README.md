@@ -61,6 +61,20 @@ ADR that supersedes the old one (don't edit the old one).
 | [047](047-ui-cohesion-header-nav.md) | UI cohesion: one compact-toolbar page header (PaneHeader/PaneBody, drop PaneShell), grouped sidebar nav, AI-lens starter idle states, Codex adopts the per-type visuals | Accepted | 2026-07-12 |
 | [048](048-counsel-narrative-cards.md) | Counsel "in the moment": four narrative cards (title + plain-English explanation + tags), drop pillar/mechanic/teamwork, no combat-turn tactics (supersedes ADR-026's mechanics layer) | Accepted | 2026-07-12 |
 | [049](049-converse-follow-up-loop.md) | Converse: a follow-up loop (feed the answer back → follow-up questions) + a Quick/Deep speed toggle + restored MC voice (fixes the ADR-048 voice drop); extends ADR-034 | Accepted | 2026-07-13 |
+| [050](050-web-graph-enrichment.md) | Web graph enrichment — meaningful edges, time (as-of slider + playback), an AI hub, and scale | Accepted | 2026-07-13 |
+| [051](051-standalone-session-tools.md) | Standalone Extract / Illuminate / Transcribe on the Sessions page; decouple the Illuminate model | Accepted | 2026-07-14 |
+| [052](052-embedder-upgrade-reranker.md) | Upgrade the local embedder (gte-base-en-v1.5 on Transformers.js v3) + a cross-encoder reranker | Accepted | 2026-07-14 |
+| [053](053-web-graph-legibility.md) | Web graph legibility at scale — label LOD, hide-minor, collapsible clusters, hide weak edges | Accepted | 2026-07-15 |
+| [054](054-enum-only-status-type-aware-lifecycle.md) | Enum-only extraction status + type-aware lifecycle terminology | Accepted | 2026-07-15 |
+| [055](055-list-fields-add-cut-only.md) | AI field changes may add/cut a trait, goal, or flaw — never alter one | Accepted | 2026-07-15 |
+| [056](056-continuity-audit.md) | Continuity — a read-only campaign consistency audit (deterministic checks + an additive AI pass) | Accepted | 2026-07-15 |
+| [057](057-bug-reports-email.md) | In-app bug reports — an email hand-off, never an upload | Accepted | 2026-07-16 |
+| [058](058-bugreport-autosend-worker.md) | Bug-report auto-send — a Cloudflare-Worker intake in front of Resend (extends ADR-057) | Accepted | 2026-07-16 |
+| [059](059-spotlight-tutorial.md) | Spotlight tutorial — a welcome page, then a guided tour of the real app (revises ADR-044/045) | Accepted | 2026-07-16 |
+| [060](060-tutorial-per-page-walkthrough.md) | Tutorial per-page walkthrough (19 stops) + Report-a-bug moves into Settings (revises ADR-059) | Accepted | 2026-07-16 |
+| [061](061-home-dashboard.md) | Home — a dashboard front door, and the new default landing view (revises ADR-044's nav order) | Accepted | 2026-07-16 |
+| [062](062-insert-session-before.md) | Insert session before — backfilling earlier sessions via a uniform renumber shift (amends ADR-017) | Accepted | 2026-07-16 |
+| [063](063-optional-key-before-session-one.md) | Onboarding API key optional (Skip for now) + before-session-1 needs-attention items (revises ADR-044/060) | Accepted | 2026-07-17 |
 
 ## Status legend
 

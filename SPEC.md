@@ -499,6 +499,12 @@ Illuminate → Ask), every tool, and how to get set up (including where to get a
 out-of-the-way **"Guide"** button at the bottom of the sidebar. It's where the capture→close-out loop is
 taught now that the first-run tutorial no longer runs it.
 
+**Insert session before** (ADR-062) — backfill for mid-campaign adopters: an **"Insert before"** action
+on the Sessions page adds a new empty session at any existing session's number, shifting that session and
+everything later (notes, chronicle entries, and all chronology stamps travel with them) up by one in a
+single transaction. Existing sessions never change relative order, so recorded history can't invert;
+"Before tracking" facts stay before everything.
+
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, and map attachments. The nearest queued follow-up is an
 **in-character recap voice**.

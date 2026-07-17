@@ -1,5 +1,15 @@
-import { useEffect, useState } from 'react'
-import { BookCheck, CalendarClock, Check, FileInput, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  BookCheck,
+  CalendarClock,
+  Check,
+  FileInput,
+  ListStart,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { ledger } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -15,7 +25,8 @@ import { ExtractDialog } from '@renderer/components/capture/ExtractDialog'
 import { TranscribeDialog } from '@renderer/components/capture/TranscribeDialog'
 import {
   DeleteSessionDialog,
-  EditSessionDialog
+  EditSessionDialog,
+  InsertSessionBeforeDialog
 } from '@renderer/components/sessions/SessionDialogs'
 
 // Sessions view (ADR-032): a browsable list of the campaign's sessions with their saved summaries, and a
@@ -40,6 +51,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [insertOpen, setInsertOpen] = useState(false)
   const [enrichOpen, setEnrichOpen] = useState(false)
   const [extractOpen, setExtractOpen] = useState(false)
   const [transcribeOpen, setTranscribeOpen] = useState(false)
@@ -47,9 +59,28 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
 
   const ordered = [...sessions].sort((a, b) => b.number - a.number)
 
+  // A just-created session id isn't in the (stale) list until the bump's refetch lands — selecting it
+  // immediately would make the default-pick effect below see an "invalid" id and steal the selection
+  // back to the old newest. Park the intent here; the effect consumes it once the id is listed.
+  const pendingSelect = useRef<string | null>(null)
+  function selectWhenListed(id: string) {
+    if (sessions.some((s) => s.id === id)) {
+      setSelectedId(id)
+      return
+    }
+    pendingSelect.current = id
+  }
+
   // Default to the newest session, and recover if the selected one is deleted. Keyed off `sessions` +
   // `selectedId` only (not the freshly-sorted `ordered`, which would re-run the effect every render).
   useEffect(() => {
+    if (pendingSelect.current) {
+      if (sessions.some((s) => s.id === pendingSelect.current)) {
+        setSelectedId(pendingSelect.current)
+        pendingSelect.current = null
+      }
+      return // hold the default pick while a just-created id is in flight
+    }
     if (sessions.length > 0 && (!selectedId || !sessions.some((s) => s.id === selectedId))) {
       const newest = sessions.reduce((a, b) => (a.number >= b.number ? a : b))
       setSelectedId(newest.id)
@@ -64,7 +95,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
     try {
       const s = await ledger.session.create({ campaignId })
       useUiStore.getState().bumpSessions()
-      setSelectedId(s.id)
+      selectWhenListed(s.id)
       toast.success(`Session ${s.number} started`)
     } catch (err) {
       toast.error('Could not start session', { description: String(err) })
@@ -128,7 +159,9 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
       <div className="min-w-0 flex-1 overflow-y-auto">
         {selected ? (
           <div className="mx-auto max-w-2xl space-y-5 p-6">
-            <div className="flex items-start justify-between gap-3">
+            {/* flex-wrap: six actions no longer fit beside the title at max-w-2xl — the whole action
+                block drops below the title instead of flexing the min-w-0 heading to zero width. */}
+            <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
               <div className="min-w-0">
                 <h2 className="font-display text-2xl font-semibold text-foreground">
                   Session {selected.number}
@@ -172,6 +205,15 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                   <FileInput className="size-3.5" />
                   Transcribe
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="Backfill: add a new empty session before this one (later sessions renumber)"
+                  onClick={() => setInsertOpen(true)}
+                >
+                  <ListStart className="size-3.5" />
+                  Insert before
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="size-3.5" />
                   Edit
@@ -204,6 +246,13 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
               open={editOpen}
               onOpenChange={setEditOpen}
               onSaved={refresh}
+            />
+            <InsertSessionBeforeDialog
+              session={selected}
+              campaignId={campaignId}
+              open={insertOpen}
+              onOpenChange={setInsertOpen}
+              onInserted={selectWhenListed}
             />
             <DeleteSessionDialog
               session={selected}

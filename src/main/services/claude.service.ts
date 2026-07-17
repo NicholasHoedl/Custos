@@ -862,7 +862,6 @@ export interface DeriveProfileContext {
   name: string
   ancestry: string | null
   class: string | null
-  level: string | null
   backstory: string
 }
 
@@ -881,7 +880,6 @@ export async function deriveProfileCall(
   const lines = [`Name: ${ctx.name}`]
   if (ctx.ancestry) lines.push(`Ancestry: ${ctx.ancestry}`)
   if (ctx.class) lines.push(`Class: ${ctx.class}`)
-  if (ctx.level) lines.push(`Level: ${ctx.level}`)
   lines.push('', 'Backstory:', ctx.backstory)
   return structuredObjectCall<Record<string, unknown>>({
     feature: 'backstory',
@@ -915,7 +913,7 @@ const EXTRACTION_INSTRUCTIONS = `You extract structured campaign data from paste
 
 ONLY WHAT THE TEXT SUPPORTS. Extract only entities and facts the text states or strongly implies — invent nothing. Prefer fewer, high-confidence items. If the text contains none of a kind, return an empty array.
 
-ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event, creature), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, level, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance; creature: abilities, tactics, weakness, habitat. Never invent an attribute value the text doesn't give.
+ENTITIES. Each has a type (one of: npc, location, faction, quest, item, pc, event, creature), a name, and optionally a short description, a status, and type-specific attributes (an array of {key, value}). Use these attribute keys per type — pc: player, ancestry, class, backstory; npc: race, role; location: kind, features, atmosphere; faction: alignment, reach; quest: objective, reward, deadline; item: rarity, value, properties; event: date, outcome, significance; creature: abilities, tactics, weakness, habitat. Never invent an attribute value the text doesn't give.
 
 STATUSES. Per type, use EXACTLY one of these — pick the closest; if none fits, omit the status: ${STATUS_VOCAB}.
 

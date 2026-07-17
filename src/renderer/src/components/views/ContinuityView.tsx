@@ -54,7 +54,7 @@ export function ContinuityView() {
   const [speed, setSpeed] = useState<Speed>('deep')
   const { entities } = useEntities(activeCampaignId)
   const nameById = new Map(entities.map((e) => [e.id, e.name]))
-  const { entries: recent, remember } = useLensHistory()
+  const { entries: recent, remember } = useLensHistory('continuity')
   const snapshottedRef = useRef(false)
 
   const result = audit.status === 'done' ? audit.result : null
@@ -194,7 +194,7 @@ export function ContinuityView() {
 function AiStatusBanner({ ai }: { ai: ContinuityResult['ai'] }) {
   if (ai.status === 'ok') return null
   if (ai.status === 'skipped') {
-    if (ai.reason === 'empty') return null
+    if (ai.reason === 'empty' || ai.reason === 'checks_only') return null
     const copy =
       ai.reason === 'no_key'
         ? 'The AI contradiction pass didn’t run — add an API key in Settings. The automatic checks below still ran.'

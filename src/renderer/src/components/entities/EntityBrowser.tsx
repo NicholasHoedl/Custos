@@ -15,7 +15,7 @@ import { Portrait } from './Portrait'
 
 export type EntityFilter = EntityType | 'all'
 /** Which non-entity pane the capture detail area shows when no entity is selected. Previously… and
- *  Transcribe were promoted to top-level nav (ADR-032); Codex keeps only Inscribe + Annals. */
+ *  Transcribe were promoted to top-level nav (ADR-032); Codex keeps only Add entity + Notes. */
 export type CapturePanel = 'add' | 'notes'
 
 const FILTERS: EntityFilter[] = ['all', ...ENTITY_TYPES]
@@ -74,7 +74,7 @@ export function EntityBrowser({
           )}
         >
           <Plus className="size-4" />
-          Inscribe
+          Add entity
         </button>
         <button
           onClick={onShowNotes}
@@ -86,7 +86,7 @@ export function EntityBrowser({
           )}
         >
           <StickyNote className="size-4" />
-          Annals
+          Notes
         </button>
       </div>
       <div className="border-b border-border">
@@ -135,7 +135,7 @@ export function EntityBrowser({
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {visible.length === 0 ? (
           <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-            {entities.length === 0 ? 'Nothing inscribed yet — use Inscribe above.' : 'No matches.'}
+            {entities.length === 0 ? 'No entities yet — use Add entity above.' : 'No matches.'}
           </p>
         ) : (
           visible.map((entity) => (

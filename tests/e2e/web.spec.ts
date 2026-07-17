@@ -24,9 +24,9 @@ test('web: renders the relationship graph with a node per entity', async () => {
   await page.getByLabel('Main character').fill('Vargas')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // Inscribe a second entity so the map has more than the lone MC.
+  // Add a second entity so the map has more than the lone MC.
   await page.getByRole('button', { name: 'Codex' }).click()
-  await page.getByRole('button', { name: 'Inscribe' }).click()
+  await page.getByRole('button', { name: 'Add entity' }).click()
   await page.getByLabel('Name').fill('Sister Garaele')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('heading', { name: 'Sister Garaele' })).toBeVisible()

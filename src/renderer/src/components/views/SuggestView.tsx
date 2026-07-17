@@ -84,10 +84,10 @@ export function SuggestView() {
   const [asOf, setAsOf] = useState<number | null>(null)
   const [goal, setGoal] = useState('')
   const [asked, setAsked] = useState('')
-  const { entries: recent, remember } = useLensHistory()
+  const { entries: recent, remember } = useLensHistory('suggest')
   const rememberedRef = useRef<SuggestResult | null>(null)
 
-  // Prose for the current result (Copy/Inscribe), and a snapshot into history once it's done (P1-1).
+  // Prose for the current result (Copy/Save note), and a snapshot into history once it's done (P1-1).
   const prose =
     suggest.status === 'done' && suggest.result?.ok
       ? suggest.result.mode === 'attitudes'

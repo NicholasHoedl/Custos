@@ -1,31 +1,27 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
+import {
+  useUiStore,
+  type LensHistoryEntry,
+  type LensHistoryKey
+} from '@renderer/store/ui-store'
 
-// A lens's last-N answers, kept in memory (ROADMAP P1-1). Session-scoped by design: MainPanel keeps the
-// views mounted, so this survives nav within a run but not an app restart (durable saving is Inscribe →
-// Annals). One entry per completed ask; consecutive identical prose is de-duped so a re-render or a
-// no-op re-ask doesn't stack.
+// A lens's last-N answers (ROADMAP P1-1) — STORE-backed since ADR-061 so the Home dashboard can read
+// the same history the lens views write (it was per-component useState before, invisible to any other
+// consumer). Still session-scoped by design: no persist middleware, so it survives nav and remounts
+// within a run but not an app restart (durable saving is Save note → Notes). One entry per completed
+// ask; consecutive identical prose is de-duped so a re-render or a no-op re-ask doesn't stack.
 
-export interface LensHistoryEntry {
-  id: string
-  /** Short human label for the picker row (the question / situation / target). */
-  label: string
-  /** The full inscribe-able prose (same payload as Copy/Inscribe on the live result). */
-  prose: string
-}
+export type { LensHistoryEntry, LensHistoryKey }
 
-export function useLensHistory(cap = 5): {
+export function useLensHistory(lens: LensHistoryKey): {
   entries: LensHistoryEntry[]
   remember: (label: string, prose: string) => void
 } {
-  const [entries, setEntries] = useState<LensHistoryEntry[]>([])
+  const entries = useUiStore((s) => s.lensHistory[lens])
+  const rememberLens = useUiStore((s) => s.rememberLens)
   const remember = useCallback(
-    (label: string, prose: string) => {
-      setEntries((prev) => {
-        if (prev[0]?.prose === prose) return prev // same result re-observed — don't stack
-        return [{ id: crypto.randomUUID(), label, prose }, ...prev].slice(0, cap)
-      })
-    },
-    [cap]
+    (label: string, prose: string) => rememberLens(lens, label, prose),
+    [lens, rememberLens]
   )
   return { entries, remember }
 }

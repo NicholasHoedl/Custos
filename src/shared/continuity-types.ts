@@ -91,6 +91,9 @@ export interface ContinuityRequest {
   /** Per-query speed (mirrors the other lenses): 'quick' = Sonnet + medium, 'deep'/unset = Settings model.
    *  (v1 audits the live "now" picture; an as-of audit is a reserved future extension.) */
   speed?: 'quick' | 'deep'
+  /** Run ONLY the deterministic checks — free, instant, keyless (the Home dashboard's record-health
+   *  tile, ADR-061). The AI pass reports `skipped/checks_only`. */
+  checksOnly?: boolean
 }
 
 /**
@@ -100,7 +103,7 @@ export interface ContinuityRequest {
  */
 export type ContinuityAiStatus =
   | { status: 'ok' }
-  | { status: 'skipped'; reason: 'no_key' | 'offline' | 'empty' }
+  | { status: 'skipped'; reason: 'no_key' | 'offline' | 'empty' | 'checks_only' }
   | { status: 'failed'; reason: 'bad_key' | 'too_long' | 'api' | 'unknown'; message?: string }
 
 /**

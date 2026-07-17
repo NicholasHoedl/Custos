@@ -80,7 +80,6 @@ export async function deriveProfile(
           name: pc.name,
           ancestry: attrStr('ancestry'),
           class: attrStr('class'),
-          level: attrStr('level'),
           backstory
         },
         model: suggestModel,

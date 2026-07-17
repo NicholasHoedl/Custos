@@ -51,7 +51,7 @@ export function RecallView() {
   const { sessions } = useSessions(activeCampaignId)
   const { entities } = useEntities(activeCampaignId)
   const [asOf, setAsOf] = useState<number | null>(null)
-  const { entries: recent, remember } = useLensHistory()
+  const { entries: recent, remember } = useLensHistory('recall')
   const rememberedRef = useRef(0)
 
   // Snapshot each completed turn's answer into the cross-session lens history (P1-1). Resets when the
@@ -255,7 +255,7 @@ function SpeedToggle({ speed, setSpeed }: { speed: Speed; setSpeed: (s: Speed) =
   )
 }
 
-/** One completed turn in the transcript: the question, the answer (+ per-turn Copy/Inscribe), its sources,
+/** One completed turn in the transcript: the question, the answer (+ per-turn Copy/Save note), its sources,
  *  and — on the degraded paths — a note that it's showing the retrieved notes instead of an answer. */
 function TurnBlock({ turn }: { turn: RecallTurn }) {
   const { copy, inscribe } = useLensSave()
@@ -297,7 +297,7 @@ function TurnBlock({ turn }: { turn: RecallTurn }) {
               onClick={() => inscribe(prose)}
             >
               <BookPlus className="size-3.5" />
-              Inscribe
+              Save note
             </Button>
           </div>
         </>

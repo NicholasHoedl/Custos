@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, History } from 'lucide-react'
 import { toast } from 'sonner'
 import { lifecycleLabel, type EntityType, type StatusHistoryEntry } from '@shared/entity-types'
 import { ledger } from '@renderer/lib/ipc'
+import { useUiStore } from '@renderer/store/ui-store'
 import { Button } from '@renderer/components/ui/button'
 
 // A collapsible "Changed over time" trail for one entity — its status/lifecycle history by session
@@ -13,18 +14,30 @@ export function EntityHistory({ entityId, type }: { entityId: string; type: Enti
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<StatusHistoryEntry[] | null>(null)
 
-  async function toggle() {
-    const next = !open
-    setOpen(next)
-    if (next && rows === null) {
-      try {
-        setRows(await ledger.entity.history(entityId))
-      } catch (err) {
+  // The rows cache displays STORED session numbers — drop it whenever entity data changes (an
+  // import-apply status change, an ADR-062 insert-before renumber) so it never shows stale stamps.
+  const entitiesVersion = useUiStore((s) => s.entitiesVersion)
+  useEffect(() => setRows(null), [entitiesVersion, entityId])
+
+  // Lazy load: fetch when expanded with no cached rows — covers both the first expand and a re-fetch
+  // after the cache was dropped while the trail was open.
+  useEffect(() => {
+    if (!open || rows !== null) return
+    let cancelled = false
+    ledger.entity
+      .history(entityId)
+      .then((r) => {
+        if (!cancelled) setRows(r)
+      })
+      .catch((err) => {
+        if (cancelled) return
         setRows([])
         toast.error("Couldn't load history", { description: String(err) })
-      }
+      })
+    return () => {
+      cancelled = true
     }
-  }
+  }, [open, rows, entityId])
 
   return (
     <div className="space-y-2">
@@ -32,7 +45,7 @@ export function EntityHistory({ entityId, type }: { entityId: string; type: Enti
         variant="ghost"
         size="sm"
         className="-ml-2 h-7 gap-1.5 text-muted-foreground"
-        onClick={toggle}
+        onClick={() => setOpen((o) => !o)}
       >
         {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         <History className="size-3.5" />

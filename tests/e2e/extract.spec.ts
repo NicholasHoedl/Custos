@@ -36,6 +36,8 @@ async function setupSessionWithEntry(campaign: string, mc: string): Promise<void
   )
   await page.reload()
 
+  // The app lands on Home (ADR-061); the session control lives in the Chronicle header.
+  await page.getByRole('button', { name: 'Chronicle', exact: true }).click()
   await page.getByRole('button', { name: 'New session' }).click()
   await page.getByPlaceholder('A sentence or two').fill('The party met a stranger and struck a deal.')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
@@ -64,9 +66,11 @@ test('extract: a session log becomes entities + notes in the Codex', async () =>
   await page.getByRole('button', { name: 'Close', exact: true }).first().click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
-  // The applied changeset is real: the extracted NPC now exists in the Codex.
+  // The applied changeset is real: the extracted NPC now exists in the Codex. Role query — the hidden
+  // Home view (ADR-061) also carries the name as text (recently-touched chip / archives spotlight),
+  // but hidden elements are excluded from the accessibility tree, so only the Codex row matches.
   await page.getByRole('button', { name: 'Codex' }).click()
-  await expect(page.getByText('Aldric Vane')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Aldric Vane/ })).toBeVisible()
 })
 
 test('extract: discarding the proposal applies nothing', async () => {

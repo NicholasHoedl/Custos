@@ -14,7 +14,7 @@ import { EntityForm } from '@renderer/components/entities/EntityForm'
 import { EntityDetail } from '@renderer/components/entities/EntityDetail'
 import { NotesView } from '@renderer/components/views/NotesView'
 
-// Master/detail capture surface: the entity browser on the left (Inscribe / Annals — Previously… and
+// Master/detail capture surface: the entity browser on the left (Add entity / Notes — Previously… and
 // Transcribe are top-level views now, ADR-032), and on the right either the selected entity's detail or
 // the active pane — including the full "Add entity" profile form, which is its own pane rather than a popup.
 export function CaptureView() {

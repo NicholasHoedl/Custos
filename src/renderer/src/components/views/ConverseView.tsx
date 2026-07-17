@@ -76,7 +76,7 @@ export function ConverseView() {
   // The suggested question the player picked to build a follow-up on (required before following up).
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null)
   const [asked, setAsked] = useState<{ name: string; focus: string }>({ name: '', focus: '' })
-  const { entries: recent, remember } = useLensHistory()
+  const { entries: recent, remember } = useLensHistory('converse')
   const rememberedRef = useRef(0)
 
   // Snapshot each completed turn's spread into the cross-session lens history (P1-1). Resets when the
@@ -358,7 +358,7 @@ function FollowUpBox({
 }
 
 /** One turn in the thread: for a follow-up, the exchange that prompted it (you asked X → they said Y), then
- *  the funnel-ordered spread and per-turn Copy/Inscribe. `onPick` (latest turn only) enables the follow-up. */
+ *  the funnel-ordered spread and per-turn Copy/Save note. `onPick` (latest turn only) enables the follow-up. */
 function TurnBlock({
   targetName,
   focus,
@@ -404,7 +404,7 @@ function TurnBlock({
           onClick={() => inscribe(prose)}
         >
           <BookPlus className="size-3.5" />
-          Inscribe
+          Save note
         </Button>
       </div>
       {turn.cost && (

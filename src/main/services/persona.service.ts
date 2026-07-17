@@ -17,7 +17,7 @@ const PERSONA_SYSTEM = `You write a compact CHARACTER BRIEF that another AI will
 
 Use exactly this template:
 
-# Character Brief — {name}  ({ancestry} {class}, level {level})
+# Character Brief — {name}  ({ancestry} {class})
 {one line: who they are and the tension that drives them}
 
 ## Lens (how they read any situation)
@@ -56,7 +56,6 @@ function sourceText(e: Entity): string {
     e.name,
     attr(e, 'ancestry') ?? '',
     attr(e, 'class') ?? '',
-    attr(e, 'level') ?? '',
     e.description ?? '',
     attr(e, 'backstory') ?? '',
     e.traits.join(','),
@@ -76,10 +75,8 @@ function personaUserPrompt(e: Entity): string {
   const lines = [`Name: ${e.name}`]
   const ancestry = attr(e, 'ancestry')
   const klass = attr(e, 'class')
-  const level = attr(e, 'level')
   if (ancestry) lines.push(`Ancestry: ${ancestry}`)
   if (klass) lines.push(`Class: ${klass}`)
-  if (level) lines.push(`Level: ${level}`)
   if (e.description) lines.push(`Description: ${e.description}`)
   const backstory = attr(e, 'backstory')
   if (backstory) lines.push(`Backstory: ${backstory}`)

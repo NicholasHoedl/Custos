@@ -3,6 +3,7 @@ import { RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PersonaBrief } from '@shared/recall-types'
 import { ledger } from '@renderer/lib/ipc'
+import { useUiStore } from '@renderer/store/ui-store'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 
@@ -41,6 +42,8 @@ export function PersonaEditor({ entityId }: { entityId: string }) {
       const p = await ledger.persona.generate(entityId)
       setPersona(p)
       setDraft(p.brief)
+      // Signal other views (Home's fill-in-character needs-attention item clears on persona, ADR-063).
+      useUiStore.getState().bumpEntities()
       toast.success('Persona generated')
     } catch (err) {
       toast.error('Could not generate persona', {

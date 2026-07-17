@@ -146,9 +146,11 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `to_disposition`, oriented near/far for the viewing entity; ADR-033). All five lenses inherit it; extraction
   populates disposition+confidence+description on `form` ties. `getEntityContext`'s neighbor seam mirrors the
   fields but is test-only; `getHierarchy` ignores them (structural).
-- **UI label ↔ code name (ADR-024/032/036/040/044/047/056):** the nav labels are Chronicle · Sessions · Character ·
-  Codex · **Web** · Lore · Counsel · Converse · **Continuity** · Settings (10 views, Chronicle-first per ADR-044, now GROUPED in
-  the Sidebar under **Capture / World / Ask** + Settings via `NavItem.group` + `.inscribed` headings, ADR-047;
+- **UI label ↔ code name (ADR-024/032/036/040/044/047/056/061):** the nav labels are **Home** · Chronicle ·
+  Sessions · Character · Codex · **Web** · Lore · Counsel · Converse · **Continuity** · Settings (11 views,
+  HOME-first per ADR-061 — the dashboard, `'home'`, the DEFAULT landing view, its heading-less nav group
+  skipped by the Sidebar's marker logic; revises ADR-044's Chronicle-first — the rest stay GROUPED under
+  **Capture / World / Ask** + Settings via `NavItem.group` + `.inscribed` headings, ADR-047;
   **Web** is P2-3/ADR-040, `'web'`, right after Codex; **Continuity** is ADR-056, `'continuity'`, last in the Ask group);
   the code names stay `recall` (Lore), `suggest`
   (Counsel), `journal` (Chronicle), `capture` (Codex), `import` (Transcribe), `enrich` (Illuminate), `continuity` (Continuity).
@@ -174,7 +176,9 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   mounted) — ADR-051 moved the AI tools OFF the header. The SessionsView detail header hosts the three
   per-session tools: **Extract** (`capture/ExtractDialog.tsx` — tier-1, formerly the close-out wizard's
   step 1), **Illuminate** (`sessions/EnrichDialog.tsx`; rows shared via `sessions/enrich-rows.tsx`), and
-  **Transcribe** (`capture/TranscribeDialog.tsx`, now a `session`-prop targeting the selected session). Codex is Inscribe + Annals only; Annals shows a read-only "Filing
+  **Transcribe** (`capture/TranscribeDialog.tsx`, now a `session`-prop targeting the selected session). Codex is **Add entity + Notes** only (the plain labels replaced
+  the thematic "Inscribe"/"Annals" — user-clarity pass; `NotesView`'s header + the entity/Character note
+  sections + the ChangesetReview section all say "Notes" now); Notes shows a read-only "Filing
   under Session N" hint (it stamps `note.sessionId = activeSessionId`). Previously…/recap lives in the
   Sessions view. The assistant is **"the Keeper"** in-app; "Claude"/Anthropic only in Settings +
   onboarding. Shared failure copy lives in `lib/ai-copy.ts` `reasonCopy` (`classifyError` distinguishes
@@ -192,7 +196,7 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `onMouseDown` `preventDefault`); it's `role="combobox"` ONLY while open (else it collides with real combobox
   role-queries), Ctrl/Cmd+Enter still submits the composer, and Escape `stopPropagation`s so it dismisses the
   menu, not a parent Dialog. A pick restores the caret past the inserted name via a `useLayoutEffect` +
-  `pendingCaret` ref. Wired into the Chronicle composer + entry-edit, Annals composer + `NoteEditDialog`,
+  `pendingCaret` ref. Wired into the Chronicle composer + entry-edit, Notes composer + `NoteEditDialog`,
   entity Description, and the Lore/Counsel/Converse query boxes. NOT the Character `InlineText` (blur-autosave)
   or Transcribe/import rows — deferred, convert via the same `onValueChange` (+ an optional shared `entities`
   prop to avoid N fetches). e2e `tests/e2e/mention.spec.ts` (pure UI); parser unit `tests/unit/renderer/
@@ -339,8 +343,21 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `timestamp, rowid` so same-ms extraction order is deterministic. **E1/E2:** the Chronicle composer pins the
   target session at submit (a mid-flight switch → a "saved to the session you wrote it in" toast) and persists
   an unsent draft to `localStorage` keyed per session.
-- **Lens polish + merge (docs/ROADMAP.md P1-1/5/6):** the three AI lenses share a `LensResultBar`
-  (Copy · **Inscribe** → a campaign-lore note via `ledger.note.create` entityIds:[] · **Recent** popover
+- **Insert session before = the ONE sanctioned renumber (ADR-062).** Session NUMBERS are the timeline
+  axis, denormalized (no FK) into `status_history.since_session_number` + `entity_link.start/
+  end_session_number` — so `session.service.insertSessionBefore` (the backfill tool: a new EMPTY session
+  at the anchor's number; "Insert before" on the Sessions detail header) must shift the session numbers
+  AND both stamp tables in ONE transaction. **The session shift uses a NEGATE two-phase**
+  (`n → -(n+1)`, then `negatives → -n`) because SQLite checks the `(campaign_id, number)` UNIQUE index
+  PER ROW during UPDATE — a naive `+1` UPDATE fails on any dense run (locked by test), and UPDATE's
+  `ORDER BY` does NOT control write order. NULL stamps are never touched (`>= k` is false for NULL), so
+  pre-tracking baselines stay pre-tracking and OPEN intervals stay open. Uniform shift ONLY — moving/
+  reordering EXISTING sessions is deliberately unsupported (it can invert a tie's `[start, end)`
+  interval and silently corrupt as-of history). `deleteSession` still never renumbers. The dialog bumps
+  `sessionsVersion` + `entitiesVersion` (graph + EntityHistory read stored numbers; EntityHistory now
+  drops its rows cache on `entitiesVersion`). Integration test:
+  `tests/integration/insert-session-before.test.ts` (every as-of read at n+1 ≡ the pre-shift read at n). the three AI lenses share a `LensResultBar`
+  (Copy · **Save note** → a campaign-lore note via `ledger.note.create` entityIds:[] · **Recent** popover
   of the last ~5) fed by `useLensHistory` + prose serializers in `lib/lens-prose.ts`; each view snapshots
   on done (MainPanel keeps views mounted, so history survives nav, not restart). **Cancel** for Counsel/
   Converse/Transcribe: request/response calls carry an OPTIONAL `requestId`; `ipc/cancelable.ts`
@@ -437,6 +454,26 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   ~1.2 KB, `formatReportText`, `dataUrlToImage`, `buildReportPayload`) are unit-tested incl. auto-send +
   fallback via a stubbed fetch; `tests/e2e/bugreport.spec.ts` guards launcher → capture → dialog → the
   description-gated submit. No migration; no new deps (the worker is plain JS deployed via npx wrangler).
+- **Home — the dashboard + DEFAULT landing view (ADR-061, `views/HomeView.tsx`):** identity hero
+  (campaign + MC `Portrait` + last-played) · "Previously…" (the SAME `SessionRecap` mounted for the
+  latest session, key-gated) · needs-attention (unclosed-extract counts, setup nags, **two before-session-1
+  items (ADR-063): "Fill in your character"** — shown until the MC has a generated persona, via the local
+  `useMcPersonaReady` hook [`ledger.persona.get`, refetch on `entitiesVersion`; `PersonaEditor.generate`
+  now BUMPS `entitiesVersion` so it clears live] — **and "Start your first session"** — shown when the
+  campaign has no sessions (`needsFirstSession(sessions)`, loading-guarded) · and a RECORD-HEALTH
+  probe — **`ContinuityRequest.checksOnly`**: deterministic checks only, free/keyless, the AI pass
+  reports `skipped/checks_only` and `AiStatusBanner` renders null for it) · open threads (active quests
+  + rumored/suspected notes) · type-chip stats · **`components/home/MiniWeb.tsx`** (the Web view's
+  d3-force recipe run to completion SYNCHRONOUSLY in a useMemo — `.stop()` + tick×150 — ≤50 top-degree
+  nodes, click → `'web'`) · "From the archives…" (a dormant active entity or an old rumor, DAY-seeded
+  pick, so it rotates daily not per-render) · an ask box that PRE-FILLS Lore via `openLens` (never
+  auto-asks) + recent questions across all four lenses. Widget math is the PURE **`lib/dashboard.ts`**
+  (unit-tested, `tests/unit/renderer/dashboard.test.ts`). **Lens history is STORE-side now**
+  (`ui-store.lensHistory` + `rememberLens`; entries carry `at`; `useLensHistory(lens)` keeps its shape —
+  the four lens views just pass their key) so Home reads what the lenses write. Tutorial: the REVIEW
+  card floats over Home and `finish()` lands there. **Four e2e specs navigate to Chronicle first**
+  (capture/extract/recap/transcribe — the default view is Home now); `home.spec.ts` covers landing →
+  fill-in → the Lore hand-off. No migration.
 - **Tests** run as `cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run` (the
   native better-sqlite3 binding needs the Electron ABI). If `npm test` / `cross-env` isn't resolvable in
   a raw shell, invoke `./node_modules/.bin/electron` directly with `ELECTRON_RUN_AS_NODE=1`.
@@ -487,7 +524,9 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   each — `data-tour="tool-*"` on SessionsView's header buttons + SessionRecap's button; the newest session
   AUTO-SELECTS so they render) → Codex → Web → Lore → Counsel → Converse → Continuity (PAGE each;
   Continuity's copy segues into the key) → apikey (ACTION — VALIDATED key via the ui-store
-  **`keySavedNonce`** SettingsView bumps per save; validate once per bump + an entry probe) → Settings
+  **`keySavedNonce`** SettingsView bumps per save; validate once per bump + an entry probe; **but the key is
+  now OPTIONAL — a "Skip for now" button advances keyless (ADR-063), and Home's needs-attention key nag
+  carries the reminder**) → Settings
   page (PAGE, scrollable; explains Settings + Report a bug's new home there) → review (REVIEW:
   `LOOP_STEPS` + `TOUR_GROUPS`/`TOOL_BLURBS` + the Quickstart pointer + **`REVIEW_COPY` — the SECOND
   placeholder Nick writes**; Finish). **ACTION steps advance by WATCHING state** (campaigns.length /
@@ -500,8 +539,10 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   **Quickstart guide** ("Guide", sidebar bottom) is unchanged; blurbs/groups/loop/key-steps +
   `WELCOME_COPY`/`SPOTLIGHT_COPY`/`REVIEW_COPY` all live in ONE `lib/guide-content.tsx` (TOUR_GROUPS ask
   keys include `continuity`). **e2e:** `launchApp` sets `LEDGER_SKIP_TUTORIAL` BY DEFAULT;
-  `launchApp({ tutorial: true, fakeAi: true })` drives `tutorial.spec.ts` through all 20 stops
-  (`apikey:validate` returns valid under `fakeAiEnabled`). `AppSettings` fields: `userName?`,
+  `launchApp({ tutorial: true, fakeAi: true })` drives `tutorial.spec.ts` (a shared `driveToApiKey` helper
+  + two tests: the key-entered happy path and the **Skip-for-now** keyless path, ADR-063 — the latter
+  asserts Home then nags for the key + the character; `apikey:validate` returns valid under `fakeAiEnabled`
+  but `keyReady`/`apikey:exists` stay honest). `AppSettings` fields: `userName?`,
   `tutorialCompleted?`, `tutorialStep?`. Multi-provider (OpenAI/Gemini) keys remain **deferred** — a
   separate AI-backend project (docs/ROADMAP.md).
 
