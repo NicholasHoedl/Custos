@@ -16,28 +16,37 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 - **Counsel** — narrative ideas for the moment (four plain-English options that fit your main character) or
   open-ended directions for where to take the story next.
 
-Built on top of these: the **Character page** (every campaign has one **main character** — the hero you
-play and the voice the Keeper speaks in; a dashboard manages their profile, persona, and voice examples, and
-a **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties your
-backstory implies — all review-gated), **Converse** (pick a character to talk *with* — an NPC or a fellow
-party member — and get a spread of tagged, in-character questions to draw them out, from safe openers to
-pointed probes; name a thread to steer them, then feed back what they say for follow-ups), the **Chronicle**
-(jot plain lines of what happened; when
-the night is over, **Close out session** runs the Keeper over the whole log — entities, notes, and
-status changes, then straight into Illuminate — in one review wizard built for volume; the header also
-hosts the session switcher and the paste-and-extract **Transcribe** dialog, which can tie an import to
-any session or none), **Sessions** (browse each session with its summary, a "previously on…" recap, and
-**Illuminate** — a review-gated pass where the Keeper re-reads everything known about each entity the
-session touched and fills in the profile details and relationship ties the notes support), the **Web**
-view (a live force-directed graph of the campaign's relationships), a global **command palette**
-(`Ctrl+K` — jump to any view or find any entity), and chronology throughout (the world reconstructed
-"as of session N" with no future-knowledge leak).
+Built on top of these:
+
+- **Home** — the default landing view: your campaign at a glance — who you're playing, a "previously
+  on…" recap of the last session, what needs doing before the next one, open threads (quests and
+  rumors), a mini relationship map, and a box to ask the Keeper.
+- **Character page** — every campaign has one **main character** (the hero you play and the voice the
+  Keeper speaks in); a dashboard manages their profile, persona, and voice examples, and a
+  **Draft-from-backstory** tool derives the profile *and* proposes the people, places, notes, and ties
+  your backstory implies — all review-gated.
+- **Converse** — pick a character to talk *with* (an NPC or a fellow party member) and get a spread of
+  tagged, in-character questions to draw them out, from safe openers to pointed probes; name a thread to
+  steer them, then feed back what they say for follow-ups.
+- **Chronicle** — jot plain lines of what happened, one at a time; this is the view you live in during a
+  session. Its header hosts the active-session switcher.
+- **Sessions** — browse each session with its summary and a "previously on…" recap, and run the
+  per-session AI tools: **Extract** turns the raw log into entities, notes, and status changes;
+  **Illuminate** re-reads everything known about each entity the session touched and fills in the profile
+  details and relationship ties the notes support; **Transcribe** pastes in outside notes; and **Insert
+  before** backfills an earlier session if you started tracking mid-campaign.
+- **Web** — a live force-directed graph of the campaign's relationships you can filter, focus, and rewind
+  session by session.
+- **Continuity** — a read-only audit that flags contradictions in your records (a fallen character still
+  acting, ally/enemy conflicts, status mismatches), with one-click fixes for the deterministic ones.
+- A global **command palette** (`Ctrl+K` — jump to any view or find any entity), and **chronology**
+  throughout: the world reconstructed "as of session N" with no future-knowledge leak.
 
 ## Stack
 
 Electron · React 19 · TypeScript · Tailwind 4 + shadcn/ui · Zustand · SQLite (better-sqlite3) +
-Drizzle ORM · local sentence embeddings via Transformers.js (all-MiniLM-L6-v2) · the Anthropic SDK
-(main-process only). Windows-first.
+Drizzle ORM · local sentence embeddings + cross-encoder reranking via `@huggingface/transformers`
+(`Alibaba-NLP/gte-base-en-v1.5`) · the Anthropic SDK (main-process only). Windows-first.
 
 ## Download & install
 
@@ -56,10 +65,12 @@ npm install        # postinstall rebuilds better-sqlite3 for the Electron ABI
 npm run dev         # launch the app with hot reload
 ```
 
-On first run, create a campaign (each is created with its **main character** — the hero you play), then
-open **Settings** to add your API key (stored encrypted via Electron safeStorage — it never leaves your
-machine except to call Anthropic) and download the ~30 MB local search model. Codex capture works without
-either; Lore and Counsel need both; Converse and the Character page's AI tools need only the key.
+On first launch a short guided tutorial walks you through creating a campaign (each is created with its
+**main character** — the hero you play), then adding your API key (you can skip it for now) and
+downloading the local search model (~230 MB — a long-context embedder plus a reranker). The key is stored
+encrypted via Electron safeStorage — it never leaves your machine except to call Anthropic. Codex capture
+works without either; Lore and Counsel need both the key and the model; Converse and the Character tools
+need only the key; Continuity's automatic consistency checks run with neither.
 
 ## Scripts
 
@@ -86,7 +97,7 @@ Everything is stored under the app's user-data directory (`%APPDATA%\Custos` on 
 - `backups/` — a rotating snapshot of the DB taken before migrations on each launch (keeps the 5
   newest). To restore, replace `custos.db` with a backup while the app is closed.
 - `logs/main.log` — the main-process log (rotates at 1 MiB).
-- `models/` — the downloaded embedding model.
+- `models/` — the downloaded local search models (the embedder and the reranker).
 - `anthropic.key.enc` — your encrypted API key.
 - `usage.json` — AI token-usage + cost totals in monthly buckets (the Settings "AI usage" card).
 - `window-state.json` — the persisted window position and size.

@@ -1,8 +1,10 @@
 # Custos — Product Specification
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25
-**Status:** Draft — awaiting developer approval
+**Date:** 2026-06-25 · **Last currency review:** 2026-07-17 (through ADR-064)
+**Status:** Implemented and shipping (v0.1.0). This is the founding MVP spec; the product has since evolved
+through 64 ADRs. **§10 ("Delivered beyond the MVP") and [`docs/adr/`](docs/adr/README.md) are the
+authoritative record of the current state** — where they disagree with the MVP body below, they win.
 
 ---
 

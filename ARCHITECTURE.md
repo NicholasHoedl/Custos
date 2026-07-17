@@ -1,13 +1,13 @@
 # Custos — Architecture Document
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25 · **Last currency review:** 2026-07-12 (through ADR-045)
+**Date:** 2026-06-25 · **Last currency review:** 2026-07-17 (through ADR-064)
 **Status:** Implemented — this is the original MVP architecture plan. Several subsystems have since
 evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
 store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest's "in the moment" mode is a
 **multi-tag, 4-option narrative** model (title + plain-English explanation, no D&D mechanics — ADR-048,
 superseding ADR-026), not 4-of-7 fixed attitudes; **notes are many-to-many** via `note_entity` (SPEC §10);
-retrieval is **hybrid** (dense + fuzzy entity-name match, ADR-012); post-MVP features (current
+retrieval is **hybrid** (dense + fuzzy entity-name match) then **cross-encoder reranked**, and the local embedder is now **`gte-base-en-v1.5`** (768-dim) on `@huggingface/transformers` v3, **not `all-MiniLM-L6-v2`** — the 384-dim MiniLM references below are MVP-era (ADR-012/052); post-MVP features (current
 scene, session recap, paste-and-extract import, PC persona) live in ADR-013–016 and SPEC §10; a
 **chronology** model (session-stamped history + "as of session N" reconstruction) shipped in
 ADR-017, with **event re-scope to world history** (ADR-019) and an **operational-hardening** layer — DB
@@ -22,10 +22,18 @@ manual **Illuminate** (035), plus the Chronicle-header consolidation (036); **se
 chronicle entries (037); entity **merge** (038); entity **portraits** (039); the **"Web"** relationship graph
 (040); an env-gated **fake-AI e2e seam** (041/043); the **electron-updater** distribution stack + proprietary
 license (042); and a **forced first-run tutorial** (setup-only) with an always-available **Quickstart guide**
-(044/045). See [`docs/adr/README.md`](docs/adr/README.md) for the authoritative current index (**ADR-001–045**).
-The
-data model and module sections below are reconciled to match; older narrative sections remain
-MVP-era where the ADRs supersede them.
+(044/045). **A further arc (ADR-046–064) then continued:** per-type Web-graph colour (046) and UI cohesion —
+one compact page header + grouped nav (047); Counsel **narrative cards** (048) and the Converse **follow-up
+loop** (049); Web-graph **enrichment + a session time slider** (050) and **legibility at scale** (053);
+**standalone Extract / Illuminate / Transcribe on the Sessions page — the Chronicle "close out" wizard is
+retired** (051); the **local embedder upgrade to `gte-base-en-v1.5` + a cross-encoder reranker** (052);
+**enum-only** extraction status + **type-aware lifecycle** labels (054) and add/cut-only AI list edits (055);
+the **Continuity** consistency audit (056); **in-app bug reports and feature requests** via a Cloudflare-Worker
+email intake (057/058/064); a **spotlight first-run tutorial** (059/060, superseding 044/045); the **Home
+dashboard** as the default landing view (061); **insert-session-before** backfill (062); and an **optional
+onboarding API key** (063). See [`docs/adr/README.md`](docs/adr/README.md) for the authoritative current index
+(**ADR-001–064**). The data model and module sections below are reconciled to match where noted; older
+narrative sections remain MVP-era where the ADRs supersede them.
 
 ---
 

@@ -133,7 +133,7 @@ family, so the death cues lean on the strike + skull + ghosting to separate — 
 
 - Display **Fraunces**; body **Bricolage Grotesque**; mono **JetBrains Mono** (all bundled + wired).
 - The **`.inscribed`** utility (small-caps, letter-spaced, `--pewter`) marks section labels
-  (Ties / Annals / Persona) so they read like tomb inscriptions. The LEDGER wordmark uses the same
+  (Ties / Notes / Persona) so they read like tomb inscriptions. The CUSTOS wordmark uses the same
   register (pewter, letter-spaced).
 
 ### Death as a motif (the distinctive move)
