@@ -2,15 +2,13 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ModelDownloadProgress } from '@shared/recall-types'
-import { EMBED_DIM, EMBED_MODEL } from './embedding-constants'
+import { EMBED_MODEL } from './embedding-constants'
 
 // Local sentence embeddings via Transformers.js (ADR-001/002; ADR-052 upgraded the runtime to v3 + the
 // gte-base-en-v1.5 embedder). Runs in the main process; weights live in userData/models so a normal launch
 // never touches the network (offline-retrieval guarantee). @huggingface/transformers is ESM-only, but the
 // main bundle is CJS — so it is loaded via dynamic import(). Backend = onnxruntime-node (cpu); NOT wasm
 // (invalid in Node) — so `device` is omitted (defaults to cpu) and `dtype: 'q8'` gives the quantized weights.
-
-export { EMBED_DIM, EMBED_MODEL }
 
 type EmbedPipeline = (
   text: string,

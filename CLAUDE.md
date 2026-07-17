@@ -425,7 +425,8 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   **#4 Hide-rumored** are render-only (labels rationed by small-graph ≤30 / zoom `k≥1.4` / hub degree≥3 / MC /
   `hoveredId` / focus, edge labels only zoomed/hovered/focused; weak-edge skip needs raw `confidence` on
   `SimLink`). Type/hide-fallen/focus stay render-only (`visibleIds`) so they don't reshuffle. `parentOf`
-  generalizes the old inline `clusterOf` to both authored directions (`PARENT_SIDE` over `HIERARCHY_RELATIONS`);
+  generalizes the old inline `clusterOf` to both authored directions (via its own `PARENT_SIDE` map over the
+  hierarchical relations — `located_in`/`member_of` + inverses);
   grouping derives from the as-of `graph.edges` (NOT `getHierarchy`, which is structural) so collapse is
   as-of-correct under the slider. Header counter stays campaign totals + a conditional `· N hidden`. No
   migration; renderer-only.

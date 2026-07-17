@@ -179,18 +179,8 @@ export const RELATIONS: Record<RelationKey, RelationDef> = {
 
 export const RELATION_LIST: RelationDef[] = Object.values(RELATIONS)
 
-/** The relation keys that form containment hierarchies (walked by the recursive-CTE traversal). */
-export const HIERARCHY_RELATIONS: RelationKey[] = RELATION_LIST.filter((r) => r.hierarchical).map(
-  (r) => r.key
-)
-
 export function isRelationKey(value: string): value is RelationKey {
   return Object.prototype.hasOwnProperty.call(RELATIONS, value)
-}
-
-/** Label shown when viewing the edge from the `to` side. */
-export function inverseLabel(key: RelationKey): string {
-  return RELATIONS[key].inverse
 }
 
 function typeMatches(allowed: EntityType[] | '*', type: EntityType): boolean {
