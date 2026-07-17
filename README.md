@@ -9,7 +9,7 @@ Everything lives on your machine. Retrieval runs offline; only the written answe
 
 ## The main loop
 
-Custos is built around one night-to-night loop (the same one its in-app Quickstart teaches):
+Custos is built around one night-to-night loop:
 
 1. **Chronicle** — jot down what happens at the table, one plain line at a time. This is the view you
    live in during a session.
