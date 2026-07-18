@@ -324,7 +324,7 @@ function FollowUpBox({
     <div className="space-y-2 rounded-lg border border-primary/30 bg-card/60 p-3">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-relaxed text-foreground/80">
-          <span className="inscribed mr-1.5 text-[10px]">You asked</span>
+          <span className="inscribed mr-1.5 text-[0.625rem]">You asked</span>
           {`"${question}"`}
         </p>
         <button
@@ -377,11 +377,11 @@ function TurnBlock({
       {turn.asked && (
         <div className="space-y-1 rounded-md border-l-2 border-primary/40 bg-muted/20 py-1.5 pl-3 pr-2 text-sm leading-relaxed">
           <p className="text-foreground/70">
-            <span className="inscribed mr-1.5 text-[10px]">You asked</span>
+            <span className="inscribed mr-1.5 text-[0.625rem]">You asked</span>
             {`"${turn.asked.question}"`}
           </p>
           <p className="text-foreground/80">
-            <span className="inscribed mr-1.5 text-[10px]">They said</span>
+            <span className="inscribed mr-1.5 text-[0.625rem]">They said</span>
             {turn.asked.answer}
           </p>
         </div>
@@ -408,7 +408,7 @@ function TurnBlock({
         </Button>
       </div>
       {turn.cost && (
-        <p className="text-right font-mono text-[10px] text-muted-foreground">
+        <p className="text-right font-mono text-[0.625rem] text-muted-foreground">
           {formatRunCost(turn.cost)}
         </p>
       )}
@@ -509,14 +509,16 @@ function QuestionCard({ q, onPick }: { q: ConverseQuestion; onPick?: (question: 
         <span className="rounded-md bg-primary/15 px-2 py-0.5 font-display text-sm font-medium text-primary">
           {converseTagLabel(q.tag)}
         </span>
-        <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+        <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
           {CONVERSE_AIM_LABELS[meta.aim]}
         </span>
-        <span className="ml-auto text-[11px] text-muted-foreground">
+        <span className="ml-auto text-[0.6875rem] text-muted-foreground">
           {CONVERSE_COST_LABELS[meta.cost]}
         </span>
       </div>
-      <p className="text-[15px] leading-relaxed text-foreground/90">{`"${q.question}"`}</p>
+      <p className="font-reading text-[0.9375rem] leading-relaxed text-foreground/90">
+        {`"${q.question}"`}
+      </p>
       <p className="border-t border-border pt-2 text-xs text-muted-foreground">{q.read}</p>
       {onPick && (
         <button

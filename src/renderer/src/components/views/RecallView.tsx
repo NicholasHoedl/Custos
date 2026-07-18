@@ -199,7 +199,7 @@ export function RecallView() {
                     : `Something went wrong: ${recall.error.message}`}
                 </Banner>
               ) : (
-                <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                <div className="font-reading whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-foreground/90">
                   {recall.answer}
                   <span className="ml-0.5 animate-pulse text-primary">▌</span>
                 </div>
@@ -277,7 +277,7 @@ function TurnBlock({ turn }: { turn: RecallTurn }) {
 
       {turn.answer && (
         <>
-          <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+          <div className="font-reading whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-foreground/90">
             {turn.answer}
           </div>
           <div className="flex items-center justify-end gap-1">
@@ -306,7 +306,7 @@ function TurnBlock({ turn }: { turn: RecallTurn }) {
       {turn.sources.length > 0 && <Sources sources={turn.sources} />}
 
       {turn.cost && (
-        <p className="text-right font-mono text-[10px] text-muted-foreground">
+        <p className="text-right font-mono text-[0.625rem] text-muted-foreground">
           {formatRunCost(turn.cost)}
         </p>
       )}
@@ -335,12 +335,12 @@ function Sources({ sources }: { sources: RecallSource[] }) {
                   {s.entityName ?? 'Campaign lore'}
                 </span>
                 {s.cited && (
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-primary/80">
+                  <span className="font-mono text-[0.5625rem] uppercase tracking-wider text-primary/80">
                     cited
                   </span>
                 )}
                 {s.sessionLabel && (
-                  <span className="font-mono text-[10px] text-muted-foreground">
+                  <span className="font-mono text-[0.625rem] text-muted-foreground">
                     {s.sessionLabel}
                   </span>
                 )}

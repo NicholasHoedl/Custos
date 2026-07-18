@@ -70,13 +70,60 @@
   --font-display: 'Fraunces Variable', Georgia, serif;
   --font-body: 'Bricolage Grotesque Variable', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  /* Source token behind the `font-reading` utility (ADR-065). Named APART from --font-reading so the
+   * @theme inline mapping below is a real alias, not a self-reference. */
+  --reading-family: var(--font-body);
+}
+
+/* ---- Appearance variants (Settings → Appearance; entity-types `UiScale` / `BaseTemperature` /
+ * `ReadingFont` / `Texture` — ADR-065). Same contract as the accent blocks below: override RAW tokens
+ * only, never semantic roles, so these stay orthogonal to [data-accent] and no combined
+ * [data-accent][data-base] selectors are ever needed. The defaults (comfortable / warm / sans / none)
+ * need no block — the base :root above IS the default. ---- */
+
+/* Interface SCALE, not merely text: Tailwind v4's spacing scale is calc(var(--spacing) * N), so the root
+ * font-size zooms padding, gaps, widths and radii too. Borders stay a crisp 1px and breakpoints don't
+ * move (rem inside a media query resolves against the INITIAL root size) — which is why this is
+ * preferable to webFrame.setZoomFactor. */
+:root[data-ui-scale='compact'] {
+  font-size: 15px;
+}
+:root[data-ui-scale='spacious'] {
+  font-size: 18px;
+}
+
+/* Cold slate ground — pairs with the cold accents (steel / verdigris / indigo), which otherwise sit on a
+ * deliberately warm charcoal. Also cools the bone/ash INKS (a cold ground under warm ink is a
+ * half-measure) and --destructive-foreground, the one semantic role written as a literal hex. Must NOT
+ * touch --primary-foreground: the accent blocks own it and var(--bone) resolves live. The --type-* graph
+ * hues stay warm on purpose (ADR-046 places the graph outside the single-accent register). */
+:root[data-base='cold'] {
+  --char: #121316;
+  --char-sidebar: #0e0f12;
+  --char-raised: #1a1c20;
+  --char-inset: #22252a;
+  --iron: #2f3339;
+  --iron-soft: #22252a;
+  --bone: #dfe3e8;
+  --bone-dim: #bfc4cb;
+  --ash: #838a94;
+  --destructive-foreground: #f0e6e6;
+}
+
+/* Reading font — swaps ONLY the source token behind the `font-reading` utility, which is applied to the
+ * long-form prose elements. Inert by default (it resolves to the body sans), so those call sites carry
+ * no conditional logic. Fraunces is already bundled, so the serif costs no bundle. */
+:root[data-reading-font='serif'] {
+  --reading-family: var(--font-display);
 }
 
 /* ---- Accent variants (Settings → Accent color; entity-types `AccentColor`). Each block overrides ONLY
  * the raw --ember* trio; every accent-derived role (--primary, --accent, --ring) and the Web graph's
  * --type-pc resolve THROUGH those tokens, so the whole app re-tints. Default (ember) needs no block — the
- * base :root above IS ember. Deep bases (red, purple) also flip --primary-foreground to bone so ink on a
- * filled primary button stays legible. Keep the swatch hexes in lib/accent.ts ACCENT_META in sync. ---- */
+ * base :root above IS ember. Deep bases (red, purple, steel, oxblood, indigo) also flip
+ * --primary-foreground to bone so ink on a filled primary button stays legible. Keep the swatch hexes in
+ * lib/accent.ts ACCENT_META in sync. ---- */
 :root[data-accent='cyan'] {
   --ember: #2fb0c6;
   --ember-deep: #1c5f6b;
@@ -103,6 +150,38 @@
   --ember-deep: #523472;
   --ember-bright: #bd9bde;
   --primary-foreground: var(--bone);
+}
+:root[data-accent='steel'] {
+  --ember: #4a7fb5;
+  --ember-deep: #2a4a6b;
+  --ember-bright: #7aa9d8;
+  --primary-foreground: var(--bone);
+}
+:root[data-accent='verdigris'] {
+  --ember: #3f9285;
+  --ember-deep: #235049;
+  --ember-bright: #6bb8ab;
+}
+:root[data-accent='oxblood'] {
+  --ember: #9c4256;
+  --ember-deep: #5a2431;
+  --ember-bright: #c4707f;
+  --primary-foreground: var(--bone);
+}
+:root[data-accent='parchment'] {
+  --ember: #c9b78f;
+  --ember-deep: #786a4c;
+  --ember-bright: #e0d3b4;
+}
+:root[data-accent='rose'] {
+  --ember: #bf7a88;
+  --ember-deep: #6f3f48;
+  --ember-bright: #d9a3ad;
+}
+:root[data-accent='indigo'] {
+  --ember: #5f5fb0;
+  --ember-deep: #36336a;
+  --ember-bright: #8f8fd0;
 }
 
 /* ---- Expose semantic roles to Tailwind v4 utilities ---- */
@@ -142,6 +221,7 @@
   --font-display: var(--font-display);
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
+  --font-reading: var(--reading-family);
 }
 
 @layer base {
@@ -160,5 +240,27 @@
     font-variant-caps: all-small-caps;
     letter-spacing: 0.14em;
     color: var(--pewter);
+  }
+
+  /* Long-form prose (ADR-065). The `font-reading` FAMILY comes from the Tailwind utility generated off
+   * --font-reading; this only adds optical sizing, since Fraunces is a high-contrast display serif and
+   * needs it at body sizes. Harmless for the sans default. */
+  .font-reading {
+    font-optical-sizing: auto;
+  }
+
+  /* Optional film grain over the canvas (Settings → Appearance, ADR-065). `display: none` when off, so a
+   * full-viewport layer costs no compositing for users who leave it off. The noise is a TILED 160×160 SVG
+   * (stitchTiles + background-repeat) because a viewport-sized feTurbulence rasterizes expensively, and is
+   * desaturated to grey. Deliberately NO mix-blend-mode: the AppShell frame creates no stacking context,
+   * so blending would resolve against the root backdrop unpredictably. */
+  .app-grain {
+    display: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    opacity: 0.035;
+  }
+  :root[data-texture='grain'] .app-grain {
+    display: block;
   }
 }

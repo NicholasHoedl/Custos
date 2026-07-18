@@ -196,7 +196,7 @@ export function EntityRow({
               {Object.entries(entity.attributes).map(([k, v]) => (
                 <span
                   key={k}
-                  className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                  className="rounded bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
                 >
                   {k}: {String(v)}
                 </span>
@@ -266,26 +266,26 @@ export function NoteRow({
             disabled={!note.include}
             className={cn(
               'min-h-0 resize-none border-0 bg-transparent px-0 py-0 font-display italic text-foreground shadow-none focus-visible:ring-0',
-              compact ? 'text-sm leading-snug' : 'text-[15px] leading-relaxed'
+              compact ? 'text-sm leading-snug' : 'text-[0.9375rem] leading-relaxed'
             )}
           />
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {note.entityRefs.map((r, i) => (
-              <span key={i} className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+              <span key={i} className="rounded bg-primary/10 px-1.5 py-0.5 text-[0.6875rem] text-primary">
                 {refName(r)}
               </span>
             ))}
             {note.tags.map((t) => (
               <span
                 key={t}
-                className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                className="rounded bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
               >
                 #{t}
               </span>
             ))}
             {note.possibleDuplicate && (
               <span
-                className="rounded bg-metal/15 px-1.5 py-0.5 text-[11px] text-metal"
+                className="rounded bg-metal/15 px-1.5 py-0.5 text-[0.6875rem] text-metal"
                 title="Very similar to a note already in the campaign — include only if it adds something new."
               >
                 Possible duplicate
@@ -299,7 +299,7 @@ export function NoteRow({
                 disabled={!note.include}
               >
                 <SelectTrigger
-                  className="h-6 w-auto gap-1 border-0 bg-transparent px-1 text-[11px] text-metal focus:ring-0"
+                  className="h-6 w-auto gap-1 border-0 bg-transparent px-1 text-[0.6875rem] text-metal focus:ring-0"
                   aria-label="Confidence"
                 >
                   <SelectValue />
@@ -351,7 +351,7 @@ export function StatusChangeRow({
       <div className="flex items-start gap-3">
         <Toggle on={change.include} onClick={onToggle} />
         <div className="min-w-0 flex-1">
-          <div className={cn('font-display text-foreground', compact ? 'text-sm' : 'text-[15px]')}>
+          <div className={cn('font-display text-foreground', compact ? 'text-sm' : 'text-[0.9375rem]')}>
             {refName(change.entityRef)}
           </div>
           <div className={cn('flex flex-wrap items-center gap-2', compact ? 'mt-1' : 'mt-2')}>
@@ -454,7 +454,7 @@ export function RelationshipChangeRow({
                 placeholder="Why / context (optional)"
                 className="h-7 text-xs"
               />
-              {feelings && <p className="text-[11px] text-muted-foreground">{feelings}</p>}
+              {feelings && <p className="text-[0.6875rem] text-muted-foreground">{feelings}</p>}
             </div>
           )}
         </div>
@@ -484,10 +484,10 @@ export function FieldChangeRow({
         <Toggle on={change.include} onClick={onToggle} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className={cn('font-display text-foreground', compact ? 'text-sm' : 'text-[15px]')}>
+            <span className={cn('font-display text-foreground', compact ? 'text-sm' : 'text-[0.9375rem]')}>
               {refName(change.entityRef)}
             </span>
-            <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
               {fieldLabel(change.field)}
             </span>
           </div>

@@ -171,7 +171,7 @@ export function ExtractDialog({
                 </ul>
               )}
               {imp.cost && (
-                <p className="pt-1 font-mono text-[10px] text-muted-foreground">
+                <p className="pt-1 font-mono text-[0.625rem] text-muted-foreground">
                   This extract used {formatRunCost(imp.cost)}
                 </p>
               )}

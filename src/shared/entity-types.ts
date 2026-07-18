@@ -178,15 +178,62 @@ export interface EventLogEntry {
   updatedAt: number | null
 }
 
-// The app is dark-only and has no font-size control; the former `theme`/`fontSize` settings were
-// declared but never read, so they were removed (ROADMAP R-1/R-2). Dark lives unconditionally in
-// globals.css; the Toaster hardcodes theme="dark".
+// The app is dark-only — dark lives unconditionally in globals.css and the Toaster hardcodes
+// theme="dark". The former `theme`/`fontSize` stubs were declared but never READ, so they were removed
+// (ROADMAP R-1/R-2); the appearance settings below (ADR-065) are their wired replacements — each one is
+// actually applied, as a `[data-*]` attribute on <html> that globals.css keys its token overrides off.
 
 /** The user-selectable UI accent hue. Drives every accent-derived token through the raw --ember* trio
  *  that globals.css re-tints per `:root[data-accent]` (see docs/design/theme.md). 'ember' is the default. */
-export type AccentColor = 'ember' | 'cyan' | 'green' | 'red' | 'yellow' | 'purple'
+export type AccentColor =
+  | 'ember'
+  | 'cyan'
+  | 'green'
+  | 'red'
+  | 'yellow'
+  | 'purple'
+  | 'steel'
+  | 'verdigris'
+  | 'oxblood'
+  | 'parchment'
+  | 'rose'
+  | 'indigo'
 /** Canonical order for the Settings picker; also the allow-list for the applied [data-accent] value. */
-export const ACCENT_COLORS: AccentColor[] = ['ember', 'cyan', 'green', 'red', 'yellow', 'purple']
+export const ACCENT_COLORS: AccentColor[] = [
+  'ember',
+  'cyan',
+  'green',
+  'red',
+  'yellow',
+  'purple',
+  'steel',
+  'verdigris',
+  'oxblood',
+  'parchment',
+  'rose',
+  'indigo'
+]
+
+/** Interface scale (ADR-065). Sets the ROOT font-size — and because Tailwind v4's spacing scale is
+ *  `calc(var(--spacing) * N)`, that zooms padding, gaps, widths and radii too, not just type. Borders
+ *  stay a crisp 1px and breakpoints don't move, which is why this beats `webFrame.setZoomFactor`. */
+export type UiScale = 'compact' | 'comfortable' | 'spacious'
+export const UI_SCALES: UiScale[] = ['compact', 'comfortable', 'spacious']
+
+/** Base temperature (ADR-065): the warm "Ash & Ember" charcoal, or a cold slate ground that suits the
+ *  cold accents (steel / verdigris / indigo). Overrides RAW tokens only, so it stays orthogonal to
+ *  [data-accent] — no combined selectors needed. */
+export type BaseTemperature = 'warm' | 'cold'
+export const BASE_TEMPERATURES: BaseTemperature[] = ['warm', 'cold']
+
+/** Long-form reading font (ADR-065): the body sans, or Fraunces (already bundled, so free) for prose
+ *  surfaces only. Applied via the `font-reading` utility — never where `font-display` already sits. */
+export type ReadingFont = 'sans' | 'serif'
+export const READING_FONTS: ReadingFont[] = ['sans', 'serif']
+
+/** Background texture (ADR-065): off, or a subtle tiled grain over the canvas. */
+export type Texture = 'none' | 'grain'
+export const TEXTURES: Texture[] = ['none', 'grain']
 
 /** The spotlight-tour steps (ADR-059, expanded to the per-page walkthrough by ADR-060), in order.
  *  `AppSettings.tutorialStep` persists the step to RESUME at — its presence also proves the welcome
@@ -239,4 +286,11 @@ export interface AppSettings {
   /** UI accent hue (globals.css [data-accent]); optional so pre-existing settings.json files default to
    *  ember. Unlike the removed theme/fontSize stubs, this one is actually applied (AppShell + Settings). */
   accentColor?: AccentColor
+  /** Appearance prefs (ADR-065), each applied as a `[data-*]` attribute on <html> by
+   *  `renderer/lib/appearance.ts`. All optional so pre-existing settings.json files stay valid, and
+   *  every default reproduces the current look. */
+  uiScale?: UiScale
+  baseTemperature?: BaseTemperature
+  readingFont?: ReadingFont
+  texture?: Texture
 }

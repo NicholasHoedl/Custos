@@ -381,7 +381,7 @@ export function HomeView() {
                 })}
                 {rumors.map((r) => (
                   <div key={r.id} className="rounded-md px-2 py-1 text-xs text-muted-foreground">
-                    <span className="mr-1.5 rounded bg-muted/60 px-1 py-0.5 text-[10px] uppercase tracking-wide">
+                    <span className="mr-1.5 rounded bg-muted/60 px-1 py-0.5 text-[0.625rem] uppercase tracking-wide">
                       {r.confidence === 'rumored' ? 'rumor' : 'suspected'}
                     </span>
                     <span className="line-clamp-2">{r.content}</span>
@@ -430,7 +430,7 @@ export function HomeView() {
                 </div>
                 {touched.length > 0 && (
                   <div className="space-y-1">
-                    <h4 className="inscribed text-[10px]">Recently touched</h4>
+                    <h4 className="inscribed text-[0.625rem]">Recently touched</h4>
                     <div className="flex flex-wrap gap-1.5">
                       {touched.map((e) => (
                         <button
@@ -439,7 +439,7 @@ export function HomeView() {
                           onClick={() => openEntity(e)}
                           className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/40 px-2 py-1 text-xs text-foreground transition-colors hover:border-primary/50"
                         >
-                          <Portrait image={e.image} name={e.name} lifecycle={e.lifecycle} size="sm" className="size-4 rounded-sm text-[7px]" />
+                          <Portrait image={e.image} name={e.name} lifecycle={e.lifecycle} size="sm" className="size-4 rounded-sm text-[0.4375rem]" />
                           <span className="max-w-32 truncate">{e.name}</span>
                         </button>
                       ))}
@@ -519,7 +519,7 @@ export function HomeView() {
                   onClick={() => setActiveView(r.lens)}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                 >
-                  <span className="shrink-0 rounded bg-muted/60 px-1 py-0.5 text-[10px] uppercase tracking-wide">
+                  <span className="shrink-0 rounded bg-muted/60 px-1 py-0.5 text-[0.625rem] uppercase tracking-wide">
                     {LENS_LABEL[r.lens]}
                   </span>
                   <span className="truncate">{r.label}</span>

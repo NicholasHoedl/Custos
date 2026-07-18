@@ -208,7 +208,7 @@ export function TutorialOverlay({
   const header = (
     <div className="flex items-baseline justify-between gap-3">
       <h2 className="font-display text-base font-semibold text-foreground">{copy.title}</h2>
-      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="shrink-0 font-mono text-[0.625rem] uppercase tracking-wider text-muted-foreground">
         Step {STEP_DEFS.indexOf(def) + 1} of {STEP_DEFS.length}
       </span>
     </div>
@@ -289,7 +289,7 @@ export function TutorialOverlay({
         scrollSelector={def.id === 'settings-page' ? '[data-tour="api-key-card"]' : undefined}
       >
         {header}
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{copy.body}</p>
+        <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">{copy.body}</p>
         {nextRow}
       </PageOverlay>
     )
@@ -299,7 +299,7 @@ export function TutorialOverlay({
     <Spotlight rect={rect} interactive={def.kind === 'action'} side={def.side ?? 'right'} wide={def.id === 'apikey'}>
       <div className="space-y-2">
         {header}
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{copy.body}</p>
+        <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">{copy.body}</p>
 
         {def.id === 'apikey' && (
           <div className="space-y-2">

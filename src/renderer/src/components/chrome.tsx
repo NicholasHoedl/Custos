@@ -186,7 +186,7 @@ export function ProgressBar({
           style={{ width: pct != null ? `${pct}%` : '40%' }}
         />
       </div>
-      <span className="font-mono text-[10px] text-muted-foreground">
+      <span className="font-mono text-[0.625rem] text-muted-foreground">
         {pct != null ? `${pct}%` : '…'}
       </span>
     </div>

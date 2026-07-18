@@ -60,7 +60,7 @@ export function EntityHistory({ entityId, type }: { entityId: string; type: Enti
           <ol className="space-y-1 border-l border-border pl-3">
             {rows.map((r) => (
               <li key={r.id} className="flex flex-wrap items-baseline gap-x-2 text-xs">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-primary">
+                <span className="font-mono text-[0.625rem] uppercase tracking-wider text-primary">
                   {r.sinceSessionNumber === null ? 'Before tracking' : `Session ${r.sinceSessionNumber}`}
                 </span>
                 <span className="text-foreground/90">

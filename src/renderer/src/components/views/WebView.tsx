@@ -594,7 +594,7 @@ export function WebView() {
                   className="h-7 w-32 pl-7 text-xs"
                 />
               </div>
-              <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+              <span className="whitespace-nowrap font-mono text-[0.6875rem] text-muted-foreground">
                 {graph.nodes.length} {graph.nodes.length === 1 ? 'entity' : 'entities'} ·{' '}
                 {graph.edges.length} {graph.edges.length === 1 ? 'tie' : 'ties'}
                 {hiddenCount > 0 && ` · ${hiddenCount} hidden`}
@@ -750,14 +750,14 @@ export function WebView() {
           <div className="absolute bottom-3 left-3 flex flex-col gap-2">
             <div className="rounded-md border border-border/60 bg-card/80 px-2.5 py-2 backdrop-blur-sm">
               <div className="mb-1 flex items-center justify-between gap-3">
-                <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                <span className="text-[0.5625rem] font-medium uppercase tracking-wide text-muted-foreground/70">
                   Show types
                 </span>
                 {hidden.size > 0 && (
                   <button
                     type="button"
                     onClick={() => setHidden(new Set())}
-                    className="text-[9px] text-primary hover:underline"
+                    className="text-[0.5625rem] text-primary hover:underline"
                   >
                     Show all
                   </button>
@@ -792,7 +792,7 @@ export function WebView() {
                       ) : (
                         <Icon className="size-3 shrink-0" style={{ color: ENTITY_TYPE_COLOR[t] }} />
                       )}
-                      <span className={cn('text-[10px] text-muted-foreground', off && 'line-through')}>
+                      <span className={cn('text-[0.625rem] text-muted-foreground', off && 'line-through')}>
                         {ENTITY_TYPE_LABELS[t]}
                       </span>
                     </button>
@@ -852,7 +852,7 @@ export function WebView() {
               }}
               className="h-1 w-40 cursor-pointer accent-[var(--ember-bright)]"
             />
-            <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
+            <span className="w-16 shrink-0 font-mono text-[0.625rem] text-muted-foreground">
               {asOfLabel}
             </span>
           </div>
@@ -933,7 +933,7 @@ export function WebView() {
         )}
 
         {!empty && hasCampaign && (
-          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 font-mono text-[10px] text-muted-foreground/70">
+          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 font-mono text-[0.625rem] text-muted-foreground/70">
             click a node to focus · shift-click two to compare · right-click for actions · drag to
             pan · scroll to zoom
           </p>
@@ -1100,7 +1100,7 @@ function ToggleChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-colors',
+        'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.625rem] transition-colors',
         on
           ? 'border-primary/40 bg-primary/15 text-primary'
           : 'border-border/60 bg-card/80 text-muted-foreground hover:text-foreground'

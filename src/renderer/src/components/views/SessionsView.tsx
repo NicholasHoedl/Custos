@@ -135,7 +135,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                   {s.summary && <Check className="size-3 shrink-0 text-primary" aria-label="Recapped" />}
                   {(unclosed[s.id] ?? 0) > 0 && (
                     <span
-                      className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
+                      className="ml-auto rounded-full bg-primary px-1.5 text-[0.625rem] font-semibold text-primary-foreground"
                       title={`${unclosed[s.id]} ${unclosed[s.id] === 1 ? 'entry' : 'entries'} added or changed since last extract`}
                     >
                       {unclosed[s.id]}
@@ -180,7 +180,7 @@ function SessionsWorkspace({ campaignId }: { campaignId: string }) {
                   Extract
                   {(unclosed[selected.id] ?? 0) > 0 && (
                     <span
-                      className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground"
+                      className="rounded-full bg-primary px-1.5 text-[0.625rem] font-semibold text-primary-foreground"
                       title={`${unclosed[selected.id]} ${unclosed[selected.id] === 1 ? 'entry' : 'entries'} added or changed since last extract`}
                     >
                       {unclosed[selected.id]}
@@ -286,10 +286,10 @@ function ChronicleEntries({ sessionId }: { sessionId: string }) {
       ) : (
         ordered.map((ev) => (
           <div key={ev.id} className="flex gap-3 border-l-2 border-border pl-3">
-            <span className="shrink-0 pt-0.5 font-mono text-[10px] text-muted-foreground">
+            <span className="shrink-0 pt-0.5 font-mono text-[0.625rem] text-muted-foreground">
               {formatTime(ev.timestamp)}
             </span>
-            <p className="whitespace-pre-wrap text-sm text-foreground/90">{ev.content}</p>
+            <p className="font-reading whitespace-pre-wrap text-sm text-foreground/90">{ev.content}</p>
           </div>
         ))
       )}

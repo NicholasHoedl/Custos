@@ -260,7 +260,7 @@ function NoteCard({
         editing ? 'border-primary/50' : 'border-border'
       )}
     >
-      <p className="whitespace-pre-wrap text-sm text-foreground/90">{note.content}</p>
+      <p className="font-reading whitespace-pre-wrap text-sm text-foreground/90">{note.content}</p>
       <div className="mt-2 flex flex-wrap gap-1">
         {note.entityIds.map((id) => {
           const e = entityById.get(id)
@@ -277,12 +277,12 @@ function NoteCard({
       </div>
       <div className="mt-1.5 flex items-center gap-2">
         {note.confidence !== 'confirmed' && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-metal">
+          <span className="inline-flex items-center gap-1 text-[0.625rem] font-medium text-metal">
             <CircleDashed className="size-3" />
             {NOTE_CONFIDENCE_LABELS[note.confidence]}
           </span>
         )}
-        <span className="font-mono text-[10px] text-muted-foreground">
+        <span className="font-mono text-[0.625rem] text-muted-foreground">
           {formatTimestamp(note.createdAt)}
         </span>
       </div>

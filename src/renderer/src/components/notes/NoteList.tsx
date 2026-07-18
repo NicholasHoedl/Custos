@@ -32,8 +32,8 @@ export function NoteList({
             key={n.id}
             className="group relative rounded-md border border-border bg-card/40 p-3 pr-16"
           >
-            <p className="whitespace-pre-wrap text-sm text-foreground/90">{n.content}</p>
-            <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+            <p className="font-reading whitespace-pre-wrap text-sm text-foreground/90">{n.content}</p>
+            <div className="mt-1 flex items-center gap-2 font-mono text-[0.625rem] text-muted-foreground">
               <span>{formatTimestamp(n.createdAt)}</span>
               {n.confidence !== 'confirmed' && (
                 <span className="inline-flex items-center gap-1 text-metal">

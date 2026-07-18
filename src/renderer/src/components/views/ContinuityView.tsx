@@ -179,7 +179,7 @@ export function ContinuityView() {
                 </div>
               )}
               {result.cost && (
-                <p className="text-right font-mono text-[10px] text-muted-foreground">
+                <p className="text-right font-mono text-[0.625rem] text-muted-foreground">
                   {formatRunCost(result.cost)}
                 </p>
               )}
@@ -229,27 +229,27 @@ function FindingCard({
       <div className="flex flex-wrap items-center gap-1.5">
         <span
           className={cn(
-            'rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+            'rounded-md px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide',
             SEVERITY_STYLE[finding.severity]
           )}
         >
           {SEVERITY_LABEL[finding.severity]}
         </span>
-        <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+        <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
           {CONTINUITY_CATEGORY_LABELS[finding.category]}
         </span>
-        <span className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+        <span className="rounded-md border border-border/60 px-1.5 py-0.5 text-[0.625rem] uppercase tracking-wide text-muted-foreground/70">
           {finding.source === 'ai' ? 'AI' : 'Auto'}
         </span>
       </div>
-      <h3 className="font-display text-[15px] font-medium leading-snug text-foreground">
+      <h3 className="font-display text-[0.9375rem] font-medium leading-snug text-foreground">
         {finding.summary}
       </h3>
       {finding.detail && (
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{finding.detail}</p>
+        <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">{finding.detail}</p>
       )}
       {finding.suggestedFix && (
-        <p className="text-[12px] italic leading-relaxed text-muted-foreground/80">
+        <p className="text-[0.75rem] italic leading-relaxed text-muted-foreground/80">
           Suggested fix: {finding.suggestedFix}
         </p>
       )}

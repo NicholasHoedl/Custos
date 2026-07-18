@@ -73,7 +73,7 @@ export function SceneControls({ campaignId }: { campaignId: string }) {
         className="flex w-full items-center justify-between gap-2"
       >
         <span className="flex items-center gap-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="font-mono text-[0.625rem] uppercase tracking-wider text-muted-foreground">
             Scene
           </span>
           {!open && sceneActive && (

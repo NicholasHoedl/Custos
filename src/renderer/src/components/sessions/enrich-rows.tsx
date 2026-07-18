@@ -21,7 +21,7 @@ export function ChecklistRow({
     <label className="flex cursor-pointer items-center gap-3 rounded-md border border-border bg-card/60 px-3 py-2">
       <input type="checkbox" className="accent-primary" checked={checked} onChange={onToggle} />
       <span className="min-w-0 flex-1 truncate text-sm text-foreground">{touched.name}</span>
-      <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+      <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
         {ENTITY_TYPE_LABELS[touched.type]}
       </span>
       <span className="shrink-0 text-xs text-muted-foreground">

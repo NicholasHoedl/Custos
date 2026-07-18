@@ -148,16 +148,16 @@ export function CharacterDashboard({
           </button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
+              <span className="rounded border border-primary/40 px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-wider text-primary">
                 {ENTITY_TYPE_LABELS.pc}
               </span>
               {entity.status && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                   {entity.status}
                 </span>
               )}
               {(fallen || presumed) && (
-                <span className="inscribed text-[11px] text-blood">
+                <span className="inscribed text-[0.6875rem] text-blood">
                   {lifecycleLabel(entity.type, entity.lifecycle)}
                 </span>
               )}
@@ -235,7 +235,7 @@ export function CharacterDashboard({
                   }
                 />
                 {(fallen || presumed) && (
-                  <label className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+                  <label className="flex items-center gap-2 pt-1 text-[0.6875rem] text-muted-foreground">
                     <input
                       type="checkbox"
                       className="size-3.5 accent-primary"
@@ -275,7 +275,7 @@ export function CharacterDashboard({
               action={<EditListButton onClick={() => setEditList('voiceExamples')} />}
             >
               <ChipList items={entity.voiceExamples} />
-              <p className="mt-2 text-[11px] text-muted-foreground">
+              <p className="mt-2 text-[0.6875rem] text-muted-foreground">
                 Sample lines in their own words — these ground Counsel and Converse.
               </p>
             </Card>
@@ -312,7 +312,7 @@ export function CharacterDashboard({
                 placeholder="Where they come from — Draft from backstory turns this into traits, goals, flaws, and voice."
               />
               {suggestHint && (
-                <p className="mt-1.5 text-[11px] text-muted-foreground">{suggestHint}</p>
+                <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">{suggestHint}</p>
               )}
             </Card>
 

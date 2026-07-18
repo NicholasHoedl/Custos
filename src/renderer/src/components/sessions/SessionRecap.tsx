@@ -78,7 +78,7 @@ export function SessionRecap({ session, onSaved }: { session: Session; onSaved?:
       )}
 
       {body ? (
-        <article className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+        <article className="font-reading whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-foreground/90">
           {body}
           {streaming && <span className="ml-0.5 animate-pulse text-primary">▌</span>}
         </article>

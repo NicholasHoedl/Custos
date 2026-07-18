@@ -195,7 +195,7 @@ export function EnrichDialog({
                   </ul>
                 )}
                 {enrich.cost && (
-                  <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                  <p className="mt-2 font-mono text-[0.625rem] text-muted-foreground">
                     This sweep used {formatRunCost(enrich.cost)}
                   </p>
                 )}

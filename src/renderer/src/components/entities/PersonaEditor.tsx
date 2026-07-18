@@ -75,12 +75,12 @@ export function PersonaEditor({ entityId }: { entityId: string }) {
         <div className="flex items-center gap-2">
           <h3 className="inscribed text-xs">Persona</h3>
           {persona?.stale && (
-            <span className="rounded bg-metal/15 px-1.5 py-0.5 text-[10px] text-metal">
+            <span className="rounded bg-metal/15 px-1.5 py-0.5 text-[0.625rem] text-metal">
               May be out of date
             </span>
           )}
           {persona?.edited && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
               Edited
             </span>
           )}

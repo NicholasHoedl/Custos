@@ -228,7 +228,7 @@ function EntryRow({
   if (editing) {
     return (
       <div className="flex gap-3 border-l-2 border-primary/50 pl-3">
-        <span className="shrink-0 pt-2 font-mono text-[10px] text-muted-foreground">
+        <span className="shrink-0 pt-2 font-mono text-[0.625rem] text-muted-foreground">
           {formatTime(event.timestamp)}
         </span>
         <div className="flex-1 space-y-1.5">
@@ -237,6 +237,7 @@ function EntryRow({
             onValueChange={setDraft}
             rows={2}
             autoFocus
+            className="font-reading"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault()
@@ -262,10 +263,10 @@ function EntryRow({
 
   return (
     <div className="group relative flex gap-3 border-l-2 border-border pl-3 pr-14">
-      <span className="shrink-0 pt-0.5 font-mono text-[10px] text-muted-foreground">
+      <span className="shrink-0 pt-0.5 font-mono text-[0.625rem] text-muted-foreground">
         {formatTime(event.timestamp)}
       </span>
-      <p className="whitespace-pre-wrap text-sm text-foreground/90">{event.content}</p>
+      <p className="font-reading whitespace-pre-wrap text-sm text-foreground/90">{event.content}</p>
       {/* Revealed on hover OR keyboard focus (P0-1 pattern) — hover-only actions are invisible to tab users. */}
       <div className="absolute right-1 top-0 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
         <button

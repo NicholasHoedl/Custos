@@ -6,7 +6,7 @@ import { cn } from '@renderer/lib/utils'
 // presumed entities dim, matching the strike/italic treatment elsewhere.
 
 const SIZE: Record<'sm' | 'md' | 'lg', string> = {
-  sm: 'size-8 text-[10px]',
+  sm: 'size-8 text-[0.625rem]',
   md: 'size-16 text-lg',
   lg: 'size-24 text-2xl'
 }

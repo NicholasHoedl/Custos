@@ -110,7 +110,7 @@ export function EntityDetail({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span
-                className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+                className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-wider"
                 style={{
                   color: ENTITY_TYPE_COLOR[entity.type],
                   borderColor: ENTITY_TYPE_COLOR[entity.type]
@@ -120,7 +120,7 @@ export function EntityDetail({
                 {ENTITY_TYPE_LABELS[entity.type]}
               </span>
               {entity.status && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                   {entity.status}
                 </span>
               )}
@@ -137,7 +137,7 @@ export function EntityDetail({
               {presumed && <EndIcon className={cn('size-4', markColorDim)} aria-label={endLabel} />}
             </h2>
             {(fallen || presumed) && (
-              <div className={cn('inscribed mt-0.5 text-[11px]', markColor)}>{endLabel}</div>
+              <div className={cn('inscribed mt-0.5 text-[0.6875rem]', markColor)}>{endLabel}</div>
             )}
             {hierarchy && hierarchy.ancestors.length > 0 && (
               <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
@@ -186,7 +186,7 @@ export function EntityDetail({
 
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {entity.description && (
-          <p className="text-sm leading-relaxed text-foreground/90">{entity.description}</p>
+          <p className="font-reading text-sm leading-relaxed text-foreground/90">{entity.description}</p>
         )}
 
         {(entity.traits.length > 0 || entity.goals.length > 0 || entity.flaws.length > 0) && (
@@ -215,7 +215,7 @@ export function EntityDetail({
         </div>
 
         {death && fallen && (
-          <p className="border-t border-border/60 pt-3 font-display text-[13px] italic text-muted-foreground">
+          <p className="border-t border-border/60 pt-3 font-display text-[0.8125rem] italic text-muted-foreground">
             “Another name for the Custos of the Fallen.” — the Keeper
           </p>
         )}

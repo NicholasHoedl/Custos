@@ -71,7 +71,7 @@ export function StatusCombobox({ value, onChange, options, id }: StatusComboboxP
                   />
                   {opt.label}
                   {(opt.lifecycle === 'ended' || opt.lifecycle === 'presumed_ended') && (
-                    <span className="ml-auto text-[10px] text-muted-foreground">
+                    <span className="ml-auto text-[0.625rem] text-muted-foreground">
                       {opt.lifecycle === 'presumed_ended' ? 'presumed ended' : 'ended'}
                     </span>
                   )}

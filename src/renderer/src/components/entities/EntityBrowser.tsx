@@ -213,7 +213,7 @@ function EntityCard({
             />
           )}
           <span
-            className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-wider"
+            className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[0.5625rem] uppercase tracking-wider"
             style={{ color: ENTITY_TYPE_COLOR[entity.type] }}
           >
             <TypeIcon className="size-3" />

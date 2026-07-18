@@ -98,15 +98,52 @@ utilities via `--color-metal` / `--color-blood` (`text-metal`, `text-blood`, `de
 ```
 
 **Accent variants (Settings → Accent color).** The ember accent is user-swappable — Settings offers
-ember (default), cyan, green, red, yellow, purple. Each is a `:root[data-accent='<name>']` block in
-`globals.css` that overrides ONLY the raw `--ember` / `--ember-deep` / `--ember-bright` trio; because every
-accent-derived role (`--primary`, `--accent`, `--ring`) and `--type-pc` resolve *through* those tokens, the
-whole app (including the MC's Web node) re-tints from three lines. Deep bases (red, purple) also set
+ember (default), cyan, green, red, yellow, purple, steel blue, verdigris, oxblood, parchment, dusty rose,
+and indigo. Each is a `:root[data-accent='<name>']` block in `globals.css` that overrides ONLY the raw
+`--ember` / `--ember-deep` / `--ember-bright` trio; because every accent-derived role (`--primary`,
+`--accent`, `--ring`) and `--type-pc` resolve *through* those tokens, the whole app (including the MC's
+Web node) re-tints from three lines. Deep bases (red, purple, steel, oxblood, indigo) also set
 `--primary-foreground: var(--bone)` so ink on a filled button stays legible; ember needs no block — the
 base `:root` IS ember. `AccentColor` + `ACCENT_COLORS` live in `@shared/entity-types`; the picker's
 swatch/label preview is `ACCENT_META` (`renderer/lib/accent.ts`, kept in sync with the CSS by hand + a
 unit test). `applyAccent()` sets `[data-accent]` on `<html>` — AppShell on launch from the saved
 `settings.accentColor`, SettingsView live on each pick.
+
+**Appearance variants (Settings → Appearance, ADR-065).** Four more preferences ride the same
+`[data-*]`-on-`<html>` mechanism as the accent and obey the same contract — each block overrides RAW
+tokens only, never semantic roles, so they stay orthogonal to `[data-accent]` and no combined
+`[data-accent][data-base]` selectors are ever needed. Every default reproduces the pre-ADR-065 look.
+
+- **`[data-ui-scale]`** — compact (15px) / comfortable (the 16px default, no block) / spacious (18px), set
+  on the ROOT font-size. This is an interface **zoom**, not a text-size control: Tailwind v4's spacing
+  scale is `calc(var(--spacing) * N)`, so padding, gaps, widths and radii scale with it. Borders stay a
+  crisp 1px and breakpoints don't move (rem inside a media query resolves against the *initial* root
+  size) — the reason this is preferable to `webFrame.setZoomFactor`. It only reads correctly because the
+  86 hard-coded `text-[Npx]` utilities were converted to rem; arbitrary px stay pinned and would invert
+  the type hierarchy at Spacious.
+- **`[data-base='cold']`** — a cold slate ground for the cold accents (steel / verdigris / indigo), which
+  otherwise sit on a deliberately warm charcoal. Overrides `--char*` / `--iron*` and also cools the
+  `--bone*` / `--ash` inks plus `--destructive-foreground` (the one semantic role written as a literal
+  hex). Deliberately does NOT touch `--primary-foreground` — the accent blocks own it. The `--type-*`
+  graph hues stay warm (ADR-046 already places the graph outside the single-accent register).
+- **`[data-reading-font='serif']`** — swaps `--reading-family`, the source token behind the `font-reading`
+  utility, from the body sans to Fraunces (already bundled, so free). Applied to the ~11 long-form prose
+  elements only, and NEVER where `font-display` already sits: `twMerge('font-display','font-reading')`
+  resolves to `font-reading` and would silently destroy a Fraunces heading. `--font-reading` aliases a
+  *differently named* token on purpose — `@theme inline { --font-reading: var(--font-reading) }` would be
+  self-referential and survive only by cascade luck.
+- **`[data-texture='grain']`** — flips `.app-grain` (an always-mounted, `pointer-events-none` overlay in
+  AppShell painted just under the candle vignette) from `display: none` to visible. The noise is a tiled
+  160×160 SVG `data:` URI, desaturated to grey; no `mix-blend-mode`, because the AppShell frame creates
+  no stacking context.
+
+`UiScale` / `BaseTemperature` / `ReadingFont` / `Texture` and their ordered arrays live in
+`@shared/entity-types`; labels, the `normalizeAppearance()` clamp, `applyAppearance()` and
+`bootstrapAppearance()` are in `renderer/lib/appearance.ts`. `applyAppearance()` writes all four
+attributes (delegating the accent to `applyAccent`, still the sole owner of `[data-accent]`) and is the
+single writer of a `localStorage` mirror; `bootstrapAppearance()` replays that mirror from `main.tsx`
+*before* React renders, so a scale change doesn't reflow the UI once the settings IPC resolves.
+`tests/unit/renderer/appearance.test.ts` guards the clamp and asserts a CSS block exists per union member.
 
 **Web-graph entity-type hues (ADR-046).** The one data-viz surface that steps outside the single-accent
 rule: each entity type gets a muted "heraldry" outline color + a lucide icon on its node (with a legend),

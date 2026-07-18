@@ -13,7 +13,13 @@ export const ACCENT_META: Record<AccentColor, { label: string; swatch: string }>
   green: { label: 'Green', swatch: '#4fa863' },
   red: { label: 'Red', swatch: '#cf463a' },
   yellow: { label: 'Yellow', swatch: '#d4a333' },
-  purple: { label: 'Purple', swatch: '#8f5fbe' }
+  purple: { label: 'Purple', swatch: '#8f5fbe' },
+  steel: { label: 'Steel Blue', swatch: '#4a7fb5' },
+  verdigris: { label: 'Verdigris', swatch: '#3f9285' },
+  oxblood: { label: 'Oxblood', swatch: '#9c4256' },
+  parchment: { label: 'Parchment', swatch: '#c9b78f' },
+  rose: { label: 'Dusty Rose', swatch: '#bf7a88' },
+  indigo: { label: 'Indigo', swatch: '#5f5fb0' }
 }
 
 /** Apply the accent to the document root; globals.css keys its token overrides off `[data-accent]`.

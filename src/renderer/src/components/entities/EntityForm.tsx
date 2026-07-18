@@ -429,7 +429,7 @@ export function EntityForm({
             options={prof.status}
           />
           {(lifecycle === 'ended' || lifecycle === 'presumed_ended') && (
-            <label className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
+            <label className="flex items-center gap-2 pt-0.5 text-[0.6875rem] text-muted-foreground">
               <input
                 type="checkbox"
                 className="size-3.5 accent-primary"
@@ -439,7 +439,7 @@ export function EntityForm({
               Presumed / unconfirmed — believed over, but the party hasn’t confirmed it.
             </label>
           )}
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[0.6875rem] text-muted-foreground">
             Where this stands now — the AI trusts it for “now vs. then.”
           </p>
         </div>

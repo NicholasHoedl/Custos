@@ -7,7 +7,7 @@ import { Toaster } from '@renderer/components/ui/sonner'
 import { TooltipProvider } from '@renderer/components/ui/tooltip'
 import type { OnboardingStatus } from '@shared/recall-types'
 import { ledger } from '@renderer/lib/ipc'
-import { applyAccent } from '@renderer/lib/accent'
+import { applyAppearance } from '@renderer/lib/appearance'
 import { useUiStore } from '@renderer/store/ui-store'
 
 export function AppShell() {
@@ -29,12 +29,14 @@ export function AppShell() {
       .catch(() => setOnboarding({ keyReady: false, modelReady: false, tutorialDone: true }))
   }, [])
 
-  // Apply the saved accent color on launch (globals.css keys off [data-accent]). SettingsView applies
-  // live changes itself, so this only needs to run once at startup; leave the default ember on failure.
+  // Apply the saved appearance on launch — accent, interface scale, base temperature, reading font and
+  // grain (globals.css keys off the [data-*] attributes). main.tsx has already applied the localStorage
+  // mirror pre-paint; this is the authoritative settings.json pass, which also refreshes that mirror.
+  // SettingsView applies live changes itself, so this only runs once; leave the defaults on failure.
   useEffect(() => {
     ledger.settings
       .get()
-      .then((s) => applyAccent(s.accentColor))
+      .then((s) => applyAppearance(s))
       .catch(() => {})
   }, [])
 
@@ -70,6 +72,10 @@ export function AppShell() {
         <main className="flex-1 overflow-hidden">
           <MainPanel />
         </main>
+        {/* Optional film grain (Settings → Appearance, ADR-065) — always mounted, CSS-gated on
+            [data-texture] so React holds no state for it. Non-interactive, and painted just under the
+            vignette; portalled dialogs sit above both by DOM order. */}
+        <div aria-hidden className="app-grain pointer-events-none absolute inset-0 z-50" />
         {/* Grim candle-vignette — non-interactive, darkens the edges (portalled dialogs sit above it). */}
         <div
           aria-hidden

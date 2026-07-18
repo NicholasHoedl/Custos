@@ -315,7 +315,7 @@ export function SuggestView() {
                 </div>
                 {/* Re-roll the same moment, nudged — replaces the spread rather than stacking a transcript. */}
                 <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-                  <span className="inscribed text-[10px]">Refine</span>
+                  <span className="inscribed text-[0.625rem]">Refine</span>
                   {REFINE_NUDGES.map((n) => (
                     <Button
                       key={n}
@@ -338,7 +338,7 @@ export function SuggestView() {
             )}
 
           {suggest.status === 'done' && suggest.result?.ok && suggest.result.cost && (
-            <p className="text-right font-mono text-[10px] text-muted-foreground">
+            <p className="text-right font-mono text-[0.625rem] text-muted-foreground">
               {formatRunCost(suggest.result.cost)}
             </p>
           )}
@@ -419,22 +419,22 @@ function MomentCard({ rec }: { rec: MomentSuggestion }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card/60 p-4">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-primary">
+        <span className="rounded-md bg-primary/15 px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-primary">
           {tagLabel(rec.primaryTag)}
         </span>
         {rec.secondaryTags.map((t) => (
           <span
             key={t}
-            className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+            className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
           >
             {tagLabel(t)}
           </span>
         ))}
       </div>
-      <h3 className="font-display text-[15px] font-medium leading-snug text-foreground">
+      <h3 className="font-display text-[0.9375rem] font-medium leading-snug text-foreground">
         {rec.title}
       </h3>
-      <p className="text-[13px] leading-relaxed text-muted-foreground">{rec.explanation}</p>
+      <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">{rec.explanation}</p>
     </div>
   )
 }
@@ -459,7 +459,9 @@ function DirectionsList({ suggestions }: { suggestions: StorySuggestion[] }) {
             <ul className="space-y-2">
               {items.map((s, i) => (
                 <li key={i} className="rounded-lg border border-border bg-card/60 p-3">
-                  <p className="text-[15px] leading-relaxed text-foreground/90">{s.suggestion}</p>
+                  <p className="font-reading text-[0.9375rem] leading-relaxed text-foreground/90">
+                    {s.suggestion}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">{s.rationale}</p>
                 </li>
               ))}

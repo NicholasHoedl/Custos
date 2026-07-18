@@ -300,7 +300,7 @@ function Section({
       <div className="flex items-center gap-2">
         {bulk && <BulkToggle state={bulk.state} onClick={bulk.onToggle} label={label} />}
         <h3 className="inscribed text-xs">{label}</h3>
-        {count && <span className="text-[11px] text-muted-foreground">{count}</span>}
+        {count && <span className="text-[0.6875rem] text-muted-foreground">{count}</span>}
       </div>
       {children}
     </section>

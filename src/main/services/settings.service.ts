@@ -18,7 +18,13 @@ const DEFAULTS: AppSettings = {
   illuminateEffort: 'medium',
   hotkey: DEFAULT_HOTKEY,
   tutorialCompleted: false, // forced first-run tutorial (ADR-044); flips true on completion
-  accentColor: 'ember' // UI accent hue; the base :root in globals.css IS ember
+  accentColor: 'ember', // UI accent hue; the base :root in globals.css IS ember
+  // Appearance (ADR-065). Each default reproduces the CURRENT look, so an existing install sees no
+  // visual change until the user picks otherwise in Settings → Appearance.
+  uiScale: 'comfortable',
+  baseTemperature: 'warm',
+  readingFont: 'sans',
+  texture: 'none'
 }
 
 function settingsPath(): string {

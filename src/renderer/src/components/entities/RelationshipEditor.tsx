@@ -130,7 +130,7 @@ export function RelationshipEditor({ entity, allEntities }: RelationshipEditorPr
                   <span className="shrink-0 text-muted-foreground">{rel.label}</span>
                   <EntityBadge entity={rel.other} onClick={() => setSelectedEntity(rel.other.id)} />
                   {rel.link.confidence !== 'confirmed' && (
-                    <span className="shrink-0 rounded bg-metal/15 px-1.5 py-0.5 text-[10px] text-metal">
+                    <span className="shrink-0 rounded bg-metal/15 px-1.5 py-0.5 text-[0.625rem] text-metal">
                       {NOTE_CONFIDENCE_LABELS[rel.link.confidence]}
                     </span>
                   )}
@@ -409,7 +409,7 @@ function LinkDialog({ open, onOpenChange, entity, candidates, onCreated }: LinkD
               <CommandGroup>
                 {candidates.map((c) => (
                   <CommandItem key={c.id} value={`${c.name} ${c.type}`} onSelect={() => pick(c)}>
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                    <span className="font-mono text-[0.5625rem] uppercase tracking-wider text-muted-foreground">
                       {ENTITY_TYPE_LABELS[c.type]}
                     </span>
                     <span className="truncate">{c.name}</span>

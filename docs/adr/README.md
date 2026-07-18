@@ -76,6 +76,7 @@ ADR that supersedes the old one (don't edit the old one).
 | [062](062-insert-session-before.md) | Insert session before — backfilling earlier sessions via a uniform renumber shift (amends ADR-017) | Accepted | 2026-07-16 |
 | [063](063-optional-key-before-session-one.md) | Onboarding API key optional (Skip for now) + before-session-1 needs-attention items (revises ADR-044/060) | Accepted | 2026-07-17 |
 | [064](064-feature-request-flow.md) | A "Feedback" section — Report a bug + Request a feature (a second email kind through the same worker; extends ADR-057/058) | Accepted | 2026-07-17 |
+| [065](065-appearance-preferences.md) | Appearance preferences — interface scale, base temperature, reading font, grain (extends ADR-024; revisits the removed `fontSize` stub) | Accepted | 2026-07-18 |
 
 ## Status legend
 

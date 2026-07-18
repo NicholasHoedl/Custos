@@ -60,7 +60,7 @@ export function Sidebar() {
             Custos
           </span>
           {/* A minimalist dictionary gloss — pronunciation + definition (Custos = Latin "keeper"). */}
-          <span className="font-mono text-[10px] tracking-wide text-muted-foreground/60">
+          <span className="font-mono text-[0.625rem] tracking-wide text-muted-foreground/60">
             ˈkus-tōs · keeper, custodian
           </span>
         </div>

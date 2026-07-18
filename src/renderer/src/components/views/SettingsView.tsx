@@ -25,7 +25,18 @@ import { AI_FEATURE_LABELS, type AiFeature, type UsageSummary } from '@shared/us
 import { ledger } from '@renderer/lib/ipc'
 import { formatUsd } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/utils'
-import { ACCENT_COLORS, ACCENT_META, applyAccent } from '@renderer/lib/accent'
+import { ACCENT_COLORS, ACCENT_META } from '@renderer/lib/accent'
+import {
+  applyAppearance,
+  BASE_META,
+  BASE_TEMPERATURES,
+  READING_FONT_META,
+  READING_FONTS,
+  TEXTURE_META,
+  TEXTURES,
+  UI_SCALE_META,
+  UI_SCALES
+} from '@renderer/lib/appearance'
 import { useAppStore } from '@renderer/store/app-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useSettings } from '@renderer/hooks/use-settings'
@@ -64,8 +75,53 @@ function updateLabel(s: UpdateStatus | null): string {
   }
 }
 
+/** A labeled row of mutually-exclusive appearance options. `components/ui` has no toggle-group
+ *  primitive and this isn't worth a dependency, so it mirrors the accent swatches' plain-button +
+ *  aria-pressed pattern. The hint under the row describes the SELECTED option. */
+function OptionRow<T extends string>({
+  label,
+  options,
+  meta,
+  value,
+  onPick
+}: {
+  label: string
+  options: readonly T[]
+  meta: Record<T, { label: string; hint: string }>
+  value: T
+  onPick: (value: T) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <h3 className="inscribed text-xs">{label}</h3>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const active = o === value
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => onPick(o)}
+              aria-pressed={active}
+              className={cn(
+                'rounded-md border px-3 py-1.5 text-sm transition',
+                active
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground'
+              )}
+            >
+              {meta[o].label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-xs text-muted-foreground">{meta[value].hint}</p>
+    </div>
+  )
+}
+
 export function SettingsView() {
-  const { settings, update } = useSettings()
+  const { settings, update, refresh } = useSettings()
   const { status: onb, progress, downloading, error: modelError, download } = useOnboarding()
   const activeCampaignId = useAppStore((s) => s.activeCampaignId)
   const [keyInput, setKeyInput] = useState('')
@@ -206,6 +262,21 @@ export function SettingsView() {
     }
   }
 
+  // Apply an appearance change LIVE, then persist. `useSettings.update()` awaits the IPC and refetches,
+  // so applying first is what makes the change feel instant. If the write fails we re-apply the last
+  // persisted settings, so the highlighted option and the actual appearance can never disagree — the
+  // silent mismatch the accent picker originally shipped with.
+  async function pickAppearance(patch: Partial<AppSettings>): Promise<void> {
+    applyAppearance({ ...(settings ?? {}), ...patch })
+    try {
+      await ledger.settings.set(patch)
+      refresh()
+    } catch (e) {
+      applyAppearance(settings)
+      toast.error('Setting not saved', { description: String(e) })
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PaneHeader icon={Settings} title="Settings" />
@@ -260,48 +331,84 @@ export function SettingsView() {
 
         <Separator />
 
-        <section className="space-y-3">
+        <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Palette className="size-4 text-primary" />
-            <h2 className="font-display text-lg font-medium text-foreground">Accent color</h2>
+            <h2 className="font-display text-lg font-medium text-foreground">Appearance</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            The single accent the app uses for focus, active state, and highlights. Ember is the
-            default — pick another to re-tint everything.
+            How Custos looks. Every change applies instantly and is remembered for next launch.
           </p>
-          <div className="flex flex-wrap gap-3">
-            {ACCENT_COLORS.map((c) => {
-              const active = (settings?.accentColor ?? 'ember') === c
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => {
-                    applyAccent(c) // live, before the persist round-trip
-                    void update({ accentColor: c })
-                  }}
-                  aria-label={ACCENT_META[c].label}
-                  aria-pressed={active}
-                  className="group flex flex-col items-center gap-1.5"
-                >
-                  <span
-                    className={cn(
-                      'size-9 rounded-full ring-offset-2 ring-offset-background transition',
-                      active
-                        ? 'ring-2 ring-foreground'
-                        : 'ring-1 ring-border group-hover:ring-foreground/40'
-                    )}
-                    style={{ backgroundColor: ACCENT_META[c].swatch }}
-                  />
-                  <span
-                    className={cn('text-xs', active ? 'text-foreground' : 'text-muted-foreground')}
+
+          <div className="space-y-1.5">
+            <h3 className="inscribed text-xs">Accent</h3>
+            <p className="text-sm text-muted-foreground">
+              The single accent used for focus, active state, and highlights. Ember is the default —
+              pick another to re-tint everything.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              {ACCENT_COLORS.map((c) => {
+                const active = (settings?.accentColor ?? 'ember') === c
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => void pickAppearance({ accentColor: c })}
+                    aria-label={ACCENT_META[c].label}
+                    aria-pressed={active}
+                    className="group flex flex-col items-center gap-1.5"
                   >
-                    {ACCENT_META[c].label}
-                  </span>
-                </button>
-              )
-            })}
+                    <span
+                      className={cn(
+                        'size-9 rounded-full ring-offset-2 ring-offset-background transition',
+                        active
+                          ? 'ring-2 ring-foreground'
+                          : 'ring-1 ring-border group-hover:ring-foreground/40'
+                      )}
+                      style={{ backgroundColor: ACCENT_META[c].swatch }}
+                    />
+                    <span
+                      className={cn(
+                        'text-xs',
+                        active ? 'text-foreground' : 'text-muted-foreground'
+                      )}
+                    >
+                      {ACCENT_META[c].label}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
+
+          <OptionRow
+            label="Interface scale"
+            options={UI_SCALES}
+            meta={UI_SCALE_META}
+            value={settings?.uiScale ?? 'comfortable'}
+            onPick={(v) => void pickAppearance({ uiScale: v })}
+          />
+          <OptionRow
+            label="Base tone"
+            options={BASE_TEMPERATURES}
+            meta={BASE_META}
+            value={settings?.baseTemperature ?? 'warm'}
+            onPick={(v) => void pickAppearance({ baseTemperature: v })}
+          />
+          <OptionRow
+            label="Reading font"
+            options={READING_FONTS}
+            meta={READING_FONT_META}
+            value={settings?.readingFont ?? 'sans'}
+            onPick={(v) => void pickAppearance({ readingFont: v })}
+          />
+          <OptionRow
+            label="Background texture"
+            options={TEXTURES}
+            meta={TEXTURE_META}
+            value={settings?.texture ?? 'none'}
+            onPick={(v) => void pickAppearance({ texture: v })}
+          />
         </section>
 
         <Separator />

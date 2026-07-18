@@ -378,7 +378,35 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   stays reachable via the palette command + the OS-global **Ctrl+Alt+L**; **Ctrl+F** (sidebar search)
   unchanged. e2e: `tests/e2e/palette.spec.ts` (keyless — pure nav). The dead `fontSize`/`ThemeMode`
   `AppSettings` stubs were removed (never read; app is dark-only via globals.css + hardcoded
-  `Toaster theme="dark"`); the `'import'` ViewKey was already gone (ADR-036).
+  `Toaster theme="dark"`); the `'import'` ViewKey was already gone (ADR-036). **ADR-065 re-instates a
+  scale control** — this time actually wired (next bullet); dark-only still holds.
+- **Appearance prefs (ADR-065): four more `[data-*]` knobs on `<html>`, riding the accent's mechanism.**
+  `UiScale` (`compact|comfortable|spacious`) · `BaseTemperature` (`warm|cold`) · `ReadingFont`
+  (`sans|serif`) · `Texture` (`none|grain`) sit in `@shared/entity-types` beside `ACCENT_COLORS`, with
+  optional `AppSettings` fields + `settings.service` defaults that reproduce the CURRENT look (an existing
+  install sees no change). `renderer/lib/appearance.ts` owns the labels, a `normalizeAppearance()` clamp
+  (the ONLY validation on either untrusted path — `settings.service` spreads `settings.json` unvalidated,
+  and the localStorage mirror is equally untrusted), `applyAppearance()` (writes all four attrs,
+  **delegates the accent to `applyAccent`** so `accent.ts` stays the sole owner of `[data-accent]`, and is
+  the SINGLE writer of the mirror), and `bootstrapAppearance()` — called from `main.tsx` BEFORE
+  `createRoot()` so a scale change doesn't reflow the app after the settings IPC resolves (an inline
+  `<script>` would be earlier but is CSP-blocked: `script-src 'self'`). Every block overrides **RAW tokens
+  only**, keeping the four orthogonal to `[data-accent]` — no combined selectors. **GOTCHAS:** (1)
+  `[data-ui-scale]` sets the ROOT font-size, which in Tailwind v4 zooms spacing/widths/radii too
+  (`calc(var(--spacing) * N)`) — it is an interface ZOOM, and it only reads right because the 86 hardcoded
+  `text-[Npx]` utilities were converted to **rem** (arbitrary px stay pinned and invert the hierarchy at
+  Spacious); borders stay 1px and breakpoints don't move, which is why this beats `webFrame.setZoomFactor`.
+  (2) `--font-reading` aliases a *differently named* `--reading-family` — `@theme inline { --font-reading:
+  var(--font-reading) }` is self-referential and survives only by cascade luck. (3) `font-reading` goes on
+  the ~11 long-form prose elements and **NEVER where `font-display` sits** — `twMerge('font-display',
+  'font-reading')` → `font-reading`, silently killing a Fraunces heading (hence `import-rows.tsx:269` is
+  deliberately EXCLUDED: its row already sets `font-display italic`). (4) the cold base must NOT touch
+  `--primary-foreground` (the accent blocks own it) but MUST include `--destructive-foreground`, the one
+  literal-hex semantic role. (5) `.app-grain` is always mounted and CSS-gated (`display:none` when off),
+  tiled 160×160, and uses no `mix-blend-mode` (the AppShell frame creates no stacking context). Settings
+  hosts all five under one **Appearance** section (`OptionRow`, a local segmented control — there is no
+  toggle-group primitive in `components/ui`); `tests/unit/renderer/appearance.test.ts` guards the clamp
+  and asserts a CSS block exists per union member.
 - **Portraits + Web graph (docs/ROADMAP.md P2-2/P2-3, ADR-039/040):** every entity has an optional
   **portrait** — a base64 JPEG **thumbnail** in the nullable `entity.image` column (**migration 0011**,
   the arc's first; a 1-line `ALTER`). Set via `entity:pickImage` (`ipc/entity.ts` → Electron `nativeImage`
