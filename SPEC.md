@@ -1,9 +1,9 @@
 # Custos — Product Specification
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25 · **Last currency review:** 2026-07-17 (through ADR-064)
+**Date:** 2026-06-25 · **Last currency review:** 2026-07-21 (through ADR-065)
 **Status:** Implemented and shipping (v0.1.0). This is the founding MVP spec; the product has since evolved
-through 64 ADRs. **§10 ("Delivered beyond the MVP") and [`docs/adr/`](docs/adr/README.md) are the
+through 65 ADRs. **§10 ("Delivered beyond the MVP") and [`docs/adr/`](docs/adr/README.md) are the
 authoritative record of the current state** — where they disagree with the MVP body below, they win.
 
 ---
@@ -513,6 +513,15 @@ on the Sessions page adds a new empty session at any existing session's number, 
 everything later (notes, chronicle entries, and all chronology stamps travel with them) up by one in a
 single transaction. Existing sessions never change relative order, so recorded history can't invert;
 "Before tracking" facts stay before everything.
+
+**Appearance preferences** (ADR-065) — a Settings **Appearance** section adds four wired display controls
+beside the accent (now **12** hues): **interface scale** (compact / comfortable / spacious — a real
+rem-based zoom that scales spacing and radii too, not just type), **base tone** (the warm Ash-and-Ember
+charcoal or a cold slate that suits the cold accents), **reading font** (the body sans or the Fraunces
+serif for long-form prose), and an optional **background grain**. Each rides the accent's mechanism (a
+`[data-*]` attribute on `<html>` over raw tokens), with a pre-paint bootstrap so a scale change never
+reflows the app. This is the wired interface scale the founding `fontSize`/`theme` stubs (§4) never
+delivered — they were removed as dead code, then re-instated here. No migration.
 
 Still not built (per §4 / §7): multi-user or sync, mobile companion, VTT / dice / initiative,
 character-sheet stats, audio transcription, and map attachments. The nearest queued follow-up is an

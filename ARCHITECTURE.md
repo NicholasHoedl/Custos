@@ -1,7 +1,7 @@
 # Custos — Architecture Document
 
 **Version:** 0.1 (MVP Planning)
-**Date:** 2026-06-25 · **Last currency review:** 2026-07-17 (through ADR-064)
+**Date:** 2026-06-25 · **Last currency review:** 2026-07-21 (through ADR-065)
 **Status:** Implemented — this is the original MVP architecture plan. Several subsystems have since
 evolved; **where this document and the ADRs disagree, the ADRs win.** Authoritative deltas: the vector
 store is **brute-force JS cosine, not `sqlite-vec`** (ADR-012); Suggest's "in the moment" mode is a
@@ -22,7 +22,7 @@ manual **Illuminate** (035), plus the Chronicle-header consolidation (036); **se
 chronicle entries (037); entity **merge** (038); entity **portraits** (039); the **"Web"** relationship graph
 (040); an env-gated **fake-AI e2e seam** (041/043); the **electron-updater** distribution stack + proprietary
 license (042); and a **forced first-run tutorial** (setup-only) with an always-available **Quickstart guide**
-(044/045). **A further arc (ADR-046–064) then continued:** per-type Web-graph colour (046) and UI cohesion —
+(044/045). **A further arc (ADR-046–065) then continued:** per-type Web-graph colour (046) and UI cohesion —
 one compact page header + grouped nav (047); Counsel **narrative cards** (048) and the Converse **follow-up
 loop** (049); Web-graph **enrichment + a session time slider** (050) and **legibility at scale** (053);
 **standalone Extract / Illuminate / Transcribe on the Sessions page — the Chronicle "close out" wizard is
@@ -31,8 +31,8 @@ retired** (051); the **local embedder upgrade to `gte-base-en-v1.5` + a cross-en
 the **Continuity** consistency audit (056); **in-app bug reports and feature requests** via a Cloudflare-Worker
 email intake (057/058/064); a **spotlight first-run tutorial** (059/060, superseding 044/045); the **Home
 dashboard** as the default landing view (061); **insert-session-before** backfill (062); and an **optional
-onboarding API key** (063). See [`docs/adr/README.md`](docs/adr/README.md) for the authoritative current index
-(**ADR-001–064**). The data model and module sections below are reconciled to match where noted; older
+onboarding API key** (063); and **appearance preferences — interface scale, base tone, reading font, grain** (065). See [`docs/adr/README.md`](docs/adr/README.md) for the authoritative current index
+(**ADR-001–065**). The data model and module sections below are reconciled to match where noted; older
 narrative sections remain MVP-era where the ADRs supersede them.
 
 ---
@@ -102,7 +102,7 @@ strike + skull + ghosting, not color** — see the death motif in `theme.md`.
 
 **Design-language guardrails (the governing rule — unchanged across re-themes):** Past attempts to make a UI
 "feel like a ledger" produced *generic shadcn components recolored beige*. Do **not** do that. The identity
-is a committed **grim, warm-charcoal canvas with a single dying-ember accent** — not parchment, not
+is a committed **grim, warm-charcoal canvas with a single sharp accent (dying-ember by default)** — not parchment, not
 skeuomorphic paper, not beige. The "ledger" character comes from **typography, structure, and the death
 motif** (Fraunces display at large sizes with weight extremes; Bricolage Grotesque body; JetBrains Mono for
 IDs/timestamps; the `.inscribed` small-caps pewter labels; layered charcoal surfaces for depth; the

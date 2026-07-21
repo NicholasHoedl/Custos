@@ -61,7 +61,7 @@ also check manually from **Settings → Your data → Check for updates**.
 The first time you open Custos, a short guided tour walks you through creating your campaign and its main
 character. Capture works right away — but the AI features need your own **Anthropic API key** (get one at
 [console.anthropic.com](https://console.anthropic.com/settings/keys)) and a one-time download of the local
-search model (~230 MB):
+search model (~225 MB):
 
 - **Lore** and **Counsel** need both the key and the search model.
 - **Converse** and the **Character** tools need only the key.

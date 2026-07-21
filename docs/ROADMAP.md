@@ -141,6 +141,8 @@ action clusters (NoteCard edit/delete, `RelationshipEditor` icons) also reveal o
 
 - **R-1 ☑ `fontSize`**: dead setting (declared + defaulted, read nowhere) — remove from `AppSettings`
   + defaults, or wire it. Decision: remove.
+  → **Update (ADR-065):** a wired interface scale (`UiScale`) was later re-instated as one of the
+  Appearance preferences — distinct from this dead stub, and actually read this time.
 - **R-2 ☑ `ThemeMode`**: single-variant union pretending to be a choice — collapse to a constant;
   dark IS the brand.
 - **R-3 ☑ `'import'` ViewKey**: vestigial since Transcribe left the nav (ADR-036).
