@@ -139,7 +139,7 @@ export function fakeDirections(): StorySuggestion[] {
 export function fakeConverse(): ConverseQuestion[] {
   return [
     {
-      question: 'It has been a long road for you — how are you holding up, truly?',
+      question: 'That was a long road. How are you holding up?',
       tag: 'rapport',
       read: 'Opens warmly to earn a little trust before pressing.'
     },
@@ -156,7 +156,7 @@ export function fakeConverse(): ConverseQuestion[] {
     {
       question: 'What is the one thing you are hoping no one here finds out?',
       tag: 'secret-seeking',
-      read: 'A high-cost probe — worth the risk only after some rapport.'
+      read: 'A high-cost probe, worth the risk only after some rapport.'
     }
   ]
 }

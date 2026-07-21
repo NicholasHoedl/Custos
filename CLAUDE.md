@@ -240,11 +240,23 @@ Transformers.js embeddings · Anthropic SDK (main-process only).
   `CONVERSE_INSTRUCTIONS` keeps questions in-character but SHORT + spoken + flourish-free (a "SOUND LIKE A
   REAL PERSON" section mirroring Recall's RESTRAINT/RIGHT-SIZE, a **few-shot** of tight example questions,
   and a firm boundary that the `question` is ONLY what's said out loud — all strategy stays in the `read`);
-  this is prompt tuning, NOT a plain-English pivot like Counsel (Converse stays in-voice). **Converse
+  this is prompt tuning, NOT a plain-English pivot like Counsel (Converse stays in-voice). **THE DASH-PIVOT
+  FIX (the one to know):** output kept coming back as written prose ("The name Black Spider — you run into
+  that before?") *even though line 1 of the prompt forbade exactly that* — because the INSTRUCTION BLOCK
+  ITSELF was dash-saturated, and a model mirrors the REGISTER of its instructions over a stated rule about
+  register. So `CONVERSE_INSTRUCTIONS` **and** `buildConverseUserContent` are now em-dash-free; the few-shot
+  grew from 3 to **TEN** examples picked for RANGE (four are bare one-beat lines like "What aren't you
+  telling me?", spanning all four trust tiers, 5–13 words, warm→cold — the old set was three two-beat
+  setup-then-ask lines, so the model only ever wrote that shape); and a **NEVER WRITE A LINE LIKE THESE**
+  block names the banned patterns (no em-dash, no noun-phrase pivot, keep the auxiliary verb, no
+  self-interrupting aside, no noir register) with four "Not this:" demonstrations. Those negatives hold the
+  ONLY em-dashes left in the prompt, deliberately. `fakeConverse` carried the same pattern and is cleaned
+  too. Guarded by `converse-prompt.test.ts`: every `- question:` few-shot line must be dash-free. **Converse
   follow-up loop + speed (ADR-049):**
   `ConverseRequest.history?: { question, answer }[]` (the EXCHANGES so far — the question the player used +
   the target's answer, oldest-first; mirrors Recall) → the model returns FOLLOW-UP questions that build on
-  the specific exchange (`buildConverseUserContent` renders each as `You asked "Q" — They said "A"`; the
+  the specific exchange (`buildConverseUserContent` renders each as `You asked "Q"` then `They said "A"` on
+  its own line; the
   `CONVERSE_INSTRUCTIONS` FOLLOW UP rule says PROGRESS not restart — skip openers, react to how they
   answered, don't repeat last turn's tags; FUNNEL's "open with a low-cost question" is scoped to the OPENING
   round). To follow up you MUST **pick one of the four cards** (a "Follow up on this →" button on the latest

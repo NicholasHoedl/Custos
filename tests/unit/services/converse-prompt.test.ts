@@ -9,6 +9,17 @@ vi.mock('electron', () => ({
 
 const { buildConverseSystem, buildConverseUserContent, confidenceTag } =
   await import('../../../src/main/services/claude.service')
+const { fakeConverse } = await import('../../../src/main/services/ai-fake')
+
+const CTX = {
+  campaignName: 'Phandelver',
+  campaignDescription: 'a frontier town',
+  pcName: 'Vargas',
+  pcRace: 'elf',
+  pcClass: 'wizard',
+  persona: 'THE-CHARACTER-BRIEF',
+  voiceExamples: ['Coin first, questions later.']
+}
 
 const TARGET = {
   name: 'Glasstaff',
@@ -50,6 +61,30 @@ describe('converse prompt assembly', () => {
     expect(text).toContain('Coin first, questions later.')
     // The cacheable breakpoint rides the last block (the voice block carries its own).
     expect(sys[sys.length - 1].cache_control).toEqual({ type: 'ephemeral' })
+  })
+
+  // The dash-pivot regression: a noun-phrase setup, an em-dash, then the real question ("The name Black
+  // Spider — you run into that before?"). It reads as written prose, not speech. The prompt now bans it
+  // outright and shows it ONLY as a negative, so the positive few-shot must stay clean, or the model
+  // learns the pattern from the very examples meant to prevent it.
+  it('bans the em-dash pivot and keeps every positive example free of it', () => {
+    const text = buildConverseSystem(CTX)
+      .map((b) => b.text)
+      .join('\n')
+    expect(text).toContain('No em-dash anywhere in a spoken line')
+    const positives = text.split('\n').filter((l) => l.startsWith('- question:'))
+    // The expanded, deliberately diverse few-shot (bare one-beat lines through to two-beat setups).
+    expect(positives.length).toBeGreaterThanOrEqual(8)
+    for (const line of positives) expect(line).not.toContain('—')
+    // The negatives DO contain the dash on purpose, so they are what teaches the ban.
+    expect(text).toContain('Not this: "The name Ashen Hand — you run into that before?"')
+  })
+
+  it('the canned fake questions model the same plain style', () => {
+    for (const q of fakeConverse()) {
+      expect(q.question).not.toContain('—')
+      expect(q.read).not.toContain('—')
+    }
   })
 
   it('confidenceTag marks rumored/suspected notes and leaves confirmed unmarked', () => {
