@@ -87,7 +87,7 @@ curl -X POST https://custos-bugreport.<your-subdomain>.workers.dev/ \
 Expected: `{"ok":true}` and an email in CustosService@outlook.com within seconds (check junk the
 first time). Re-run without the `x-custos-report` header to confirm you get a `401`. To smoke-test a
 feature request, add `\"kind\":\"feature\"` + `\"problem\":\"…\"` + `\"proposedFeature\":\"…\"` to the
-body (and drop `description`) — expect a `[Custos] Feature request` email.
+body (and drop `description`) — expect a `[Custos] Feature request` email. (Both kinds append ` from <name>` to the subject when a name is supplied, so the bug smoke-test above arrives as `[Custos] Bug report from Smoke test`.)
 
 ## Step 6 — Turn auto-send on in the app
 
